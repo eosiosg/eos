@@ -64,6 +64,7 @@ namespace eosio { namespace chain {
     result.pending_schedule                      = pending_schedule;
     result.dpos_proposed_irreversible_blocknum   = dpos_proposed_irreversible_blocknum;
     result.bft_irreversible_blocknum             = bft_irreversible_blocknum;
+    result.pbft_stable_checkpoint_blocknum       = pbft_stable_checkpoint_blocknum;
 
     result.producer_to_last_implied_irb[prokey.producer_name] = result.dpos_proposed_irreversible_blocknum;
     result.dpos_irreversible_blocknum                         = result.calc_dpos_last_irreversible(); 
@@ -91,7 +92,7 @@ namespace eosio { namespace chain {
 
    bool block_header_state::maybe_promote_pending() {
       if( pending_schedule.producers.size() &&
-          dpos_irreversible_blocknum >= pending_schedule_lib_num )
+          bft_irreversible_blocknum >= pending_schedule_lib_num )
       {
          active_schedule = move( pending_schedule );
 
@@ -101,7 +102,7 @@ namespace eosio { namespace chain {
             if( existing != producer_to_last_produced.end() ) {
                new_producer_to_last_produced[pro.producer_name] = existing->second;
             } else {
-               new_producer_to_last_produced[pro.producer_name] = dpos_irreversible_blocknum;
+               new_producer_to_last_produced[pro.producer_name] = bft_irreversible_blocknum;
             }
          }
 
@@ -111,7 +112,7 @@ namespace eosio { namespace chain {
             if( existing != producer_to_last_implied_irb.end() ) {
                new_producer_to_last_implied_irb[pro.producer_name] = existing->second;
             } else {
-               new_producer_to_last_implied_irb[pro.producer_name] = dpos_irreversible_blocknum;
+               new_producer_to_last_implied_irb[pro.producer_name] = bft_irreversible_blocknum;
             }
          }
 
@@ -163,7 +164,7 @@ namespace eosio { namespace chain {
      /// below this point is state changes that cannot be validated with headers alone, but never-the-less,
      /// must result in header state changes
 
-    result.set_confirmed( h.confirmed );
+//    result.set_confirmed( h.confirmed );
 
     auto was_pending_promoted = result.maybe_promote_pending();
 

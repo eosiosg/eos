@@ -69,9 +69,12 @@ namespace eosio { namespace chain {
           * it is removed unless it is the head block.
           */
          signal<void(block_state_ptr)> irreversible;
+       void set_bft_irreversible( block_id_type id );
 
-      private:
-         void set_bft_irreversible( block_id_type id );
+       void set_latest_checkpoint( block_id_type id);
+
+
+   private:
          unique_ptr<fork_database_impl> my;
    };
 

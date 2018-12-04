@@ -120,6 +120,8 @@ namespace eosio {
 
    class net_plugin_impl {
    public:
+      net_plugin_impl();
+
       unique_ptr<tcp::acceptor>        acceptor;
       tcp::endpoint                    listen_endpoint;
       string                           p2p_address;
@@ -150,10 +152,12 @@ namespace eosio {
       unique_ptr<boost::asio::steady_timer> connector_check;
       unique_ptr<boost::asio::steady_timer> transaction_check;
       unique_ptr<boost::asio::steady_timer> keepalive_timer;
+      unique_ptr<boost::asio::steady_timer> pbft_message_cache_timer;
       boost::asio::steady_timer::duration   connector_period;
       boost::asio::steady_timer::duration   txn_exp_period;
       boost::asio::steady_timer::duration   resp_expected_period;
       boost::asio::steady_timer::duration   keepalive_interval{std::chrono::seconds{32}};
+      boost::asio::steady_timer::duration   pbft_message_cache_tick_interval{std::chrono::seconds{1}};
       int                           max_cleanup_time_ms = 0;
 
       const std::chrono::system_clock::duration peer_authentication_interval{std::chrono::seconds{1}}; ///< Peer clock may be no more than 1 second skewed from our clock, including network latency.
@@ -172,7 +176,21 @@ namespace eosio {
 
       bool                          use_socket_read_watermark = false;
 
+      std::unordered_map<digest_type, time_point_sec> pbft_message_cache{};
+      const int                           pbft_message_cache_TTL = 6;
+
       channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
+      eosio::chain::plugin_interface::pbft::outgoing::prepare_channel::channel_type::handle pbft_outgoing_prepare_subscription;
+      eosio::chain::plugin_interface::pbft::outgoing::commit_channel::channel_type::handle pbft_outgoing_commit_subscription;
+      eosio::chain::plugin_interface::pbft::outgoing::view_change_channel::channel_type::handle pbft_outgoing_view_change_subscription;
+      eosio::chain::plugin_interface::pbft::outgoing::new_view_channel::channel_type::handle pbft_outgoing_new_view_subscription;
+      eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel::channel_type::handle pbft_outgoing_checkpoint_subscription;
+
+      eosio::chain::plugin_interface::pbft::incoming::prepare_channel::channel_type& pbft_incoming_prepare_channel;
+      eosio::chain::plugin_interface::pbft::incoming::commit_channel::channel_type& pbft_incoming_commit_channel;
+      eosio::chain::plugin_interface::pbft::incoming::view_change_channel::channel_type& pbft_incoming_view_change_channel;
+      eosio::chain::plugin_interface::pbft::incoming::new_view_channel::channel_type& pbft_incoming_new_view_channel;
+      eosio::chain::plugin_interface::pbft::incoming::checkpoint_channel::channel_type& pbft_incoming_checkpoint_channel;
 
       void connect( connection_ptr c );
       void connect( connection_ptr c, tcp::resolver::iterator endpoint_itr );
@@ -220,13 +238,33 @@ namespace eosio {
       void handle_message( connection_ptr c, const sync_request_message &msg);
       void handle_message( connection_ptr c, const signed_block &msg);
       void handle_message( connection_ptr c, const packed_transaction &msg);
+      //pbft messages
+      bool maybe_add_pbft_cache(const digest_type &digest);
+      void clean_expired_pbft_cache();
 
-      void start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection);
+      void pbft_outgoing_prepare(const pbft_prepare &prepare);
+      void pbft_outgoing_commit(const pbft_commit &commit);
+      void pbft_outgoing_view_change(const pbft_view_change &view_change);
+      void pbft_outgoing_new_view(const pbft_new_view &new_view);
+      void pbft_outgoing_checkpoint(const pbft_checkpoint &checkpoint);
+
+      void handle_message( connection_ptr c, const pbft_prepare &msg);
+      void handle_message( connection_ptr c, const pbft_commit &msg);
+      void handle_message( connection_ptr c, const pbft_view_change &msg);
+      void handle_message( connection_ptr c, const pbft_new_view &msg);
+      void handle_message( connection_ptr c, const pbft_checkpoint &msg);
+      void handle_message( connection_ptr c, const pbft_stable_checkpoint &msg);
+      void handle_message( connection_ptr c, const checkpoint_request_message &msg);
+
+
+       void start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection);
       void start_txn_timer( );
       void start_monitors( );
 
       void expire_txns( );
       void connection_monitor(std::weak_ptr<connection> from_connection);
+
+      void pbft_message_cache_ticker();
       /** \name Peer Timestamps
        *  Time message handling
        *  @{
@@ -564,6 +602,7 @@ namespace eosio {
       bool enqueue_sync_block();
       void request_sync_blocks (uint32_t start, uint32_t end);
 
+      void request_sync_checkpoints(uint32_t start, uint32_t end);
       void cancel_wait();
       void sync_wait();
       void fetch_wait();
@@ -832,6 +871,7 @@ namespace eosio {
 
    void connection::blk_send_branch() {
       controller &cc = my_impl->chain_plug->chain();
+      pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
       uint32_t head_num = cc.fork_db_head_block_num ();
       notice_message note;
       note.known_blocks.mode = normal;
@@ -872,6 +912,7 @@ namespace eosio {
       }
 
       vector<signed_block_ptr> bstack;
+      vector<pbft_stable_checkpoint> scp_stack;
       block_id_type null_id;
       for (auto bid = head_id; bid != null_id && bid != lib_id; ) {
          try {
@@ -886,6 +927,10 @@ namespace eosio {
             if ( b ) {
                bid = b->previous;
                bstack.push_back(b);
+               auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(b->id());
+               if ( !(scp == pbft_stable_checkpoint{})) {
+                   scp_stack.push_back(scp);
+               }
             }
             else {
                break;
@@ -901,6 +946,10 @@ namespace eosio {
             while (bstack.size()) {
                enqueue(*bstack.back());
                bstack.pop_back();
+            }
+            while (scp_stack.size()) {
+                enqueue(scp_stack.back());
+                scp_stack.pop_back();
             }
          }
          fc_ilog(logger, "Sent ${n} blocks on my fork",("n",count));
@@ -1196,6 +1245,14 @@ namespace eosio {
       sync_wait();
    }
 
+   void connection::request_sync_checkpoints(uint32_t start, uint32_t end) {
+       wlog("request sync checkpoints");
+       checkpoint_request_message srm = {start,end};
+       enqueue( net_message(srm));
+       sync_wait();
+   }
+
+
    bool connection::process_next_message(net_plugin_impl& impl, uint32_t message_length) {
       try {
          // If it is a signed_block, then save the raw message for the cache
@@ -1386,6 +1443,7 @@ namespace eosio {
             fc_ilog(logger, "requesting range ${s} to ${e}, from ${n}",
                     ("n",source->peer_name())("s",start)("e",end));
             source->request_sync_blocks(start, end);
+            source->request_sync_checkpoints(start, end);
             sync_last_requested_num = end;
          }
       }
@@ -1452,10 +1510,13 @@ namespace eosio {
       // 3  my head block num <= peer head block num - update sync state and send a catchup request
       // 4  my head block num > peer block num ssend a notice catchup if this is not the first generation
       //
+      // 5. my checkpoint height < peer lib - start request checkpoints
+      //
       //-----------------------------
 
       uint32_t head = cc.fork_db_head_block_num( );
       block_id_type head_id = cc.fork_db_head_block_id();
+      uint32_t head_checkpoint = cc.last_stable_checkpoint_block_num();
       if (head_id == msg.head_id) {
          fc_dlog(logger, "sync check state 0");
          // notify peer of our pending transactions
@@ -1488,12 +1549,19 @@ namespace eosio {
          return;
       }
 
+      if (head_checkpoint < peer_lib) {
+          wlog("request checkpoints from peer");
+          checkpoint_request_message crm;
+          crm.start_block = head_checkpoint;
+          crm.end_block = peer_lib;
+          c->enqueue( crm );
+      }
+
       if (head <= msg.head_num ) {
          fc_dlog(logger, "sync check state 3");
          verify_catchup (c, msg.head_num, msg.head_id);
          return;
-      }
-      else {
+      } else {
          fc_dlog(logger, "sync check state 4");
          if (msg.generation > 1 ||  c->protocol_version > proto_base) {
             notice_message note;
@@ -2477,6 +2545,33 @@ namespace eosio {
       }
    }
 
+   void net_plugin_impl::handle_message(  connection_ptr c, const checkpoint_request_message &msg) {
+
+       if ( msg.end_block == 0) return;
+
+       wlog("received checkpoint request message");
+       vector<pbft_stable_checkpoint> scp_stack;
+       controller &cc = my_impl->chain_plug->chain();
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+
+       for (auto i = msg.start_block; i <= msg.end_block; ++i) {
+           if (i > 0) {
+               auto bid = cc.get_block_id_for_num(i);
+               auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(bid);
+               if (!(scp == pbft_stable_checkpoint{})) {
+                   scp_stack.push_back(scp);
+               }
+           }
+       }
+
+       while (scp_stack.size()) {
+           c->enqueue(scp_stack.back());
+           scp_stack.pop_back();
+       }
+
+       fc_ilog(logger, "Sent ${n} stable checkpoints on my node",("n",scp_stack.size()));
+   }
+
    void net_plugin_impl::handle_message( connection_ptr c, const packed_transaction &msg) {
       fc_dlog(logger, "got a packed transaction, cancel wait");
       peer_ilog(c, "received packed_transaction");
@@ -2580,6 +2675,150 @@ namespace eosio {
       }
    }
 
+   void net_plugin_impl::pbft_outgoing_prepare(const pbft_prepare &prepare){
+       for(auto conn: connections){
+           conn->enqueue(prepare);
+       }
+   }
+
+    void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &commit){
+        for(auto conn: connections){
+            conn->enqueue(commit);
+        }
+    }
+
+    void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &view_change){
+        for(auto conn: connections){
+            conn->enqueue(view_change);
+        }
+    }
+
+    void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &new_view){
+        for(auto conn: connections){
+            conn->enqueue(new_view);
+        }
+    }
+
+    void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &checkpoint){
+        for(auto conn: connections){
+            conn->enqueue(checkpoint);
+        }
+    }
+
+    bool net_plugin_impl::maybe_add_pbft_cache(const digest_type &digest){
+       auto itr = pbft_message_cache.find(digest);
+       if(itr == pbft_message_cache.end()){
+           //add to cache
+           pbft_message_cache[digest] = time_point_sec(time_point::now()) + pbft_message_cache_TTL;
+           return true;
+       }
+       return false;
+   }
+    void net_plugin_impl::clean_expired_pbft_cache(){
+        auto itr = pbft_message_cache.begin();
+        auto now = time_point::now();
+
+        while (itr != pbft_message_cache.end()) {
+            if (itr->second <= now) {
+                itr = pbft_message_cache.erase(itr);
+            } else
+                itr++;
+        }
+   }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
+//        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
+        if(!msg.is_signature_valid())
+            return;
+        pbft_incoming_prepare_channel.publish(msg);
+        auto digest = msg.digest();
+        auto added = maybe_add_pbft_cache(digest);
+        if(added){
+            for(auto conn: connections){
+                if(conn != c){
+                    conn->enqueue(msg);
+                }
+            }
+        }
+    }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
+//        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
+        if(!msg.is_signature_valid())
+            return;
+        pbft_incoming_commit_channel.publish(msg);
+        auto digest = msg.digest();
+        auto added = maybe_add_pbft_cache(digest);
+        if(added){
+            for(auto conn: connections){
+                if(conn != c){
+                    conn->enqueue(msg);
+                }
+            }
+        }
+    }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
+//       ilog("net plugin received pbft_view_change");
+        if(!msg.is_signature_valid())
+            return;
+        pbft_incoming_view_change_channel.publish(msg);
+        auto digest = msg.digest();
+        auto added = maybe_add_pbft_cache(digest);
+        if(added){
+            for(auto conn: connections){
+                if(conn != c){
+                    conn->enqueue(msg);
+                }
+            }
+        }
+    }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
+//        ilog("net plugin received pbft_new_view");
+        if(!msg.is_signature_valid())
+            return;
+        pbft_incoming_new_view_channel.publish(msg);
+        auto digest = msg.digest();
+        auto added = maybe_add_pbft_cache(digest);
+        if(added){
+            for(auto conn: connections){
+                if(conn != c){
+                    conn->enqueue(msg);
+                }
+            }
+        }
+    }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
+//        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
+        if(!msg.is_signature_valid())
+            return;
+        pbft_incoming_checkpoint_channel.publish(msg);
+        auto digest = msg.digest();
+        auto added = maybe_add_pbft_cache(digest);
+        if(added){
+            for(auto conn: connections){
+                if(conn != c){
+                    conn->enqueue(msg);
+                }
+            }
+        }
+    }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_stable_checkpoint &msg) {
+        ilog("received stable checkpoint at ${h}", ("h", msg.block_num));
+        if(!msg.is_signature_valid())
+            return;
+        controller &cc = my_impl->chain_plug->chain();
+        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+        if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
+            for (auto cp: msg.checkpoints) {
+                pbft_incoming_checkpoint_channel.publish(cp);
+            }
+        }
+    }
+
    void net_plugin_impl::start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection) {
       connector_check->expires_from_now( du);
       connector_check->async_wait( [this, from_connection](boost::system::error_code ec) {
@@ -2605,6 +2844,17 @@ namespace eosio {
             }
          });
    }
+
+    void net_plugin_impl::pbft_message_cache_ticker() {
+        pbft_message_cache_timer->expires_from_now (pbft_message_cache_tick_interval);
+        pbft_message_cache_timer->async_wait ([this](boost::system::error_code ec) {
+            pbft_message_cache_ticker ();
+            if (ec) {
+                wlog ("pbft message cache ticker error: ${m}", ("m", ec.message()));
+            }
+            clean_expired_pbft_cache();
+        });
+    }
 
    void net_plugin_impl::ticker() {
       keepalive_timer->expires_from_now (keepalive_interval);
@@ -2999,6 +3249,8 @@ namespace eosio {
 
          my->keepalive_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->ticker();
+         my->pbft_message_cache_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
+         my->pbft_message_cache_ticker();
       } FC_LOG_AND_RETHROW()
    }
 
@@ -3028,6 +3280,16 @@ namespace eosio {
       }
 
       my->incoming_transaction_ack_subscription = app().get_channel<channels::transaction_ack>().subscribe(boost::bind(&net_plugin_impl::transaction_ack, my.get(), _1));
+      my->pbft_outgoing_prepare_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::prepare_channel>().subscribe(
+               boost::bind(&net_plugin_impl::pbft_outgoing_prepare, my.get(), _1));
+      my->pbft_outgoing_commit_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::commit_channel>().subscribe(
+               boost::bind(&net_plugin_impl::pbft_outgoing_commit, my.get(), _1));
+      my->pbft_outgoing_view_change_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::view_change_channel>().subscribe(
+               boost::bind(&net_plugin_impl::pbft_outgoing_view_change, my.get(), _1));
+      my->pbft_outgoing_new_view_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::new_view_channel>().subscribe(
+               boost::bind(&net_plugin_impl::pbft_outgoing_new_view, my.get(), _1));
+      my->pbft_outgoing_checkpoint_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel>().subscribe(
+               boost::bind(&net_plugin_impl::pbft_outgoing_checkpoint, my.get(), _1));
 
       if( cc.get_read_mode() == chain::db_read_mode::READ_ONLY ) {
          my->max_nodes_per_host = 0;
@@ -3111,6 +3373,15 @@ namespace eosio {
       }
       return result;
    }
+
+    net_plugin_impl::net_plugin_impl():
+    pbft_incoming_prepare_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::prepare_channel>()),
+    pbft_incoming_commit_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::commit_channel>()),
+    pbft_incoming_view_change_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::view_change_channel>()),
+    pbft_incoming_new_view_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::new_view_channel>()),
+    pbft_incoming_checkpoint_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::checkpoint_channel>())
+    {}
+
    connection_ptr net_plugin_impl::find_connection( string host )const {
       for( const auto& c : connections )
          if( c->peer_addr == host ) return c;

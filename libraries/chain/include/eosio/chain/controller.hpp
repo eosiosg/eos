@@ -46,6 +46,8 @@ namespace eosio { namespace chain {
       LIGHT
    };
 
+   using signature_provider_type = std::function<chain::signature_type(chain::digest_type)>;
+
    class controller {
       public:
 
@@ -76,6 +78,10 @@ namespace eosio { namespace chain {
 
             flat_set<account_name>   resource_greylist;
             flat_set<account_name>   trusted_producers;
+
+
+             std::map<chain::public_key_type, signature_provider_type> my_signature_providers;
+             std::set<chain::account_name>                             my_producers;
          };
 
          enum class block_status {
@@ -149,7 +155,25 @@ namespace eosio { namespace chain {
 
          const chainbase::database& db()const;
 
+         void pbft_commit_local( const block_id_type& id );
+
+         bool pending_pbft_lib();
+
+         void set_pbft_prepared_block_id(optional<block_id_type> bid);
+
+         signed_block_ptr last_irreversible_block()const;
+
+         block_num_type last_proposed_schedule_block_num()const;
+         block_num_type last_promoted_proposed_schedule_block_num()const;
+
+         void set_pbft_latest_checkpoint( const block_id_type& id );
+         uint32_t last_stable_checkpoint_block_num() const;
+
+
          const fork_database& fork_db()const;
+         set<chain::account_name> my_producers()const;
+         std::map<chain::public_key_type, signature_provider_type> my_signature_providers()const;
+
 
          const account_object&                 get_account( account_name n )const;
          const global_property_object&         get_global_properties()const;
