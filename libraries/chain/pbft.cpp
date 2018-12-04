@@ -251,11 +251,9 @@ namespace eosio {
             //validate
             ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
-            ilog("view num valid");
 
             if (!pbft_db.is_valid_view_change(e)) return;
 
-            ilog("adding view change to db");
             //do action add view change
             pbft_db.add_pbft_view_change(e);
 
@@ -389,11 +387,9 @@ namespace eosio {
             //validate
             ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
-            ilog("view num valid");
 
             if (!pbft_db.is_valid_view_change(e)) return;
 
-            ilog("adding view change to db");
             //do action add view change
             pbft_db.add_pbft_view_change(e);
 
@@ -463,10 +459,8 @@ namespace eosio {
             //validate
             ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
-            ilog("view num valid");
 
             if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("adding view change to db");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
