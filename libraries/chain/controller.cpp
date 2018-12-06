@@ -1112,7 +1112,7 @@ struct controller_impl {
       pending->_pending_block_state = std::make_shared<block_state>( *head, when ); // promotes pending schedule (if any) to active
       pending->_pending_block_state->in_current_chain = true;
 
-//      pending->_pending_block_state->set_confirmed(confirm_block_count);
+      pending->_pending_block_state->set_confirmed(confirm_block_count);
 
       auto was_pending_promoted = pending->_pending_block_state->maybe_promote_pending();
 
@@ -1251,13 +1251,18 @@ struct controller_impl {
       auto reset_prod_light_validation = fc::make_scoped_exit([old_value=trusted_producer_light_validation, this]() {
          trusted_producer_light_validation = old_value;
       });
+
       try {
          EOS_ASSERT( b, block_validate_exception, "trying to push empty block" );
          EOS_ASSERT( s != controller::block_status::incomplete, block_validate_exception, "invalid block status for a completed block" );
          emit( self.pre_accepted_block, b );
 
+
+//         if (!last_promoted_proposed_schedule_block_num || b->block_num() != *last_promoted_proposed_schedule_block_num + 1) {
          set_pbft_lib();
          set_pbft_lscb();
+//         }
+
          bool trust = !conf.force_all_checks && (s == controller::block_status::irreversible || s == controller::block_status::validated);
          auto new_header_state = fork_db.add( b, trust );
          if (conf.trusted_producers.count(b->producer)) {
@@ -1301,7 +1306,7 @@ struct controller_impl {
 
       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
          fork_db.set_bft_irreversible(pending_pbft_lib->pbft_lib);
-         ilog("=====Committed local===== [lib: ${num}]", ("num", fork_db.get_block(pending_pbft_lib->pbft_lib)->block_num));
+//         ilog("=====Committed local===== [lib: ${num}]", ("num", fork_db.get_block(pending_pbft_lib->pbft_lib)->block_num));
          pending_pbft_lib.reset();
          if (read_mode != db_read_mode::IRREVERSIBLE) {
              maybe_switch_forks();
@@ -1317,7 +1322,7 @@ struct controller_impl {
    void set_pbft_lscb() {
        if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_checkpoint) {
            fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
-           ilog("======set stable checkpoint====== [lscb: ${h}]", ("h", fork_db.get_block(*pending_pbft_checkpoint)->block_num));
+//           ilog("======set stable checkpoint====== [lscb: ${h}]", ("h", fork_db.get_block(*pending_pbft_checkpoint)->block_num));
            pending_pbft_checkpoint.reset();
 
        }
@@ -1832,7 +1837,8 @@ optional<block_id_type> controller::pending_producer_block_id()const {
 }
 
 uint32_t controller::last_irreversible_block_num() const {
-   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
+//   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
+   return my->head->bft_irreversible_blocknum;
 }
 
 block_id_type controller::last_irreversible_block_id() const {

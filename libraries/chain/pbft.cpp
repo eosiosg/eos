@@ -31,8 +31,8 @@ namespace eosio {
                 state_machine.set_current_view(current_view);
 
                 fc::raw::unpack(ds, target_view);
-                state_machine.set_target_view(target_view);
-                ilog("current view: ${cv}, target view: ${tv}", ("cv", current_view)("tv", target_view));
+                state_machine.set_target_view(state_machine.get_current_view()+1);
+                ilog("current view: ${cv}, target view: ${tv}", ("cv", current_view)("tv", state_machine.get_target_view()));
             }
 
             fc::remove(pbft_db_dat);
@@ -208,10 +208,9 @@ namespace eosio {
             }
 
             if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
-//                m->set_committed_certificate(pbft_db.generate_committed_certificate());
-                auto now = std::chrono::system_clock::now();
-                auto duration = chrono::duration_cast<chrono::microseconds>(now - pending_commit_local_set_time).count();
-                ilog("=======================================================on_commit pending commit local elasped duration: ${d}",("d",duration));
+//                auto now = std::chrono::system_clock::now();
+//                auto duration = chrono::duration_cast<chrono::microseconds>(now - pending_commit_local_set_time).count();
+//                ilog("=======================================================on_commit pending commit local elasped duration: ${d}",("d",duration));
                 auto cp = pbft_db.generate_and_add_pbft_checkpoint();
 
                 m->set_checkpoints_cache(cp);
@@ -236,9 +235,9 @@ namespace eosio {
 
             if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
 //                m->set_committed_certificate(pbft_db.generate_committed_certificate());
-                auto now = std::chrono::system_clock::now();
-                auto duration = chrono::duration_cast<chrono::microseconds>(now - pending_commit_local_set_time).count();
-                ilog("=======================================================send_commit pending commit local elasped duration: ${d}",("d",duration));
+//                auto now = std::chrono::system_clock::now();
+//                auto duration = chrono::duration_cast<chrono::microseconds>(now - pending_commit_local_set_time).count();
+//                ilog("=======================================================send_commit pending commit local elasped duration: ${d}",("d",duration));
                 auto cp = pbft_db.generate_and_add_pbft_checkpoint();
 
                 m->set_checkpoints_cache(cp);
@@ -249,7 +248,7 @@ namespace eosio {
 
         void psm_prepared_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
+//            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
@@ -385,7 +384,7 @@ namespace eosio {
 
         void psm_committed_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
+//            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
@@ -437,27 +436,27 @@ namespace eosio {
          */
         void psm_view_change_state::on_prepare(psm_machine *m, pbft_prepare &e, pbft_database &pbft_db) {
             //ignore
-            ilog("[VIEW CHANGE] ignore prepare msg");
+//            ilog("[VIEW CHANGE] ignore prepare msg");
         }
 
         void psm_view_change_state::send_prepare(psm_machine *m, pbft_database &pbft_db) {
             //ignore
-            ilog("[VIEW CHANGE] should not prepare");
+//            ilog("[VIEW CHANGE] should not prepare");
         }
 
         void psm_view_change_state::on_commit(psm_machine *m, pbft_commit &e, pbft_database &pbft_db) {
             //ignore
-            ilog("[VIEW CHANGE] ignore commit msg");
+//            ilog("[VIEW CHANGE] ignore commit msg");
         }
 
         void psm_view_change_state::send_commit(psm_machine *m, pbft_database &pbft_db) {
             //ignore
-            ilog("[VIEW CHANGE] should not commit");
+//            ilog("[VIEW CHANGE] should not commit");
         }
 
         void psm_view_change_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
+//            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
@@ -467,7 +466,7 @@ namespace eosio {
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
             if (pbft_db.should_new_view() && pbft_db.is_new_primary()) {
-                ilog("I am the chosen primary for new view!");
+//                ilog("I am the chosen primary for new view!");
                 //TODO: retry new view???
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
@@ -571,7 +570,7 @@ namespace eosio {
             this->pbft_db.prune_view_change_index();
 
             if (!new_view.committed.commits.empty()) {
-                ilog("Committed cert not empty!");
+//                ilog("Committed cert not empty!");
                 for (auto c :new_view.committed.commits) {
                     try {
                         pbft_db.add_pbft_commit(c);
@@ -588,7 +587,7 @@ namespace eosio {
             }
 
             if (!new_view.prepared.prepares.empty()) {
-                ilog("Prepared cert not empty!");
+//                ilog("Prepared cert not empty!");
                 for (auto p: new_view.prepared.prepares) {
                     try {
                         pbft_db.add_pbft_prepare(p);
@@ -622,7 +621,7 @@ namespace eosio {
                     this->get_prepared_certificate(),
                     this->get_committed_certificate(),
                     this->get_target_view());
-            ilog("generating view change msg ${vc}", ("vc", view_changes));
+//            ilog("generating view change msg ${vc}", ("vc", view_changes));
 
             if (!view_changes.empty()) {
                 this->set_view_changes_cache(view_changes);
