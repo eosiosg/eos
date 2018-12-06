@@ -91,8 +91,9 @@ namespace eosio { namespace chain {
   } /// generate_next
 
    bool block_header_state::maybe_promote_pending() {
-      if( pending_schedule.producers.size() &&
-          bft_irreversible_blocknum >= pending_schedule_lib_num )
+      if (pending_schedule.producers.size())
+          //TODO: is this actually safe?
+//          bft_irreversible_blocknum >= pending_schedule_lib_num )
       {
          active_schedule = move( pending_schedule );
 
@@ -164,7 +165,7 @@ namespace eosio { namespace chain {
      /// below this point is state changes that cannot be validated with headers alone, but never-the-less,
      /// must result in header state changes
 
-//    result.set_confirmed( h.confirmed );
+    result.set_confirmed( h.confirmed );
 
     auto was_pending_promoted = result.maybe_promote_pending();
 

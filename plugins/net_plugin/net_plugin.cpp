@@ -187,7 +187,7 @@ namespace eosio {
       bool                          use_socket_read_watermark = false;
 
       std::unordered_map<digest_type, time_point_sec> pbft_message_cache{};
-      const int                           pbft_message_cache_TTL = 6;
+      const int                     pbft_message_cache_TTL = 12;
 
       channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::prepare_channel::channel_type::handle pbft_outgoing_prepare_subscription;
@@ -961,11 +961,11 @@ namespace eosio {
             count = bstack.size();
             while (bstack.size()) {
                enqueue(*bstack.back());
+               auto cp_itr = find_if(scp_stack.begin(), scp_stack.end(), [&](const pbft_stable_checkpoint &psc) {return psc.block_id == (*bstack.back()).id();});
+               if (cp_itr != scp_stack.end()) {
+                   enqueue(*cp_itr);
+               }
                bstack.pop_back();
-            }
-            while (scp_stack.size()) {
-                enqueue(scp_stack.back());
-                scp_stack.pop_back();
             }
          }
          fc_ilog(logger, "Sent ${n} blocks on my fork",("n",count));
@@ -1157,6 +1157,7 @@ namespace eosio {
 
    bool connection::enqueue_sync_block() {
       controller& cc = app().find_plugin<chain_plugin>()->chain();
+      pbft_controller& pcc = app().find_plugin<chain_plugin>()->pbft_ctrl();
       if (!peer_requested)
          return false;
       uint32_t num = ++peer_requested->last;
@@ -1168,6 +1169,10 @@ namespace eosio {
          signed_block_ptr sb = cc.fetch_block_by_number(num);
          if(sb) {
             enqueue( *sb, trigger_send);
+            auto scp = pcc.pbft_db.get_stable_checkpoint_by_id((*sb).id());
+            if (!(scp == pbft_stable_checkpoint{})) {
+                enqueue(scp);
+            }
             return true;
          }
       } catch ( ... ) {
@@ -1482,7 +1487,7 @@ namespace eosio {
             fc_ilog(logger, "requesting range ${s} to ${e}, from ${n}",
                     ("n",source->peer_name())("s",start)("e",end));
             source->request_sync_blocks(start, end);
-            source->request_sync_checkpoints(start, end);
+//            source->request_sync_checkpoints(start, end);
             sync_last_requested_num = end;
          }
       }
@@ -2913,8 +2918,7 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 //        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
-        if(!msg.is_signature_valid())
-            return;
+        if(!msg.is_signature_valid()) return;
         pbft_incoming_checkpoint_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
@@ -2928,9 +2932,8 @@ namespace eosio {
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_stable_checkpoint &msg) {
-        ilog("received stable checkpoint at ${h}", ("h", msg.block_num));
-        if(!msg.is_signature_valid())
-            return;
+//        ilog("received stable checkpoint at ${h}", ("h", msg.block_num));
+        if(!msg.is_signature_valid()) return;
         controller &cc = my_impl->chain_plug->chain();
         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
         if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
