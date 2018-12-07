@@ -569,22 +569,33 @@ namespace eosio {
             if (itr == by_prepare_and_num_index.end()) return vector<pbft_prepared_certificate>{};
             pbft_state_ptr psp = *itr;
 
+            auto as = ctrl.fetch_block_state_by_id(psp->block_id)->active_schedule.producers;
             if (psp->should_prepared && (psp->block_num > (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
                     auto prepares = psp->prepares;
                     auto valid_prepares = vector<pbft_prepare>{};
-                    flat_map<uint32_t,vector<pbft_prepare>> prepare_count;
+
+                    flat_map<uint32_t,uint32_t> prepare_count;
+                    flat_map<uint32_t,vector<pbft_prepare>> prepare_msg;
+
                     for (const auto &pre: prepares) {
-                        prepare_count[pre.view].push_back(pre);
+                        if (prepare_count.find(pre.view) == prepare_count.end()) prepare_count[pre.view] = 0;
+                        prepare_msg[pre.view].push_back(pre);
+                    }
+
+                    for (auto const &sp: as) {
+                        for (auto const &pp: prepares) {
+                            if (sp.block_signing_key == pp.public_key) prepare_count[pp.view] += 1;
+                        }
                     }
 
                     for (auto const &e: prepare_count) {
-                        if (e.second.size() >= ctrl.fetch_block_state_by_id(psp->block_id)->active_schedule.producers.size() * 2 / 3 + 1) {
-                            valid_prepares = e.second;
+                        if (e.second >= as.size() * 2 / 3 + 1) {
+                            valid_prepares = prepare_msg[e.first];
                         }
                     }
                     if (valid_prepares.empty()) {
-                        wlog("no enough valid prepares for a prepared block --- ${p}", ("p", prepares));
+//                        wlog("no enough valid prepares for a prepared block --- ${p}", ("p", prepares));
                         return vector<pbft_prepared_certificate>{};
                     };
 
@@ -604,22 +615,32 @@ namespace eosio {
             if (itr == by_commit_and_num_index.end()) return vector<pbft_committed_certificate>{};
             pbft_state_ptr psp = *itr;
 
+            auto as = ctrl.fetch_block_state_by_id(psp->block_id)->active_schedule.producers;
             if (psp->should_committed && (psp->block_num >= (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
                     auto commits = psp->commits;
                     auto valid_commits = vector<pbft_commit>{};
-                    flat_map<uint32_t,vector<pbft_commit>> commit_count;
+
+                    flat_map<uint32_t,uint32_t> commit_count;
+                    flat_map<uint32_t,vector<pbft_commit>> commit_msg;
+
                     for (const auto &com: commits) {
-                        commit_count[com.view].push_back(com);
+                        if (commit_count.find(com.view) == commit_count.end()) commit_count[com.view] = 0;
+                        commit_msg[com.view].push_back(com);
+                    }
+                    for (auto const &sp: as) {
+                        for (auto const &pc: commits) {
+                            if (sp.block_signing_key == pc.public_key) commit_count[pc.view] += 1;
+                        }
                     }
 
                     for (auto const &e: commit_count) {
-                        if (e.second.size() >= ctrl.fetch_block_state_by_id(psp->block_id)->active_schedule.producers.size() * 2 / 3 + 1) {
-                            valid_commits = e.second;
+                        if (e.second >= as.size() * 2 / 3 + 1) {
+                            valid_commits = commit_msg[e.first];
                         }
                     }
                     if (valid_commits.empty()) {
-                        wlog("no enough valid commits for a prepared block --- ${p}", ("p", commits));
+//                        wlog("no enough valid commits for a co block --- ${p}", ("p", commits));
                         return vector<pbft_committed_certificate>{};
                     };
                     auto cc = pbft_committed_certificate{psp->block_id, psp->block_num, valid_commits, my_sp.first};
