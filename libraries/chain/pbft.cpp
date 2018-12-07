@@ -248,7 +248,7 @@ namespace eosio {
 
         void psm_prepared_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-//            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
+            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
@@ -384,7 +384,7 @@ namespace eosio {
 
         void psm_committed_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-//            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
+            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
@@ -456,7 +456,7 @@ namespace eosio {
 
         void psm_view_change_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-//            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
+            ilog("view num: ${a}, current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
