@@ -583,6 +583,8 @@ namespace eosio {
                             valid_prepares = e.second;
                         }
                     }
+                    if (valid_prepares.empty()) return vector<pbft_prepared_certificate>{};
+
                     auto pc = pbft_prepared_certificate{psp->block_id, psp->block_num, valid_prepares, my_sp.first};
                     pc.producer_signature = my_sp.second(pc.digest());
                     ppc.emplace_back(pc);
@@ -613,6 +615,7 @@ namespace eosio {
                             valid_commits = e.second;
                         }
                     }
+                    if (valid_commits.empty()) return vector<pbft_committed_certificate>{};
                     auto cc = pbft_committed_certificate{psp->block_id, psp->block_num, valid_commits, my_sp.first};
                     cc.producer_signature = my_sp.second(cc.digest());
                     pcc.emplace_back(cc);
@@ -699,7 +702,12 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_committed_certificate(const pbft_committed_certificate &certificate) {
+            //null certificate is valid
             if (certificate == pbft_committed_certificate{}) return true;
+
+            //lib certificate is valid
+            if (certificate.block_num == ctrl.last_irreversible_block_num()
+            && certificate.block_id == ctrl.last_irreversible_block_id()) return true;
 
             auto valid_sig = true;
             valid_sig &= certificate.is_signature_valid();
