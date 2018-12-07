@@ -506,6 +506,7 @@ namespace eosio {
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),
                         new_view);
+                ilog("new view msg: ${nv}", ("nv", nv_msg));
 
                 if (nv_msg == pbft_new_view{}) return;
 

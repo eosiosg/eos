@@ -849,7 +849,7 @@ void chain_plugin_impl::on_pbft_incoming_view_change(pbft_view_change vc){
 }
 
 void chain_plugin_impl::on_pbft_incoming_new_view(pbft_new_view nv){
-   ilog("received incoming pbft_new_view version: ${v}, from ${k}",("v",nv.view)("k", nv.public_key));
+   ilog("received incoming pbft_new_view: ${v}, from ${k}",("v",nv)("k", nv.public_key));
    pbft_ctrl->on_pbft_new_view(nv);
 }
 

@@ -583,7 +583,10 @@ namespace eosio {
                             valid_prepares = e.second;
                         }
                     }
-                    if (valid_prepares.empty()) return vector<pbft_prepared_certificate>{};
+                    if (valid_prepares.empty()) {
+                        wlog("no enough valid prepares for a prepared block --- ${p}", ("p", prepares));
+                        return vector<pbft_prepared_certificate>{};
+                    };
 
                     auto pc = pbft_prepared_certificate{psp->block_id, psp->block_num, valid_prepares, my_sp.first};
                     pc.producer_signature = my_sp.second(pc.digest());
@@ -615,7 +618,10 @@ namespace eosio {
                             valid_commits = e.second;
                         }
                     }
-                    if (valid_commits.empty()) return vector<pbft_committed_certificate>{};
+                    if (valid_commits.empty()) {
+                        wlog("no enough valid commits for a prepared block --- ${p}", ("p", commits));
+                        return vector<pbft_committed_certificate>{};
+                    };
                     auto cc = pbft_committed_certificate{psp->block_id, psp->block_num, valid_commits, my_sp.first};
                     cc.producer_signature = my_sp.second(cc.digest());
                     pcc.emplace_back(cc);
