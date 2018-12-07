@@ -715,7 +715,7 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
       my->chain_id.emplace( my->chain->get_chain_id());
 
       ilog("include pbft controller...");
-      my->pbft_ctrl.emplace(*my->chain, my->chain_config->state_dir);
+      my->pbft_ctrl.emplace(*my->chain);
 
       // set up method providers
       my->get_block_by_number_provider = app().get_method<methods::get_block_by_number>().register_provider(

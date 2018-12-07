@@ -46,7 +46,7 @@ namespace eosio {
       string address_config_prefix;
       //If empty, unix socket support will be completely disabled. If not empty,
       // unix socket support is enabled with the given default path (treated relative
-      // to the datadir)
+      // to the pbft_db_dir)
       string default_unix_socket_path;
       //If non 0, HTTP will be enabled by default on the given port number. If
       // 0, HTTP will not be enabled by default

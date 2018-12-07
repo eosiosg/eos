@@ -9,12 +9,12 @@
 namespace eosio {
     namespace chain {
 
-        pbft_controller::pbft_controller(controller& ctrl, fc::path& data_dir ):
-        pbft_db(ctrl, data_dir),
-        state_machine(pbft_db),
-        datadir(data_dir)
+        pbft_controller::pbft_controller(controller& ctrl):
+        pbft_db(ctrl),
+        state_machine(pbft_db)
         {
             config.view_change_timeout = 6;
+            datadir = ctrl.state_dir();
 
             if (!fc::is_directory(datadir))
                 fc::create_directories(datadir);
@@ -26,11 +26,11 @@ namespace eosio {
 
                 fc::datastream<const char *> ds(content.data(), content.size());
                 uint32_t current_view;
-                uint32_t target_view;
+//                uint32_t target_view;
                 fc::raw::unpack(ds, current_view);
                 state_machine.set_current_view(current_view);
 
-                fc::raw::unpack(ds, target_view);
+//                fc::raw::unpack(ds, target_view);
                 state_machine.set_target_view(state_machine.get_current_view()+1);
                 ilog("current view: ${cv}, target view: ${tv}", ("cv", current_view)("tv", state_machine.get_target_view()));
             }
