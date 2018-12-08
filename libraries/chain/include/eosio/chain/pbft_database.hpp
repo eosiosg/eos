@@ -194,6 +194,7 @@ namespace eosio {
             pbft_committed_certificate committed;
             public_key_type public_key;
             signature_type producer_signature;
+            uint32_t chain_id = 0;
 
             bool operator==(const pbft_view_change &rhs) const {
                 return view == rhs.view
@@ -618,7 +619,7 @@ namespace eosio {
 FC_REFLECT(eosio::chain::block_info, (block_id)(block_num))
 FC_REFLECT(eosio::chain::pbft_prepare, (uuid)(view)(block_num)(block_id)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_commit, (uuid)(view)(block_num)(block_id)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(view)(prepared)(committed)(public_key)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(view)(prepared)(committed)(public_key)(producer_signature)(chain_id))
 FC_REFLECT(eosio::chain::pbft_new_view, (uuid)(view)(prepared)(committed)(view_changed)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_state, (block_id)(block_num)(prepares)(should_prepared)(commits)(should_committed))
 FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepares)(public_key)(producer_signature))

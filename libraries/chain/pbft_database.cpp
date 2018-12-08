@@ -681,7 +681,7 @@ namespace eosio {
                 valid_sig &= p.is_signature_valid();
             }
             if (!valid_sig) return false;
-//            ilog("prepare signature valid!");
+            ilog("prepare signature valid!");
 
             //get lib schedule
             auto lib_num = ctrl.last_irreversible_block_num();
@@ -712,7 +712,7 @@ namespace eosio {
                 if (longest_fork.size() < bp_threshold) {
                     return false;
                 }
-//                ilog("prepare longest fork valid!");
+                ilog("prepare longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
@@ -720,7 +720,7 @@ namespace eosio {
                     || certificate.block_num != calculated_block_info.block_num) {
                     return false;
                 }
-//                ilog("prepare block id and num valid!");
+                ilog("prepare block id and num valid!");
 
             }
 
@@ -742,7 +742,7 @@ namespace eosio {
             }
 
             if (!valid_sig) return false;
-//            ilog("commit signature valid!");
+            ilog("commit signature valid!");
 
             //get lib schedule
             auto lib_num = ctrl.last_irreversible_block_num();
@@ -773,7 +773,7 @@ namespace eosio {
                 if (longest_fork.size() < bp_threshold) {
                     return false;
                 }
-//                ilog("commit longest fork valid!");
+                ilog("commit longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
@@ -781,7 +781,7 @@ namespace eosio {
                     || certificate.block_num != calculated_block_info.block_num) {
                     return false;
                 }
-//                ilog("commit block id and num valid!");
+                ilog("commit block id and num valid!");
             }
 
             return true;

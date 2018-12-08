@@ -556,14 +556,18 @@ namespace eosio {
             this->set_prepares_cache(vector<pbft_prepare>{});
             this->set_view_change_timer(0);
             this->set_current(new psm_committed_state);
+            ilog("deleting state, transit to committed");
             delete s;
+            ilog("deleted state, transit to committed");
         }
 
         template<typename T>
         void psm_machine::transit_to_prepared_state(T const & s) {
             this->set_commits_cache(vector<pbft_commit>{});
             this->set_current(new psm_prepared_state);
+            ilog("deleting state, transit to prepared");
             delete s;
+            ilog("deleted state, transit to prepared");
         }
 
         template<typename T>
@@ -572,7 +576,9 @@ namespace eosio {
             this->set_prepares_cache(vector<pbft_prepare>{});
             this->set_view_change_timer(0);
             this->set_current(new psm_view_change_state);
+            ilog("deleting state, transit to view change");
             delete s;
+            ilog("deleted state, transit to view change");
         }
 
         template<typename T>
@@ -594,7 +600,9 @@ namespace eosio {
                         if (pbft_db.should_committed()) {
                             ilog("Changing to COMMITTED!");
                             this->set_current(new psm_committed_state);
+                            ilog("deleting state, transit to committed");
                             delete s;
+                            ilog("deleted state, transit to committed");
                             return;
                         }
                     } catch (...) {
@@ -611,7 +619,9 @@ namespace eosio {
                         if (pbft_db.should_prepared()) {
                             ilog("Changing to PREPARED!");
                             this->set_current(new psm_prepared_state);
+                            ilog("deleting state, transit to prepared");
                             delete s;
+                            ilog("deleted state, transit to prepared");
                             return;
                         }
                     } catch (...) {
@@ -622,7 +632,9 @@ namespace eosio {
 
             ilog("Changing to COMMITTED!");
             this->set_current(new psm_committed_state);
+            ilog("deleting state, transit to committed");
             delete s;
+            ilog("deleted state, transit to committed");
             ilog("validated new view request, finished change new view");
         }
 

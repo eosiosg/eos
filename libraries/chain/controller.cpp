@@ -1124,7 +1124,8 @@ struct controller_impl {
              ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
              pending->_pending_block_state->pending_schedule.producers.size() == 0 && // ... and there is room for a new pending schedule ...
              !was_pending_promoted && // ... and not just because it was promoted to active at the start of this block, then:
-             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 12 //TODO: to be optimised.
+             // pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 12 //TODO: to be optimised.
+             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + (12*head->active_schedule.producers.size()) //TODO: to be optimised.
          )
             {
                // Promote proposed schedule to pending schedule.
@@ -1262,7 +1263,7 @@ struct controller_impl {
          set_pbft_lib();
          set_pbft_lscb();
 //         }
-
+         ilog("set lib done");
          bool trust = !conf.force_all_checks && (s == controller::block_status::irreversible || s == controller::block_status::validated);
          auto new_header_state = fork_db.add( b, trust );
          if (conf.trusted_producers.count(b->producer)) {

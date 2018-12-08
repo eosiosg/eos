@@ -661,7 +661,9 @@ namespace eosio {
       template <typename T>
       void operator()(const T &msg) const
       {
+          cout << "handling message";
          impl.handle_message( c, msg);
+          cout << "handled message";
       }
    };
 
