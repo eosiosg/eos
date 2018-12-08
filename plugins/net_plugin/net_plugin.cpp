@@ -2694,12 +2694,14 @@ namespace eosio {
 
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &view_change){
         for(auto conn: connections){
+            ilog("net_plugin sending view change msg: ${v}",("v", view_change.view));
             conn->enqueue(view_change);
         }
     }
 
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &new_view){
         for(auto conn: connections){
+            ilog("net_plugin sending new view msg: ${v}",("v", new_view));
             conn->enqueue(new_view);
         }
     }
@@ -2764,9 +2766,8 @@ namespace eosio {
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
-//       ilog("net plugin received pbft_view_change");
-        if(!msg.is_signature_valid())
-            return;
+       ilog("net plugin received pbft_view_change ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
+        if(!msg.is_signature_valid()) return;
         pbft_incoming_view_change_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
@@ -2780,9 +2781,8 @@ namespace eosio {
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
-//        ilog("net plugin received pbft_new_view");
-        if(!msg.is_signature_valid())
-            return;
+        ilog("net plugin received new view ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
+        if(!msg.is_signature_valid()) return;
         pbft_incoming_new_view_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);

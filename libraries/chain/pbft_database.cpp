@@ -595,7 +595,7 @@ namespace eosio {
                         }
                     }
                     if (valid_prepares.empty()) {
-//                        wlog("no enough valid prepares for a prepared block --- ${p}", ("p", prepares));
+                        wlog("no enough valid prepares for a prepared block, my prepares: ${p}", ("p", prepares));
                         return vector<pbft_prepared_certificate>{};
                     };
 
@@ -640,14 +640,13 @@ namespace eosio {
                         }
                     }
                     if (valid_commits.empty()) {
-//                        wlog("no enough valid commits for a co block --- ${p}", ("p", commits));
+                        wlog("no enough valid commits for a committed block, my commits: ${c}", ("c", commits));
                         return vector<pbft_committed_certificate>{};
                     };
                     auto cc = pbft_committed_certificate{psp->block_id, psp->block_num, valid_commits, my_sp.first};
                     cc.producer_signature = my_sp.second(cc.digest());
                     pcc.emplace_back(cc);
                 }
-//                ilog("generating commit cert ${pc}", ("pc", pcc));
                 return pcc;
             } else return vector<pbft_committed_certificate>{};
         }
