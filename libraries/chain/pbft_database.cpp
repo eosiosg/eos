@@ -13,16 +13,17 @@
 namespace eosio {
     namespace chain {
 
-        pbft_database::pbft_database( controller &ctrl, const fc::path &data_dir) :
+        pbft_database::pbft_database( controller &ctrl) :
         view_state_index(pbft_view_state_multi_index_type{}),
-        datadir(data_dir),
         ctrl(ctrl)
         {
             checkpoint_index = pbft_checkpoint_state_multi_index_type{};
-            if (!fc::is_directory(datadir))
-                fc::create_directories(datadir);
+            pbft_db_dir = ctrl.state_dir();
+            checkpoints_dir = ctrl.checkpoints_dir();
 
-            auto pbft_db_dat = datadir / config::pbftdb_filename;
+            if (!fc::is_directory(pbft_db_dir)) fc::create_directories(pbft_db_dir);
+
+            auto pbft_db_dat = pbft_db_dir / config::pbftdb_filename;
             if (fc::exists(pbft_db_dat)) {
                 string content;
                 fc::read_file_contents(pbft_db_dat, content);
@@ -43,6 +44,17 @@ namespace eosio {
                     set(std::make_shared<pbft_state>(move(s)));
                 }
                 ilog("index size: ${s}", ("s", index.size()));
+            }
+
+            auto checkpoints_dir = ctrl.checkpoints_dir();
+            if (!fc::is_directory(checkpoints_dir)) fc::create_directories(checkpoints_dir);
+
+            auto checkpoints_db = checkpoints_dir / config::checkpoints_filename;
+            if (fc::exists(checkpoints_db)) {
+                string content;
+                fc::read_file_contents(checkpoints_db, content);
+
+                fc::datastream<const char *> ds(content.data(), content.size());
 
                 unsigned_int checkpoint_size;
                 fc::raw::unpack(ds, checkpoint_size);
@@ -52,17 +64,26 @@ namespace eosio {
                     set(std::make_shared<pbft_checkpoint_state>(move(cs)));
                 }
                 ilog("checkpoint index size: ${cs}", ("cs", checkpoint_index.size()));
-
             }
-
         }
 
         void pbft_database::close() {
-            if (index.empty()) {
-                return;
+
+            if (checkpoint_index.empty()) return;
+
+            fc::path checkpoints_db = checkpoints_dir / config::checkpoints_filename;
+            std::ofstream c_out(checkpoints_db.generic_string().c_str(),
+                                std::ios::out | std::ios::binary | std::ofstream::trunc);
+
+            uint32_t num_records_in_checkpoint_db = checkpoint_index.size();
+            fc::raw::pack(c_out, unsigned_int{num_records_in_checkpoint_db});
+            for (const auto &s: checkpoint_index) {
+                fc::raw::pack(c_out, *s);
             }
 
-            fc::path pbft_db_dat = datadir / config::pbftdb_filename;
+            if (index.empty()) return;
+
+            fc::path pbft_db_dat = pbft_db_dir / config::pbftdb_filename;
             std::ofstream out(pbft_db_dat.generic_string().c_str(),
                               std::ios::out | std::ios::binary | std::ofstream::app);
             uint32_t num_records_in_db = index.size();
@@ -71,11 +92,7 @@ namespace eosio {
                 fc::raw::pack(out, *s);
             }
 
-            uint32_t num_records_in_checkpoint_db = checkpoint_index.size();
-            fc::raw::pack(out, unsigned_int{num_records_in_checkpoint_db});
-            for (const auto &s: checkpoint_index) {
-                fc::raw::pack(out, *s);
-            }
+
 
             index.clear();
             checkpoint_index.clear();

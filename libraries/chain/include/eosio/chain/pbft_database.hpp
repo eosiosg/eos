@@ -489,7 +489,7 @@ namespace eosio {
 
         class pbft_database {
         public:
-            pbft_database(controller &ctrl, const fc::path &data_dir);
+            pbft_database(controller &ctrl);
 
             ~pbft_database();
 
@@ -584,11 +584,12 @@ namespace eosio {
             bool is_valid_new_view(const pbft_new_view &certificate);
 
         private:
+            controller &ctrl;
             pbft_state_multi_index_type index;
             pbft_view_state_multi_index_type view_state_index;
             pbft_checkpoint_state_multi_index_type checkpoint_index;
-            fc::path const &datadir;
-            controller &ctrl;
+            fc::path pbft_db_dir;
+            fc::path checkpoints_dir;
 
             bool is_valid_prepared_certificate(const pbft_prepared_certificate &certificate);
 

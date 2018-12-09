@@ -23,6 +23,9 @@ const static auto pbftdb_filename            = "pbftdb.dat";
 const static auto default_state_size            = 1*1024*1024*1024ll;
 const static auto default_state_guard_size      =    128*1024*1024ll;
 
+const static auto default_checkpoints_dir_name = "checkpoints";
+const static auto checkpoints_filename         = "checkpoints.dat";
+
 
 const static uint64_t system_account_name    = N(eosio);
 const static uint64_t null_account_name      = N(eosio.null);

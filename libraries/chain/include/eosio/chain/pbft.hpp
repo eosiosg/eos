@@ -212,7 +212,7 @@ namespace eosio {
 
         class pbft_controller {
         public:
-            pbft_controller(controller& ctrl, fc::path& data_dir );
+            pbft_controller(controller& ctrl);
             ~pbft_controller();
 
             pbft_database pbft_db;
@@ -232,7 +232,7 @@ namespace eosio {
 
 
         private:
-            fc::path const &datadir;
+            fc::path datadir;
 
 
         };

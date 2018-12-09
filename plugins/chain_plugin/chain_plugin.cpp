@@ -715,7 +715,7 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
       my->chain_id.emplace( my->chain->get_chain_id());
 
       ilog("include pbft controller...");
-      my->pbft_ctrl.emplace(*my->chain, my->chain_config->state_dir);
+      my->pbft_ctrl.emplace(*my->chain);
 
       // set up method providers
       my->get_block_by_number_provider = app().get_method<methods::get_block_by_number>().register_provider(
@@ -844,12 +844,12 @@ void chain_plugin_impl::on_pbft_incoming_commit(pbft_commit c){
 }
 
 void chain_plugin_impl::on_pbft_incoming_view_change(pbft_view_change vc){
-   ilog("received incoming pbft_view_change version: ${v}, from ${k}",("v",vc.view)("k", vc.public_key));
+   ilog("received incoming pbft_view_change: ${v}", ("v",vc));
    pbft_ctrl->on_pbft_view_change(vc);
 }
 
 void chain_plugin_impl::on_pbft_incoming_new_view(pbft_new_view nv){
-   ilog("received incoming pbft_new_view: ${v}, from ${k}",("v",nv)("k", nv.public_key));
+    ilog("received incoming pbft_new_view: ${v}",("v",nv));
    pbft_ctrl->on_pbft_new_view(nv);
 }
 
