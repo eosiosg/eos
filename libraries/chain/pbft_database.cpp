@@ -354,11 +354,14 @@ namespace eosio {
             const auto &by_commit_and_num_index = index.get<by_commit_and_num>();
             auto itr = by_commit_and_num_index.begin();
             pbft_state_ptr psp = *itr;
+            auto blk_state = ctrl.fetch_block_state_by_id((*itr)->block_id);
+            if (!blk_state) return new_view;
             ilog("try to fetch block state");
-            auto blk = ctrl.fetch_block_state_by_id((*itr)->block_id);
+            auto as = blk_state->active_schedule.producers;
             ilog("fetched block state");
+
             auto commits = (*itr)->commits;
-            auto as = blk->active_schedule.producers;
+
             flat_map<uint32_t,uint32_t> commit_count;
             for (const auto &com: commits) {
                 if (commit_count.find(com.view) == commit_count.end()) {
@@ -587,8 +590,10 @@ namespace eosio {
             if (itr == by_prepare_and_num_index.end()) return vector<pbft_prepared_certificate>{};
             pbft_state_ptr psp = *itr;
 
+            auto prepared_block_state = ctrl.fetch_block_state_by_id(psp->block_id);
+            if (!prepared_block_state) return vector<pbft_prepared_certificate>{};
             ilog("try to fetch block state");
-            auto as = ctrl.fetch_block_state_by_id(psp->block_id)->active_schedule.producers;
+            auto as = prepared_block_state->active_schedule.producers;
             ilog("fetched block state");
             if (psp->should_prepared && (psp->block_num > (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
@@ -635,8 +640,10 @@ namespace eosio {
             if (itr == by_commit_and_num_index.end()) return vector<pbft_committed_certificate>{};
             pbft_state_ptr psp = *itr;
 
+            auto committed_block_state = ctrl.fetch_block_state_by_id(psp->block_id);
+            if (!committed_block_state) return vector<pbft_committed_certificate>{};
             ilog("try to fetch block state");
-            auto as = ctrl.fetch_block_state_by_id(psp->block_id)->active_schedule.producers;
+            auto as = committed_block_state->active_schedule.producers;
             ilog("fetched block state");
             if (psp->should_committed && (psp->block_num >= (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
@@ -1063,8 +1070,10 @@ namespace eosio {
             if (cp.block_num > ctrl.head_block_num()) return;
 
 //            auto active_bps = lib_active_producers().producers;
+            auto cp_block_state = ctrl.fetch_block_state_by_number(cp.block_num);
+            if (!cp_block_state) return;
             ilog("try to fetch block state");
-            auto active_bps = ctrl.fetch_block_state_by_number(cp.block_num)->active_schedule.producers;
+            auto active_bps = cp_block_state->active_schedule.producers;
             ilog("fetched block state");
             auto checkpoint_count = count_if(active_bps.begin(), active_bps.end(), [&](const producer_key &p) {
                 return p.block_signing_key == cp.public_key; });
