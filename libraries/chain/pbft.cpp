@@ -26,11 +26,9 @@ namespace eosio {
 
                 fc::datastream<const char *> ds(content.data(), content.size());
                 uint32_t current_view;
-//                uint32_t target_view;
                 fc::raw::unpack(ds, current_view);
                 state_machine.set_current_view(current_view);
 
-//                fc::raw::unpack(ds, target_view);
                 state_machine.set_target_view(state_machine.get_current_view()+1);
                 ilog("current view: ${cv}, target view: ${tv}", ("cv", current_view)("tv", state_machine.get_target_view()));
             }
@@ -46,10 +44,6 @@ namespace eosio {
 
             uint32_t current_view = state_machine.get_current_view();
             fc::raw::pack(out, current_view);
-
-            uint32_t target_view = state_machine.get_target_view();
-            fc::raw::pack(out, target_view);
-
         }
 
         void pbft_controller::maybe_pbft_prepare() {
@@ -177,6 +171,7 @@ namespace eosio {
             //ignore
 
             if (!e.is_signature_valid()) return;
+            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -192,6 +187,7 @@ namespace eosio {
         void psm_prepared_state::on_commit(psm_machine *m, pbft_commit &e, pbft_database &pbft_db) {
 
             if (!e.is_signature_valid()) return;
+            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -309,6 +305,7 @@ namespace eosio {
         void psm_committed_state::on_prepare(psm_machine *m, pbft_prepare &e, pbft_database &pbft_db) {
             //validate
             if (!e.is_signature_valid()) return;
+            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -356,6 +353,7 @@ namespace eosio {
 //                m->transit_to_committed_state(this);
 //            }
             if (!e.is_signature_valid()) return;
+            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -548,6 +546,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_committed_state(T const & s) {
+            ilog("trying transit to committed");
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) {
                 this->set_current_view(nv);
@@ -563,6 +562,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_prepared_state(T const & s) {
+            ilog("trying transit to prepared");
             this->set_commits_cache(vector<pbft_commit>{});
             this->set_current(new psm_prepared_state);
             ilog("deleting state, transit to prepared");
@@ -572,6 +572,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_view_change_state(T const & s) {
+            ilog("trying transit to view change");
             this->set_commits_cache(vector<pbft_commit>{});
             this->set_prepares_cache(vector<pbft_prepare>{});
             this->set_view_change_timer(0);
@@ -583,6 +584,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_new_view(const pbft_new_view &new_view, T const & s) {
+            ilog("trying transit to new view");
             this->set_current_view(new_view.view);
             this->set_target_view(new_view.view + 1);
             this->set_target_view_retries(0);
