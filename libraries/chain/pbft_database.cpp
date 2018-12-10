@@ -117,9 +117,10 @@ namespace eosio {
             auto &by_block_id_index = index.get<by_block_id>();
 
             auto prev = bs;
-//            ilog("prepare msg: ${p}", ("p", p));
+            ilog("trying to add prepare msg: ${p}", ("p", p));
 
             while ((prev != nullptr) && (prev->block_num > ctrl.last_irreversible_block_num())) {
+                ilog("previous block exists");
 
                 auto prev_itr = by_block_id_index.find(prev->id);
 
@@ -145,20 +146,28 @@ namespace eosio {
                         });
                     }
                 }
+                ilog("trying to find block in pbft db");
                 prev_itr = by_block_id_index.find(prev->id);
+                ilog("found block in pbft db");
+
                 auto prepares = (*prev_itr)->prepares;
+                ilog("prepare msg size ${s}", ("s", prepares.size()));
                 auto as = prev->active_schedule.producers;
+                ilog("active schedule size ${as}", ("as", as.size()));
                 flat_map<uint32_t,uint32_t> prepare_count;
                 for (const auto &pre: prepares) {
                     if (prepare_count.find(pre.view) == prepare_count.end()) prepare_count[pre.view] = 0;
                 }
-                
+                ilog("prepares count map initialised");
+
                 if (!(*prev_itr)->should_prepared) {
+                    ilog("maybe prepared");
                     for (auto const &sp: as) {
                         for (auto const &pp: prepares) {
                             if (sp.block_signing_key == pp.public_key) prepare_count[pp.view] += 1;
                         }
                     }
+                    ilog("prepares count map updated");
                     for (auto const &e: prepare_count) {
                         if (e.second >= as.size() * 2 / 3 + 1) {
                             by_block_id_index.modify(prev_itr,
@@ -166,14 +175,18 @@ namespace eosio {
                         }
                     }
                 }
+                ilog("getting previous block");
                 prev = ctrl.fork_db().get_block(prev->prev());
+                ilog("found previous block");
             }
+            ilog("prepare msg added");
         }
 
 
         vector<pbft_prepare> pbft_database::send_and_add_pbft_prepare(const vector<pbft_prepare> &pv, uint32_t current_view) {
 
             auto head_block_num = ctrl.head_block_num();
+            if (head_block_num <= 1) return vector<pbft_prepare>{};
 
             if (!pv.empty()) {
                 for (auto p : pv) {
@@ -185,9 +198,7 @@ namespace eosio {
                     ilog("retry pbft outgoing prepare msg: ${p} uuid: ${uuid}",("p", p.block_num)("uuid", p.uuid));
                 }
                 return vector<pbft_prepare>{};
-            } else if (head_block_num <= 1) {
-                return vector<pbft_prepare>{};
-            } else {
+            }  else {
                 vector<pbft_prepare> new_pv;
 
                 uint32_t high_water_mark_block_num = head_block_num;
