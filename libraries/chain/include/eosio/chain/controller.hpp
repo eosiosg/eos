@@ -64,7 +64,7 @@ namespace eosio { namespace chain {
             uint64_t                 state_guard_size       =  chain::config::default_state_guard_size;
             uint64_t                 reversible_cache_size  =  chain::config::default_reversible_cache_size;
             uint64_t                 reversible_guard_size  =  chain::config::default_reversible_guard_size;
-            path                     checkpoints_dir        =  chain::config::default_checkpoints_dir_name;
+            path                     checkpoints_dir        =  blocks_dir;
 
             bool                     read_only              =  false;
             bool                     force_all_checks       =  false;
@@ -271,7 +271,7 @@ namespace eosio { namespace chain {
          void set_subjective_cpu_leeway(fc::microseconds leeway);
 
          path state_dir()const;
-         path checkpoints_dir()const;
+         path blocks_dir()const;
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;

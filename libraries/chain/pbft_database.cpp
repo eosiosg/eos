@@ -14,12 +14,12 @@ namespace eosio {
     namespace chain {
 
         pbft_database::pbft_database( controller &ctrl) :
-        view_state_index(pbft_view_state_multi_index_type{}),
-        ctrl(ctrl)
+        ctrl(ctrl),
+        view_state_index(pbft_view_state_multi_index_type{})
         {
             checkpoint_index = pbft_checkpoint_state_multi_index_type{};
             pbft_db_dir = ctrl.state_dir();
-            checkpoints_dir = ctrl.checkpoints_dir();
+            checkpoints_dir = ctrl.blocks_dir();
 
             if (!fc::is_directory(pbft_db_dir)) fc::create_directories(pbft_db_dir);
 
@@ -46,7 +46,6 @@ namespace eosio {
                 ilog("index size: ${s}", ("s", index.size()));
             }
 
-            auto checkpoints_dir = ctrl.checkpoints_dir();
             if (!fc::is_directory(checkpoints_dir)) fc::create_directories(checkpoints_dir);
 
             auto checkpoints_db = checkpoints_dir / config::checkpoints_filename;

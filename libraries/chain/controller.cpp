@@ -2206,10 +2206,9 @@ path controller::state_dir() const {
    return my->conf.state_dir;
 }
 
-path controller::checkpoints_dir() const {
-   return my->conf.checkpoints_dir;
+path controller::blocks_dir() const {
+    return my->conf.blocks_dir;
 }
-
 
 bool controller::is_known_unexpired_transaction( const transaction_id_type& id) const {
    return db().find<transaction_object, by_trx_id>(id);

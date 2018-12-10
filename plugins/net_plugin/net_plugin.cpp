@@ -2748,7 +2748,7 @@ namespace eosio {
    }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
-//        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
+        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
         if(!msg.is_signature_valid())
             return;
         pbft_incoming_prepare_channel.publish(msg);
@@ -2764,7 +2764,7 @@ namespace eosio {
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
-//        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
+        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
         if(!msg.is_signature_valid())
             return;
         pbft_incoming_commit_channel.publish(msg);
@@ -2810,7 +2810,7 @@ namespace eosio {
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
-//        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
+        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
         if(!msg.is_signature_valid()) return;
         pbft_incoming_checkpoint_channel.publish(msg);
         auto digest = msg.digest();
@@ -2825,7 +2825,7 @@ namespace eosio {
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_stable_checkpoint &msg) {
-//        ilog("received stable checkpoint at ${h}", ("h", msg.block_num));
+        ilog("received stable checkpoint at ${h}", ("h", msg.block_num));
         if(!msg.is_signature_valid()) return;
         controller &cc = my_impl->chain_plug->chain();
         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
