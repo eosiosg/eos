@@ -661,9 +661,7 @@ namespace eosio {
       template <typename T>
       void operator()(const T &msg) const
       {
-          cout << "handling message";
          impl.handle_message( c, msg);
-          cout << "handled message";
       }
    };
 
@@ -1266,23 +1264,37 @@ namespace eosio {
          // This must be done before we unpack the message.
          // This code is copied from fc::io::unpack(..., unsigned_int)
          auto index = pending_message_buffer.read_index();
+         ilog("pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
          uint64_t which = 0; char b = 0; uint8_t by = 0;
          do {
             pending_message_buffer.peek(&b, 1, index);
             which |= uint32_t(uint8_t(b) & 0x7f) << by;
             by += 7;
          } while( uint8_t(b) & 0x80 && by < 32);
+         ilog("loop ends, pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
+         ilog("blk_buffer ${b}",("b",(blk_buffer.size())));
 
          if (which == uint64_t(net_message::tag<signed_block>::value)) {
             blk_buffer.resize(message_length);
             auto index = pending_message_buffer.read_index();
             pending_message_buffer.peek(blk_buffer.data(), message_length, index);
          }
+
+         ilog("b4 datastream creation, pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
+         ilog("b4 datastream creation, blk_buffer ${b}",("b",(blk_buffer.size())));
          auto ds = pending_message_buffer.create_datastream();
+         ilog("datastream created, pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
+         ilog("datastream created, blk_buffer ${b}",("b",(blk_buffer.size())));
          net_message msg;
          fc::raw::unpack(ds, msg);
+         ilog("datastream unpacked, pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
+         ilog("datastream unpacked, blk_buffer ${b}",("b",(blk_buffer.size())));
          msgHandler m(impl, shared_from_this() );
+         ilog("msg handled, pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
+         ilog("msg handled, blk_buffer ${b}",("b",(blk_buffer.size())));
          msg.visit(m);
+         ilog("msg visited, pending_message_buffer ${b}",("b",(pending_message_buffer.bytes_to_read())));
+         ilog("msg visited, blk_buffer ${b}",("b",(blk_buffer.size())));
       } catch(  const fc::exception& e ) {
          edump((e.to_detail_string() ));
          impl.close( shared_from_this() );
