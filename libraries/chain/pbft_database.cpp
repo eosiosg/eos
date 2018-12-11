@@ -116,30 +116,30 @@ namespace eosio {
 
             auto &by_block_id_index = index.get<by_block_id>();
 
-            auto prev = bs;
+            auto current = bs;
             ilog("trying to add prepare msg: ${p}", ("p", p));
 
-            while ((prev != nullptr) && (prev->block_num > ctrl.last_irreversible_block_num())) {
+            while ((current != nullptr) && (current->block_num > ctrl.last_irreversible_block_num())) {
                 ilog("previous block exists");
 
-                auto prev_itr = by_block_id_index.find(prev->id);
+                auto curr_itr = by_block_id_index.find(current->id);
 
 
-                if (prev_itr == by_block_id_index.end()) {
+                if (curr_itr == by_block_id_index.end()) {
                     try {
-                        auto prev_ps = pbft_state{prev->id, prev->block_num, {p}};
-                        auto prev_psp = make_shared<pbft_state>(prev_ps);
-                        index.insert(prev_psp);
+                        auto curr_ps = pbft_state{current->id, current->block_num, {p}};
+                        auto curr_psp = make_shared<pbft_state>(curr_ps);
+                        index.insert(curr_psp);
                         ilog("insert prepare msg");
                     } catch (...) {
                         EOS_ASSERT(false, pbft_exception, "prepare insert failure: ${p}", ("p", p));
                     }
                 } else {
-                    auto prepares = (*prev_itr)->prepares;
+                    auto prepares = (*curr_itr)->prepares;
                     auto p_itr = find_if(prepares.begin(), prepares.end(),
                             [&](const pbft_prepare &prep) { return prep.public_key == p.public_key && prep.view == p.view; });
                     if (p_itr == prepares.end()) {
-                        by_block_id_index.modify(prev_itr, [&](const pbft_state_ptr &psp) {
+                        by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr &psp) {
                             psp->prepares.emplace_back(p);
                             ilog("emplace prepare msg");
                             std::sort(psp->prepares.begin(), psp->prepares.end(), less<>());
@@ -147,12 +147,12 @@ namespace eosio {
                     }
                 }
                 ilog("trying to find block in pbft db");
-                prev_itr = by_block_id_index.find(prev->id);
+                curr_itr = by_block_id_index.find(current->id);
                 ilog("found block in pbft db");
 
-                auto prepares = (*prev_itr)->prepares;
+                auto prepares = (*curr_itr)->prepares;
                 ilog("prepare msg size ${s}", ("s", prepares.size()));
-                auto as = prev->active_schedule.producers;
+                auto as = current->active_schedule.producers;
                 ilog("active schedule size ${as}", ("as", as.size()));
                 flat_map<uint32_t,uint32_t> prepare_count;
                 for (const auto &pre: prepares) {
@@ -160,7 +160,7 @@ namespace eosio {
                 }
                 ilog("prepares count map initialised");
 
-                if (!(*prev_itr)->should_prepared) {
+                if (!(*curr_itr)->should_prepared) {
                     ilog("maybe prepared");
                     for (auto const &sp: as) {
                         for (auto const &pp: prepares) {
@@ -170,13 +170,13 @@ namespace eosio {
                     ilog("prepares count map updated");
                     for (auto const &e: prepare_count) {
                         if (e.second >= as.size() * 2 / 3 + 1) {
-                            by_block_id_index.modify(prev_itr,
+                            by_block_id_index.modify(curr_itr,
                                     [&](const pbft_state_ptr &psp) { psp->should_prepared = true; });
                         }
                     }
                 }
                 ilog("getting previous block");
-                prev = ctrl.fork_db().get_block(prev->prev());
+                current = ctrl.fork_db().get_block(current->prev());
                 ilog("found previous block");
             }
             ilog("prepare msg added");
@@ -240,6 +240,7 @@ namespace eosio {
             return (psp->should_prepared && (psp->block_num > ctrl.last_irreversible_block_num()));
         }
 
+
         void pbft_database::add_pbft_commit(pbft_commit &c) {
 
             auto bs = ctrl.fork_db().get_block(c.block_id);
@@ -257,28 +258,28 @@ namespace eosio {
 
             auto &by_block_id_index = index.get<by_block_id>();
 
-            auto prev = bs;
+            auto current = bs;
 
-            while ((prev != nullptr) && (prev->block_num > ctrl.last_irreversible_block_num())) {
+            while ((current != nullptr) && (current->block_num > ctrl.last_irreversible_block_num())) {
 
-                auto prev_itr = by_block_id_index.find(prev->id);
+                auto curr_itr = by_block_id_index.find(current->id);
 
 
-                if (prev_itr == by_block_id_index.end()) {
+                if (curr_itr == by_block_id_index.end()) {
                     try {
-                        auto prev_ps = pbft_state{prev->id, prev->block_num, .commits={c}};
-                        auto prev_psp = make_shared<pbft_state>(prev_ps);
-                        index.insert(prev_psp);
+                        auto curr_ps = pbft_state{current->id, current->block_num, .commits={c}};
+                        auto curr_psp = make_shared<pbft_state>(curr_ps);
+                        index.insert(curr_psp);
                         ilog("insert commit msg");
                     } catch (...) {
                         EOS_ASSERT(false, pbft_exception, "commit insert failure: ${c}", ("c", c));
                     }
                 } else {
-                    auto commits = (*prev_itr)->commits;
+                    auto commits = (*curr_itr)->commits;
                     auto p_itr = find_if(commits.begin(), commits.end(),
                             [&](const pbft_commit &comm) { return comm.public_key == c.public_key && comm.view == c.view; });
                     if (p_itr == commits.end()) {
-                        by_block_id_index.modify(prev_itr, [&](const pbft_state_ptr &psp) {
+                        by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr &psp) {
                             psp->commits.emplace_back(c);
                             ilog("emplace commit msg");
                             std::sort(psp->commits.begin(), psp->commits.end(), less<>());
@@ -286,28 +287,28 @@ namespace eosio {
                     }
                 }
 
-                prev_itr = by_block_id_index.find(prev->id);
-                auto commits = (*prev_itr)->commits;
-                auto as = prev->active_schedule;
+                curr_itr = by_block_id_index.find(current->id);
+                auto commits = (*curr_itr)->commits;
+                auto as = current->active_schedule;
                 flat_map<uint32_t,uint32_t> commit_count;
                 for (const auto &com: commits) {
                     if (commit_count.find(com.view) == commit_count.end()) commit_count[com.view] = 0;
                 }
                 
-                if (!(*prev_itr)->should_committed) {
+                if (!(*curr_itr)->should_committed) {
                     for (auto const &sp: as.producers) {
                         for (auto const &pc: commits) {
                             if (sp.block_signing_key == pc.public_key) commit_count[pc.view] += 1;
                         }
                     }
                     for (auto const &e: commit_count) {
-                        if (e.second >= prev->active_schedule.producers.size() * 2 / 3 + 1) {
-                            by_block_id_index.modify(prev_itr, 
+                        if (e.second >= current->active_schedule.producers.size() * 2 / 3 + 1) {
+                            by_block_id_index.modify(curr_itr,
                                     [&](const pbft_state_ptr &psp) { psp->should_committed = true; });
                         }
                     }
                 }
-                prev = ctrl.fork_db().get_block(prev->prev());
+                current = ctrl.fork_db().get_block(current->prev());
             }
         }
 
@@ -1013,7 +1014,7 @@ namespace eosio {
 
 //                auto during_bp_change = in - ctrl.last_promoted_proposed_schedule_block_num();
                 return in % 6 == 1
-                || (in >= ctrl.last_proposed_schedule_block_num() && in <= ctrl.last_promoted_proposed_schedule_block_num());
+                || (in >= ctrl.last_proposed_schedule_block_num() && in <= ctrl.last_promoted_proposed_schedule_block_num()+2);
 //                ||
             };
 

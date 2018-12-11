@@ -47,10 +47,9 @@ namespace eosio {
             }
 
             bool operator<(const pbft_prepare &rhs) const {
-                return block_num < rhs.block_num
-                       || view < rhs.view
-                       || block_id < rhs.block_id
-                       || public_key < rhs.public_key;
+                if (block_num < rhs.block_num) {
+                    return true;
+                } else return block_num == rhs.block_num && view < rhs.view;
             }
 
             digest_type digest() const {
@@ -90,10 +89,9 @@ namespace eosio {
             }
 
             bool operator<(const pbft_commit &rhs) const {
-                return block_num < rhs.block_num
-                       || view < rhs.view
-                       || block_id < rhs.block_id
-                       || public_key < rhs.public_key;
+                if (block_num < rhs.block_num) {
+                    return true;
+                } else return block_num == rhs.block_num && view < rhs.view;
             }
 
             digest_type digest() const {
@@ -204,8 +202,7 @@ namespace eosio {
             }
 
             bool operator<(const pbft_view_change &rhs) const {
-                return view < rhs.view
-                       || public_key < rhs.public_key;
+                return view < rhs.view;
             }
 
             digest_type digest() const {
@@ -276,7 +273,7 @@ namespace eosio {
             }
 
             bool operator<(const pbft_view_change &rhs) const {
-                return view < rhs.view || public_key < rhs.public_key;
+                return view < rhs.view;
             }
 
             digest_type digest() const {
@@ -316,7 +313,7 @@ namespace eosio {
             }
 
             bool operator<(const pbft_checkpoint &rhs) const {
-                return block_num < rhs.block_num || public_key < rhs.public_key;
+                return block_num < rhs.block_num;
             }
 
             digest_type digest() const {
@@ -353,7 +350,7 @@ namespace eosio {
             }
 
             bool operator<(const pbft_checkpoint &rhs) const {
-                return block_num < rhs.block_num || public_key < rhs.public_key;
+                return block_num < rhs.block_num;
             }
 
             digest_type digest() const {
@@ -534,6 +531,10 @@ namespace eosio {
                     uint32_t current_view = 1);
 
             vector<pbft_checkpoint> generate_and_add_pbft_checkpoint();
+
+            bool is_valid_prepare(pbft_prepare &p);
+
+            bool is_valid_commit(pbft_commit &c);
 
             void commit_local();
 
