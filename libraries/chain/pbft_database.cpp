@@ -968,7 +968,7 @@ namespace eosio {
 
             while (itr != by_blk_num.end()) {
                 if ( (*itr)->is_stable && ctrl.fetch_block_state_by_id((*itr)->block_id)) {
-//                    auto lib = ctrl.fetch_block_by_number(ctrl.last_irreversible_block_num());
+                    auto lib = ctrl.fetch_block_by_number(ctrl.last_irreversible_block_num());
 
 //                    wlog("itr blcok num ${c}", ("c", (*itr)->block_num));
 
@@ -976,22 +976,22 @@ namespace eosio {
                             (*itr)->block_id)->active_schedule.version;
 
 
-//                    uint32_t current_schedule_version = 0;
-//                    uint32_t new_schedule_version = 0;
-//
-//                    if (lib) {
-//                        current_schedule_version = lib->schedule_version;
-//                        if (lib->new_producers) new_schedule_version = lib->new_producers->version;
-//                    }
-//
+                    uint32_t current_schedule_version = 0;
+                    uint32_t new_schedule_version = 0;
+
+                    if (lib) {
+                        current_schedule_version = lib->schedule_version;
+                        if (lib->new_producers) new_schedule_version = lib->new_producers->version;
+                    }
+
 //                    wlog("head checkpoint schedule version ${c}, lib_sv: ${l}, new_sv: ${n}",
 //                            ("c", head_checkpoint_schedule_version)("l", current_schedule_version)("n", new_schedule_version));
 
-//                    if (head_checkpoint_schedule_version == current_schedule_version
-//                    || head_checkpoint_schedule_version == new_schedule_version) {
-//                        lscb_num = (*itr)->block_num;
-//                    }
-                    if (head_checkpoint_schedule_version == lib_active_producers().version) lscb_num = (*itr)->block_num;
+                    if (head_checkpoint_schedule_version == current_schedule_version
+                    || head_checkpoint_schedule_version == new_schedule_version) {
+                        lscb_num = (*itr)->block_num;
+                    }
+//                    if (head_checkpoint_schedule_version == lib_active_producers().version) lscb_num = (*itr)->block_num;
                 }
                 ++itr;
             }
@@ -1014,8 +1014,7 @@ namespace eosio {
 
 //                auto during_bp_change = in - ctrl.last_promoted_proposed_schedule_block_num();
                 return in % 6 == 1
-                || (in >= ctrl.last_proposed_schedule_block_num() && in <= ctrl.last_promoted_proposed_schedule_block_num()+2);
-//                ||
+                || (in >= ctrl.last_proposed_schedule_block_num() && in <= ctrl.last_promoted_proposed_schedule_block_num());
             };
 
             for (auto i = psp->block_num; i > std::max(ctrl.last_stable_checkpoint_block_num(), static_cast<uint32_t>(1)); --i) {

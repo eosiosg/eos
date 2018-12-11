@@ -1121,11 +1121,11 @@ struct controller_impl {
 
          const auto& gpo = db.get<global_property_object>();
          if( gpo.proposed_schedule_block_num.valid() && // if there is a proposed schedule that was proposed in a block ...
-             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
+//             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
              pending->_pending_block_state->pending_schedule.producers.size() == 0 && // ... and there is room for a new pending schedule ...
              !was_pending_promoted && // ... and not just because it was promoted to active at the start of this block, then:
-             // pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 12 //TODO: to be optimised.
-             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + (12*head->active_schedule.producers.size()) //TODO: to be optimised.
+             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 1 //TODO: to be optimised.
+//             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + (12*head->active_schedule.producers.size()) //TODO: to be optimised.
          )
             {
                // Promote proposed schedule to pending schedule.
