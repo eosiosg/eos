@@ -834,12 +834,12 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
 }
 
 void chain_plugin_impl::on_pbft_incoming_prepare(pbft_prepare p){
-   ilog("incoming prepare from ${bp} at ${num}", ("bp",p.public_key)("num",p.block_num));
+//   ilog("incoming prepare from ${bp} at ${num}", ("bp",p.public_key)("num",p.block_num));
    pbft_ctrl->on_pbft_prepare(p);
 }
 
 void chain_plugin_impl::on_pbft_incoming_commit(pbft_commit c){
-   ilog("incoming commit from ${bp} at ${num}", ("bp",c.public_key)("num",c.block_num));
+//   ilog("incoming commit from ${bp} at ${num}", ("bp",c.public_key)("num",c.block_num));
    pbft_ctrl->on_pbft_commit(c);
 }
 

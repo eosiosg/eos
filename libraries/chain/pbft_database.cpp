@@ -117,10 +117,10 @@ namespace eosio {
             auto &by_block_id_index = index.get<by_block_id>();
 
             auto current = bs;
-            ilog("trying to add prepare msg: ${p}", ("p", p));
+//            ilog("trying to add prepare msg: ${p}", ("p", p));
 
             while ((current != nullptr) && (current->block_num > ctrl.last_irreversible_block_num())) {
-                ilog("previous block exists");
+//                ilog("previous block exists");
 
                 auto curr_itr = by_block_id_index.find(current->id);
 
@@ -130,7 +130,7 @@ namespace eosio {
                         auto curr_ps = pbft_state{current->id, current->block_num, {p}};
                         auto curr_psp = make_shared<pbft_state>(curr_ps);
                         index.insert(curr_psp);
-                        ilog("insert prepare msg");
+//                        ilog("insert prepare msg");
                     } catch (...) {
                         EOS_ASSERT(false, pbft_exception, "prepare insert failure: ${p}", ("p", p));
                     }
@@ -141,33 +141,33 @@ namespace eosio {
                     if (p_itr == prepares.end()) {
                         by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr &psp) {
                             psp->prepares.emplace_back(p);
-                            ilog("emplace prepare msg");
+//                            ilog("emplace prepare msg");
                             std::sort(psp->prepares.begin(), psp->prepares.end(), less<>());
                         });
                     }
                 }
-                ilog("trying to find block in pbft db");
+//                ilog("trying to find block in pbft db");
                 curr_itr = by_block_id_index.find(current->id);
-                ilog("found block in pbft db");
+//                ilog("found block in pbft db");
 
                 auto prepares = (*curr_itr)->prepares;
-                ilog("prepare msg size ${s}", ("s", prepares.size()));
+//                ilog("prepare msg size ${s}", ("s", prepares.size()));
                 auto as = current->active_schedule.producers;
-                ilog("active schedule size ${as}", ("as", as.size()));
+//                ilog("active schedule size ${as}", ("as", as.size()));
                 flat_map<uint32_t,uint32_t> prepare_count;
                 for (const auto &pre: prepares) {
                     if (prepare_count.find(pre.view) == prepare_count.end()) prepare_count[pre.view] = 0;
                 }
-                ilog("prepares count map initialised");
+//                ilog("prepares count map initialised");
 
                 if (!(*curr_itr)->should_prepared) {
-                    ilog("maybe prepared");
+//                    ilog("maybe prepared");
                     for (auto const &sp: as) {
                         for (auto const &pp: prepares) {
                             if (sp.block_signing_key == pp.public_key) prepare_count[pp.view] += 1;
                         }
                     }
-                    ilog("prepares count map updated");
+//                    ilog("prepares count map updated");
                     for (auto const &e: prepare_count) {
                         if (e.second >= as.size() * 2 / 3 + 1) {
                             by_block_id_index.modify(curr_itr,
@@ -175,11 +175,11 @@ namespace eosio {
                         }
                     }
                 }
-                ilog("getting previous block");
+//                ilog("getting previous block");
                 current = ctrl.fork_db().get_block(current->prev());
-                ilog("found previous block");
+//                ilog("found previous block");
             }
-            ilog("prepare msg added");
+//            ilog("prepare msg added");
         }
 
 
@@ -195,7 +195,7 @@ namespace eosio {
                     p.uuid = uuid;
                     p.producer_signature = ctrl.my_signature_providers()[p.public_key](p.digest());
                     emit(pbft_outgoing_prepare, p);
-                    ilog("retry pbft outgoing prepare msg: ${p} uuid: ${uuid}",("p", p.block_num)("uuid", p.uuid));
+//                    ilog("retry pbft outgoing prepare msg: ${p} uuid: ${uuid}",("p", p.block_num)("uuid", p.uuid));
                 }
                 return vector<pbft_prepare>{};
             }  else {
@@ -222,7 +222,7 @@ namespace eosio {
                     p.producer_signature = sp.second(p.digest());
                     add_pbft_prepare(p);
                     emit(pbft_outgoing_prepare, p);
-                    ilog("pbft outgoing prepare msg: ${p} uuid: ${uuid}", ("p", p.block_num)("uuid", p.uuid));
+//                    ilog("pbft outgoing prepare msg: ${p} uuid: ${uuid}", ("p", p.block_num)("uuid", p.uuid));
                     new_pv.emplace_back(p);
                 }
                 return new_pv;
@@ -270,7 +270,7 @@ namespace eosio {
                         auto curr_ps = pbft_state{current->id, current->block_num, .commits={c}};
                         auto curr_psp = make_shared<pbft_state>(curr_ps);
                         index.insert(curr_psp);
-                        ilog("insert commit msg");
+//                        ilog("insert commit msg");
                     } catch (...) {
                         EOS_ASSERT(false, pbft_exception, "commit insert failure: ${c}", ("c", c));
                     }
@@ -281,7 +281,7 @@ namespace eosio {
                     if (p_itr == commits.end()) {
                         by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr &psp) {
                             psp->commits.emplace_back(c);
-                            ilog("emplace commit msg");
+//                            ilog("emplace commit msg");
                             std::sort(psp->commits.begin(), psp->commits.end(), less<>());
                         });
                     }
@@ -320,7 +320,7 @@ namespace eosio {
                     c.uuid = uuid;
                     c.producer_signature = ctrl.my_signature_providers()[c.public_key](c.digest());
                     emit(pbft_outgoing_commit, c);
-                    ilog("retry pbft outgoing commit msg: ${c} uuid: ${uuid}",("c", c.block_num)("uuid", c.uuid));
+//                    ilog("retry pbft outgoing commit msg: ${c} uuid: ${uuid}",("c", c.block_num)("uuid", c.uuid));
                 }
                 return vector<pbft_commit>{};
             } else {
@@ -341,7 +341,7 @@ namespace eosio {
                         c.producer_signature = sp.second(c.digest());
                         add_pbft_commit(c);
                         emit(pbft_outgoing_commit, c);
-                        ilog("pbft outgoing commit msg: ${c}", ("c", c.block_num));
+//                        ilog("pbft outgoing commit msg: ${c}", ("c", c.block_num));
                         new_cv.emplace_back(c);
                     }
                 }
@@ -368,9 +368,9 @@ namespace eosio {
             pbft_state_ptr psp = *itr;
             auto blk_state = ctrl.fetch_block_state_by_id((*itr)->block_id);
             if (!blk_state) return new_view;
-            ilog("try to fetch block state");
+//            ilog("try to fetch block state");
             auto as = blk_state->active_schedule.producers;
-            ilog("fetched block state");
+//            ilog("fetched block state");
 
             auto commits = (*itr)->commits;
 
@@ -421,7 +421,7 @@ namespace eosio {
                 auto vs = pbft_view_state{vc.view, .view_changes={vc}};
                 auto vsp = make_shared<pbft_view_state>(vs);
                 view_state_index.insert(vsp);
-                ilog("insert view change msg");
+//                ilog("insert view change msg");
             } else {
                 auto pvs = (*itr);
                 auto view_changes = pvs->view_changes;
@@ -429,7 +429,7 @@ namespace eosio {
                         [&](const pbft_view_change &existed) { return existed.public_key == vc.public_key; });
                 if (p_itr == view_changes.end()) {
                     by_view_index.modify(itr, [&](const pbft_view_state_ptr &pvsp) {
-                        ilog("emplace view change msg");
+//                        ilog("emplace view change msg");
                         pvsp->view_changes.emplace_back(vc);
                     });
                 }
@@ -492,7 +492,7 @@ namespace eosio {
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
                     vc.uuid = uuid;
                     vc.producer_signature = ctrl.my_signature_providers()[vc.public_key](vc.digest());
-                    ilog("retry pbft outgoing view change msg: ${v}",("v", vc.view));
+//                    ilog("retry pbft outgoing view change msg: ${v}",("v", vc.view));
                     emit(pbft_outgoing_view_change, vc);
                 }
                 return vector<pbft_view_change>{};
@@ -513,7 +513,7 @@ namespace eosio {
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
                     auto vc = pbft_view_change{uuid, new_view, my_ppc, my_pcc, my_sp.first};
                     vc.producer_signature = my_sp.second(vc.digest());
-                    ilog("starting new round of view change: ${nv}", ("nv", vc.view));
+//                    ilog("starting new round of view change: ${nv}", ("nv", vc.view));
                     emit(pbft_outgoing_view_change, vc);
                     add_pbft_view_change(vc);
                     new_vcv.emplace_back(vc);
@@ -604,9 +604,9 @@ namespace eosio {
 
             auto prepared_block_state = ctrl.fetch_block_state_by_id(psp->block_id);
             if (!prepared_block_state) return vector<pbft_prepared_certificate>{};
-            ilog("try to fetch block state");
+//            ilog("try to fetch block state");
             auto as = prepared_block_state->active_schedule.producers;
-            ilog("fetched block state");
+//            ilog("fetched block state");
             if (psp->should_prepared && (psp->block_num > (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
                     auto prepares = psp->prepares;
@@ -654,9 +654,9 @@ namespace eosio {
 
             auto committed_block_state = ctrl.fetch_block_state_by_id(psp->block_id);
             if (!committed_block_state) return vector<pbft_committed_certificate>{};
-            ilog("try to fetch block state");
+//            ilog("try to fetch block state");
             auto as = committed_block_state->active_schedule.producers;
-            ilog("fetched block state");
+//            ilog("fetched block state");
             if (psp->should_committed && (psp->block_num >= (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
                     auto commits = psp->commits;
@@ -722,7 +722,7 @@ namespace eosio {
                 valid_sig &= p.is_signature_valid();
             }
             if (!valid_sig) return false;
-            ilog("prepare signature valid!");
+//            ilog("prepare signature valid!");
 
             //get lib schedule
             auto lib_num = ctrl.last_irreversible_block_num();
@@ -753,7 +753,7 @@ namespace eosio {
                 if (longest_fork.size() < bp_threshold) {
                     return false;
                 }
-                ilog("prepare longest fork valid!");
+//                ilog("prepare longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
@@ -761,7 +761,7 @@ namespace eosio {
                     || certificate.block_num != calculated_block_info.block_num) {
                     return false;
                 }
-                ilog("prepare block id and num valid!");
+//                ilog("prepare block id and num valid!");
 
             }
 
@@ -783,7 +783,7 @@ namespace eosio {
             }
 
             if (!valid_sig) return false;
-            ilog("commit signature valid!");
+//            ilog("commit signature valid!");
 
             //get lib schedule
             auto lib_num = ctrl.last_irreversible_block_num();
@@ -814,7 +814,7 @@ namespace eosio {
                 if (longest_fork.size() < bp_threshold) {
                     return false;
                 }
-                ilog("commit longest fork valid!");
+//                ilog("commit longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
@@ -822,7 +822,7 @@ namespace eosio {
                     || certificate.block_num != calculated_block_info.block_num) {
                     return false;
                 }
-                ilog("commit block id and num valid!");
+//                ilog("commit block id and num valid!");
             }
 
             return true;
@@ -917,9 +917,9 @@ namespace eosio {
             auto id = bi.front().block_id;
             auto num = bi.front().block_num;
             while (num <= high && num >= low && !bi.empty()) {
-                ilog("try to fetch block");
+//                ilog("try to fetch block");
                 auto b = ctrl.fetch_block_by_id(id);
-                ilog("fetched block");
+//                ilog("fetched block");
 
                 for (auto it = bi.begin(); it != bi.end();) {
                     if (it->block_id == id) {
@@ -1083,9 +1083,9 @@ namespace eosio {
 //            auto active_bps = lib_active_producers().producers;
             auto cp_block_state = ctrl.fetch_block_state_by_number(cp.block_num);
             if (!cp_block_state) return;
-            ilog("try to fetch block state");
+//            ilog("try to fetch block state");
             auto active_bps = cp_block_state->active_schedule.producers;
-            ilog("fetched block state");
+//            ilog("fetched block state");
             auto checkpoint_count = count_if(active_bps.begin(), active_bps.end(), [&](const producer_key &p) {
                 return p.block_signing_key == cp.public_key; });
             if (checkpoint_count == 0) return;
@@ -1180,7 +1180,7 @@ namespace eosio {
             for (auto const &bp: active_bps) {
                 for (auto const &my: ctrl.my_signature_providers()) {
                     if (bp.block_signing_key == my.first) {
-                        ilog("I am an active producer!");
+//                        ilog("I am an active producer!");
                         return true;
                     }
                 }
@@ -1189,7 +1189,7 @@ namespace eosio {
             for (auto const &bp: previous_active_bps) {
                 for (auto const &my: ctrl.my_signature_providers()) {
                     if (bp.block_signing_key == my.first) {
-                        ilog("I used to be an active producer of last round!");
+//                        ilog("I used to be an active producer of last round!");
                         return true;
                     }
                 }

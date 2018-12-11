@@ -171,7 +171,7 @@ namespace eosio {
             //ignore
 
             if (!e.is_signature_valid()) return;
-            ilog("valid prepare sig");
+//            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -305,7 +305,7 @@ namespace eosio {
         void psm_committed_state::on_prepare(psm_machine *m, pbft_prepare &e, pbft_database &pbft_db) {
             //validate
             if (!e.is_signature_valid()) return;
-            ilog("valid prepare sig");
+//            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -353,7 +353,7 @@ namespace eosio {
 //                m->transit_to_committed_state(this);
 //            }
             if (!e.is_signature_valid()) return;
-            ilog("valid prepare sig");
+//            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -546,7 +546,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_committed_state(T const & s) {
-            ilog("trying transit to committed");
+//            ilog("trying transit to committed");
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) {
                 this->set_current_view(nv);
@@ -555,36 +555,36 @@ namespace eosio {
             this->set_prepares_cache(vector<pbft_prepare>{});
             this->set_view_change_timer(0);
             this->set_current(new psm_committed_state);
-            ilog("deleting state, transit to committed");
+//            ilog("deleting state, transit to committed");
             delete s;
-            ilog("deleted state, transit to committed");
+//            ilog("deleted state, transit to committed");
         }
 
         template<typename T>
         void psm_machine::transit_to_prepared_state(T const & s) {
-            ilog("trying transit to prepared");
+//            ilog("trying transit to prepared");
             this->set_commits_cache(vector<pbft_commit>{});
             this->set_current(new psm_prepared_state);
-            ilog("deleting state, transit to prepared");
+//            ilog("deleting state, transit to prepared");
             delete s;
-            ilog("deleted state, transit to prepared");
+//            ilog("deleted state, transit to prepared");
         }
 
         template<typename T>
         void psm_machine::transit_to_view_change_state(T const & s) {
-            ilog("trying transit to view change");
+//            ilog("trying transit to view change");
             this->set_commits_cache(vector<pbft_commit>{});
             this->set_prepares_cache(vector<pbft_prepare>{});
             this->set_view_change_timer(0);
             this->set_current(new psm_view_change_state);
-            ilog("deleting state, transit to view change");
+//            ilog("deleting state, transit to view change");
             delete s;
-            ilog("deleted state, transit to view change");
+//            ilog("deleted state, transit to view change");
         }
 
         template<typename T>
         void psm_machine::transit_to_new_view(const pbft_new_view &new_view, T const & s) {
-            ilog("trying transit to new view");
+//            ilog("trying transit to new view");
             this->set_current_view(new_view.view);
             this->set_target_view(new_view.view + 1);
             this->set_target_view_retries(0);
@@ -600,11 +600,11 @@ namespace eosio {
                     try {
                         pbft_db.add_pbft_commit(c);
                         if (pbft_db.should_committed()) {
-                            ilog("Changing to COMMITTED!");
+//                            ilog("Changing to COMMITTED!");
                             this->set_current(new psm_committed_state);
-                            ilog("deleting state, transit to committed");
+//                            ilog("deleting state, transit to committed");
                             delete s;
-                            ilog("deleted state, transit to committed");
+//                            ilog("deleted state, transit to committed");
                             return;
                         }
                     } catch (...) {
@@ -619,11 +619,11 @@ namespace eosio {
                     try {
                         pbft_db.add_pbft_prepare(p);
                         if (pbft_db.should_prepared()) {
-                            ilog("Changing to PREPARED!");
+//                            ilog("Changing to PREPARED!");
                             this->set_current(new psm_prepared_state);
-                            ilog("deleting state, transit to prepared");
+//                            ilog("deleting state, transit to prepared");
                             delete s;
-                            ilog("deleted state, transit to prepared");
+//                            ilog("deleted state, transit to prepared");
                             return;
                         }
                     } catch (...) {
@@ -632,12 +632,12 @@ namespace eosio {
                 }
             }
 
-            ilog("Changing to COMMITTED!");
+//            ilog("Changing to COMMITTED!");
             this->set_current(new psm_committed_state);
-            ilog("deleting state, transit to committed");
+//            ilog("deleting state, transit to committed");
             delete s;
-            ilog("deleted state, transit to committed");
-            ilog("validated new view request, finished change new view");
+//            ilog("deleted state, transit to committed");
+//            ilog("validated new view request, finished change new view");
         }
 
         void psm_machine::send_pbft_view_change() {
