@@ -557,7 +557,7 @@ namespace eosio {
 
             block_num_type cal_latest_possible_stable_checkpoint_block_num()const;
 
-            bool is_active_producer();
+            bool should_send_pbft_msg();
 
             void send_pbft_checkpoint(const vector<pbft_checkpoint> &cps = vector<pbft_checkpoint>{});
 

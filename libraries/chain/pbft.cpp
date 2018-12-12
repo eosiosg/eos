@@ -13,6 +13,7 @@ namespace eosio {
         pbft_db(ctrl),
         state_machine(pbft_db)
         {
+            ilog("pbft ctrl initialising...");
             config.view_change_timeout = 6;
             datadir = ctrl.state_dir();
 
@@ -44,20 +45,21 @@ namespace eosio {
 
             uint32_t current_view = state_machine.get_current_view();
             fc::raw::pack(out, current_view);
+            ilog("pbft closing...");
         }
 
         void pbft_controller::maybe_pbft_prepare() {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.send_prepare();
         }
 
         void pbft_controller::maybe_pbft_commit() {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.send_commit();
         }
 
         void pbft_controller::maybe_pbft_view_change() {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             if (state_machine.get_view_change_timer() <= config.view_change_timeout) {
                 if (!state_machine.get_view_changes_cache().empty()) {
                     pbft_db.send_and_add_pbft_view_change(state_machine.get_view_changes_cache());
@@ -70,27 +72,27 @@ namespace eosio {
         }
 
         void pbft_controller::on_pbft_prepare(pbft_prepare &p) {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.on_prepare(p);
         }
 
         void pbft_controller::on_pbft_commit(pbft_commit &c) {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.on_commit(c);
         }
 
         void pbft_controller::on_pbft_view_change(pbft_view_change &vc) {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.on_view_change(vc);
         }
 
         void pbft_controller::on_pbft_new_view(pbft_new_view &nv) {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.on_new_view(nv);
         }
 
         void pbft_controller::send_pbft_checkpoint() {
-            if (!pbft_db.is_active_producer()) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             auto cps = state_machine.get_checkpoints_cache();
             pbft_db.send_pbft_checkpoint(cps);
         }
@@ -187,7 +189,7 @@ namespace eosio {
         void psm_prepared_state::on_commit(psm_machine *m, pbft_commit &e, pbft_database &pbft_db) {
 
             if (!e.is_signature_valid()) return;
-            ilog("valid prepare sig");
+//            ilog("valid prepare sig");
 
             if (e.view < m->get_current_view()) return;
 
@@ -248,7 +250,7 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("[PREPARED] valid view change msg");
+//            ilog("[PREPARED] valid view change msg");
             //do action add view change
             pbft_db.add_pbft_view_change(e);
 
@@ -286,7 +288,7 @@ namespace eosio {
             //handle new view
             if (e.view <= m->get_current_view()) return;
 
-            ilog("[PREPARED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
+//            ilog("[PREPARED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
             if (pbft_db.is_valid_new_view(e)) {
                 ilog("[PREPARED] valid new view, transit to new view: ${v2}",("v2",e.view));
                 m->transit_to_new_view(e, this);
@@ -392,7 +394,7 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("[COMMITTED] valid view change msg");
+//            ilog("[COMMITTED] valid view change msg");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
@@ -430,7 +432,7 @@ namespace eosio {
 
             if (e.view <= m->get_current_view()) return;
 
-            ilog("[COMMITTED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
+//            ilog("[COMMITTED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
 
             //handle new view
             if (pbft_db.is_valid_new_view(e)) {
@@ -471,7 +473,7 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("[VIEW CHANGE] valid view change msg");
+//            ilog("[VIEW CHANGE] valid view change msg");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
@@ -483,7 +485,7 @@ namespace eosio {
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
-                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
+//                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),
                         new_view);
@@ -497,7 +499,7 @@ namespace eosio {
         }
 
         void psm_view_change_state::send_view_change(psm_machine *m, pbft_database &pbft_db) {
-            ilog("[VIEW CHANGE] send_view_change: current view: ${v1}",("v1",m->get_current_view()));
+//            ilog("[VIEW CHANGE] send_view_change: current view: ${v1}",("v1",m->get_current_view()));
 
             if (m->get_target_view_retries() < m->get_target_view() - m->get_current_view()) {
                 m->set_target_view_retries(m->get_target_view_retries() + 1);
@@ -514,7 +516,7 @@ namespace eosio {
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
-                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
+//                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
 
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),
@@ -538,7 +540,7 @@ namespace eosio {
             ilog("[VIEW CHANGE] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
             //transit to committed or prepare
             if (pbft_db.is_valid_new_view(e)) {
-                ilog("VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
+//                ilog("VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
 
                 m->transit_to_new_view(e, this);
             }
@@ -652,7 +654,7 @@ namespace eosio {
                     this->get_prepared_certificate(),
                     this->get_committed_certificate(),
                     this->get_target_view());
-            ilog("generating view change msg ${vc}", ("vc", view_changes));
+//            ilog("generating view change msg ${vc}", ("vc", view_changes));
 
             if (!view_changes.empty()) {
                 this->set_view_changes_cache(view_changes);

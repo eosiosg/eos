@@ -272,6 +272,7 @@ namespace eosio { namespace chain {
 
          path state_dir()const;
          path blocks_dir()const;
+         producer_schedule_type initial_schedule()const;
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;

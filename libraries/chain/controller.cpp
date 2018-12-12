@@ -117,7 +117,7 @@ struct pending_state {
 
 struct pending_pbft_state {
     block_id_type    pbft_lib;
-    bool             contains_proposed_schedule;
+    bool             contains_proposed_schedule = false;
 };
 
 struct controller_impl {
@@ -1263,7 +1263,7 @@ struct controller_impl {
          set_pbft_lib();
          set_pbft_lscb();
 //         }
-         ilog("set lib done");
+//         ilog("set lib done");
          bool trust = !conf.force_all_checks && (s == controller::block_status::irreversible || s == controller::block_status::validated);
          auto new_header_state = fork_db.add( b, trust );
          if (conf.trusted_producers.count(b->producer)) {
@@ -2209,6 +2209,11 @@ path controller::state_dir() const {
 path controller::blocks_dir() const {
     return my->conf.blocks_dir;
 }
+
+producer_schedule_type controller::initial_schedule() const {
+   return producer_schedule_type{ 0, {{eosio::chain::config::system_account_name, my->conf.genesis.initial_key}} };
+}
+
 
 bool controller::is_known_unexpired_transaction( const transaction_id_type& id) const {
    return db().find<transaction_object, by_trx_id>(id);
