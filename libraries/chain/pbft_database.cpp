@@ -456,7 +456,7 @@ namespace eosio {
                     by_view_index.modify(itr,
                             [&](const pbft_view_state_ptr &pvsp) {
                         pvsp->should_view_changed = true;
-                        wlog("view ${s} is potential new view", ("v", (*itr)->view));
+                        wlog("view ${v} is potential new view", ("v", (*itr)->view));
                     });
                 }
             }
@@ -535,10 +535,10 @@ namespace eosio {
         }
 
 
-        bool pbft_database::should_new_view() {
+        bool pbft_database::should_new_view(const uint32_t target_view) {
             auto &by_count_and_view_index = view_state_index.get<by_count_and_view>();
             auto itr = by_count_and_view_index.begin();
-            if (itr == by_count_and_view_index.end()) return false;
+            if (itr == by_count_and_view_index.end() || (*itr)->view < target_view) return false;
             return (*itr)->should_view_changed;
         }
 
@@ -550,9 +550,9 @@ namespace eosio {
         }
 
 
-        bool pbft_database::is_new_primary() {
+        bool pbft_database::is_new_primary(const uint32_t target_view) {
 
-            auto primary_key = get_new_view_primary_key();
+            auto primary_key = get_new_view_primary_key(target_view);
 
             if (primary_key == public_key_type{}) return false;
             auto sps = ctrl.my_signature_providers();
@@ -569,8 +569,8 @@ namespace eosio {
                 uint32_t current_view)
         {
 
-            auto primary_key = get_new_view_primary_key();
-            if (!is_new_primary()) return pbft_new_view{};
+            auto primary_key = get_new_view_primary_key(current_view);
+            if (!is_new_primary(current_view)) return pbft_new_view{};
 
             //`sp_itr` is not possible to be the end iterator, since it's already been checked in `is_new_primary`.
             auto my_sps = ctrl.my_signature_providers();
@@ -1211,15 +1211,15 @@ namespace eosio {
             return false;
         }
 
-        public_key_type pbft_database::get_new_view_primary_key() {
+        public_key_type pbft_database::get_new_view_primary_key(const uint32_t target_view) {
             auto &by_count_and_view_index = view_state_index.get<by_count_and_view>();
             auto itr = by_count_and_view_index.begin();
-            if (itr == by_count_and_view_index.end()) return public_key_type{};
+            if (itr == by_count_and_view_index.end() || (*itr)->view < target_view) return public_key_type{};
 
             auto active_bps = lib_active_producers().producers;
             if (active_bps.empty()) return public_key_type{};
 
-            return active_bps[(*itr)->view % active_bps.size()].block_signing_key;
+            return active_bps[target_view % active_bps.size()].block_signing_key;
         }
 
         producer_schedule_type pbft_database::lib_active_producers() const {

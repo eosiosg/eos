@@ -480,12 +480,13 @@ namespace eosio {
             pbft_db.add_pbft_view_change(e);
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
-            if (pbft_db.should_new_view() && pbft_db.is_new_primary()) {
+            if (pbft_db.should_new_view(m->get_current_view()) && pbft_db.is_new_primary(m->get_current_view())) {
 //                ilog("I am the chosen primary for new view!");
                 //TODO: retry new view???
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
+                if (new_view != m->get_current_view()) return;
 //                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),
@@ -512,11 +513,12 @@ namespace eosio {
             m->send_pbft_view_change();
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
-            if (pbft_db.should_new_view() && pbft_db.is_new_primary()) {
+            if (pbft_db.should_new_view(m->get_target_view()) && pbft_db.is_new_primary(m->get_target_view())) {
                 //TODO: retry new view???
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
+                if (new_view != m->get_target_view()) return;
 //                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
 
                 auto nv_msg = pbft_db.send_pbft_new_view(

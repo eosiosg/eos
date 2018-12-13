@@ -498,9 +498,9 @@ namespace eosio {
 
             uint32_t should_view_change();
 
-            bool should_new_view();
+            bool should_new_view(const uint32_t target_view);
 
-            bool is_new_primary();
+            bool is_new_primary(const uint32_t target_view);
 
             uint32_t get_proposed_new_view_num();
 
@@ -596,7 +596,7 @@ namespace eosio {
 
             bool is_valid_committed_certificate(const pbft_committed_certificate &certificate);
 
-            public_key_type get_new_view_primary_key();
+            public_key_type get_new_view_primary_key(const uint32_t target_view);
 
             vector<vector<block_info>> fetch_fork_from(const vector<block_info> block_infos);
 
