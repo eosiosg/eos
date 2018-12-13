@@ -17,7 +17,7 @@ namespace eosio {
         ctrl(ctrl),
         view_state_index(pbft_view_state_multi_index_type{})
         {
-            ilog("pbft db initialising...");
+//            ilog("pbft db initialising...");
 
             checkpoint_index = pbft_checkpoint_state_multi_index_type{};
             pbft_db_dir = ctrl.state_dir();
@@ -100,7 +100,7 @@ namespace eosio {
 
             index.clear();
             checkpoint_index.clear();
-            ilog("pbft db closing...");
+//            ilog("pbft db closing...");
         }
 
         pbft_database::~pbft_database()
@@ -454,7 +454,10 @@ namespace eosio {
                 }
                 if (vc_count >= active_bps.size() * 2 / 3 + 1) {
                     by_view_index.modify(itr,
-                            [&](const pbft_view_state_ptr &pvsp) { pvsp->should_view_changed = true; });
+                            [&](const pbft_view_state_ptr &pvsp) {
+                        pvsp->should_view_changed = true;
+                        wlog("view ${s} is potential new view", ("v", (*itr)->view));
+                    });
                 }
             }
         }
@@ -501,7 +504,7 @@ namespace eosio {
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
                     vc.uuid = uuid;
                     vc.producer_signature = ctrl.my_signature_providers()[vc.public_key](vc.digest());
-//                    ilog("retry pbft outgoing view change msg: ${v}",("v", vc.view));
+                    ilog("retry pbft outgoing view change msg: ${v}",("v", vc.view));
                     emit(pbft_outgoing_view_change, vc);
                 }
                 return vector<pbft_view_change>{};
@@ -522,7 +525,7 @@ namespace eosio {
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
                     auto vc = pbft_view_change{uuid, new_view, my_ppc, my_pcc, my_sp.first};
                     vc.producer_signature = my_sp.second(vc.digest());
-//                    ilog("starting new round of view change: ${nv}", ("nv", vc.view));
+                    ilog("starting new round of view change: ${nv}", ("nv", vc.view));
                     emit(pbft_outgoing_view_change, vc);
                     add_pbft_view_change(vc);
                     new_vcv.emplace_back(vc);

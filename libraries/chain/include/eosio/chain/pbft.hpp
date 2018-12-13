@@ -208,6 +208,7 @@ namespace eosio {
 
         struct pbft_config {
             uint32_t view_change_timeout;
+            bool     bp_candidate = false;
         };
 
         class pbft_controller {

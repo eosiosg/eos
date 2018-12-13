@@ -13,8 +13,9 @@ namespace eosio {
         pbft_db(ctrl),
         state_machine(pbft_db)
         {
-            ilog("pbft ctrl initialising...");
+//            ilog("pbft ctrl initialising...");
             config.view_change_timeout = 6;
+            config.bp_candidate = true;
             datadir = ctrl.state_dir();
 
             if (!fc::is_directory(datadir))
@@ -45,7 +46,7 @@ namespace eosio {
 
             uint32_t current_view = state_machine.get_current_view();
             fc::raw::pack(out, current_view);
-            ilog("pbft closing...");
+//            ilog("pbft closing...");
         }
 
         void pbft_controller::maybe_pbft_prepare() {
@@ -72,22 +73,22 @@ namespace eosio {
         }
 
         void pbft_controller::on_pbft_prepare(pbft_prepare &p) {
-            if (!pbft_db.should_send_pbft_msg()) return;
+            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
             state_machine.on_prepare(p);
         }
 
         void pbft_controller::on_pbft_commit(pbft_commit &c) {
-            if (!pbft_db.should_send_pbft_msg()) return;
+            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
             state_machine.on_commit(c);
         }
 
         void pbft_controller::on_pbft_view_change(pbft_view_change &vc) {
-            if (!pbft_db.should_send_pbft_msg()) return;
+            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
             state_machine.on_view_change(vc);
         }
 
         void pbft_controller::on_pbft_new_view(pbft_new_view &nv) {
-            if (!pbft_db.should_send_pbft_msg()) return;
+            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
             state_machine.on_new_view(nv);
         }
 
