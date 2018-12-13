@@ -83,7 +83,7 @@ namespace eosio {
         }
 
         void pbft_controller::on_pbft_view_change(pbft_view_change &vc) {
-            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
+            if (!pbft_db.should_send_pbft_msg()) return;
             state_machine.on_view_change(vc);
         }
 
@@ -289,7 +289,7 @@ namespace eosio {
             //handle new view
             if (e.view <= m->get_current_view()) return;
 
-//            ilog("[PREPARED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
+            ilog("[PREPARED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e));
             if (pbft_db.is_valid_new_view(e)) {
                 ilog("[PREPARED] valid new view, transit to new view: ${v2}",("v2",e.view));
                 m->transit_to_new_view(e, this);
@@ -433,7 +433,7 @@ namespace eosio {
 
             if (e.view <= m->get_current_view()) return;
 
-//            ilog("[COMMITTED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
+            ilog("[COMMITTED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e));
 
             //handle new view
             if (pbft_db.is_valid_new_view(e)) {
@@ -480,13 +480,13 @@ namespace eosio {
             pbft_db.add_pbft_view_change(e);
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
-            if (pbft_db.should_new_view(m->get_current_view()) && pbft_db.is_new_primary(m->get_current_view())) {
+            if (pbft_db.should_new_view(m->get_target_view()) && pbft_db.is_new_primary(m->get_target_view())) {
 //                ilog("I am the chosen primary for new view!");
                 //TODO: retry new view???
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
-                if (new_view != m->get_current_view()) return;
+                if (new_view != m->get_target_view()) return;
 //                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),
@@ -540,10 +540,10 @@ namespace eosio {
             //handle new view
             if (e.view <= m->get_current_view()) return;
 
-            ilog("[VIEW CHANGE] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
+            ilog("[VIEW CHANGE] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e));
             //transit to committed or prepare
             if (pbft_db.is_valid_new_view(e)) {
-//                ilog("VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
+                ilog("VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
 
                 m->transit_to_new_view(e, this);
             }
