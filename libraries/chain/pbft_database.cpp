@@ -536,16 +536,16 @@ namespace eosio {
 
 
         bool pbft_database::should_new_view(const uint32_t target_view) {
-            auto &by_count_and_view_index = view_state_index.get<by_count_and_view>();
-            auto itr = by_count_and_view_index.begin();
-            if (itr == by_count_and_view_index.end() || (*itr)->view < target_view) return false;
+            auto &by_view_index = view_state_index.get<by_view>();
+            auto itr = by_view_index.find(target_view);
+            if (itr == by_view_index.end()) return false;
             return (*itr)->should_view_changed;
         }
 
         uint32_t pbft_database::get_proposed_new_view_num() {
             auto &by_count_and_view_index = view_state_index.get<by_count_and_view>();
             auto itr = by_count_and_view_index.begin();
-            EOS_ASSERT(itr != by_count_and_view_index.end(), pbft_exception, "no valid proposed new view");
+//            EOS_ASSERT(itr != by_count_and_view_index.end(), pbft_exception, "no valid proposed new view");
             return (*itr)->view;
         }
 
@@ -1212,9 +1212,6 @@ namespace eosio {
         }
 
         public_key_type pbft_database::get_new_view_primary_key(const uint32_t target_view) {
-            auto &by_count_and_view_index = view_state_index.get<by_count_and_view>();
-            auto itr = by_count_and_view_index.begin();
-            if (itr == by_count_and_view_index.end() || (*itr)->view < target_view) return public_key_type{};
 
             auto active_bps = lib_active_producers().producers;
             if (active_bps.empty()) return public_key_type{};
@@ -1224,7 +1221,7 @@ namespace eosio {
 
         producer_schedule_type pbft_database::lib_active_producers() const {
             auto lib_num = ctrl.last_irreversible_block_num();
-            if (lib_num == 0) return ctrl.initial_schedule(); //TODO: should be initial schedule;
+            if (lib_num == 0) return ctrl.initial_schedule();
             auto lib_state = ctrl.fetch_block_state_by_number(lib_num);
 
             if  (lib_num == ctrl.last_promoted_proposed_schedule_block_num())
