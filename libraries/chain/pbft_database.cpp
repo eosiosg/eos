@@ -111,8 +111,7 @@ namespace eosio {
 
         void pbft_database::add_pbft_prepare(pbft_prepare &p) {
 
-            auto bs = ctrl.fork_db().get_block(p.block_id);
-            EOS_ASSERT(bs, block_validate_exception, "attempt to prepare a block not received");
+            if (!is_valid_prepare(p)) return;
 
 //            vector <producer_key> matched_producers;
 //            copy_if(bs->active_schedule.producers.begin(),
@@ -124,14 +123,12 @@ namespace eosio {
 
             auto &by_block_id_index = index.get<by_block_id>();
 
-            auto current = bs;
 //            ilog("trying to add prepare msg: ${p}", ("p", p));
+            auto current = ctrl.fetch_block_state_by_id(p.block_id);
 
-            while ((current != nullptr) && (current->block_num > ctrl.last_irreversible_block_num())) {
+            while ((current) && (current->block_num > ctrl.last_irreversible_block_num())) {
 //                ilog("previous block exists");
-
                 auto curr_itr = by_block_id_index.find(current->id);
-
 
                 if (curr_itr == by_block_id_index.end()) {
                     try {
@@ -157,6 +154,7 @@ namespace eosio {
 //                ilog("trying to find block in pbft db");
                 curr_itr = by_block_id_index.find(current->id);
 //                ilog("found block in pbft db");
+                if (curr_itr == by_block_id_index.end()) return;
 
                 auto prepares = (*curr_itr)->prepares;
 //                ilog("prepare msg size ${s}", ("s", prepares.size()));
@@ -183,9 +181,7 @@ namespace eosio {
                         }
                     }
                 }
-//                ilog("getting previous block");
-                current = ctrl.fork_db().get_block(current->prev());
-//                ilog("found previous block");
+                current = ctrl.fetch_block_state_by_id(current->prev());
             }
 //            ilog("prepare msg added");
         }
@@ -248,11 +244,19 @@ namespace eosio {
             return (psp->should_prepared && (psp->block_num > ctrl.last_irreversible_block_num()));
         }
 
+        bool pbft_database::is_valid_prepare(const pbft_prepare &p) {
+            if (!p.is_signature_valid()) return false;
+            auto bs = ctrl.fetch_block_state_by_id(p.block_id);
+            if (!bs) return false;
+            auto as = bs->active_schedule.producers;
+            auto ptr = find_if(as.begin(), as.end(), [&](const producer_key &k) { return k.block_signing_key == p.public_key; });
+            if (ptr == as.end()) return false;
+            return p.block_num == bs->block_num;
+        }
 
         void pbft_database::add_pbft_commit(pbft_commit &c) {
 
-            auto bs = ctrl.fork_db().get_block(c.block_id);
-            EOS_ASSERT(bs, block_validate_exception, "attempt to commit a block not received");
+            if (!is_valid_commit(c)) return;
 
 //            vector <producer_key> matched_producers;
 //            copy_if(bs->active_schedule.producers.begin(),
@@ -266,9 +270,9 @@ namespace eosio {
 
             auto &by_block_id_index = index.get<by_block_id>();
 
-            auto current = bs;
+            auto current = ctrl.fetch_block_state_by_id(c.block_id);
 
-            while ((current != nullptr) && (current->block_num > ctrl.last_irreversible_block_num())) {
+            while ((current) && (current->block_num > ctrl.last_irreversible_block_num())) {
 
                 auto curr_itr = by_block_id_index.find(current->id);
 
@@ -316,7 +320,7 @@ namespace eosio {
                         }
                     }
                 }
-                current = ctrl.fork_db().get_block(current->prev());
+                current = ctrl.fetch_block_state_by_id(current->prev());
             }
         }
 
@@ -363,7 +367,6 @@ namespace eosio {
             if (itr == by_commit_and_num_index.end()) return false;
             pbft_state_ptr psp = *itr;
 
-
             return (psp->should_committed && (psp->block_num > (ctrl.last_irreversible_block_num())));
         }
 
@@ -398,6 +401,16 @@ namespace eosio {
             }
 //            wlog("committed new view is ${nv}", ("nv", new_view));
             return new_view;
+        }
+
+        bool pbft_database::is_valid_commit(const pbft_commit &c) {
+            if (!c.is_signature_valid()) return false;
+            auto bs = ctrl.fetch_block_state_by_id(c.block_id);
+            if (!bs) return false;
+            auto as = bs->active_schedule.producers;
+            auto ptr = find_if(as.begin(), as.end(), [&](const producer_key &k) { return k.block_signing_key == c.public_key; });
+            if (ptr == as.end()) return false;
+            return c.block_num == bs->block_num;
         }
 
         void pbft_database::commit_local() {
@@ -726,21 +739,24 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_prepared_certificate(const eosio::chain::pbft_prepared_certificate &certificate) {
+            // an empty certificate is valid since it acts as a null digest in pbft.
             if (certificate == pbft_prepared_certificate{}) return true;
             //all signatures should be valid
-            auto valid_sig = true;
-            valid_sig &= certificate.is_signature_valid();
+            auto valid = true;
+            valid &= certificate.is_signature_valid();
             for (auto const &p : certificate.prepares) {
-                valid_sig &= p.is_signature_valid();
+                valid &= is_valid_prepare(p);
+                if (!valid) return false;
             }
-            if (!valid_sig) return false;
 //            ilog("prepare signature valid!");
 
             auto cert_num = certificate.block_num;
+            auto cert_bs = ctrl.fetch_block_state_by_number(cert_num);
             auto producer_schedule = lib_active_producers();
-            if (cert_num > 0 && ctrl.fetch_block_state_by_number(cert_num)) {
-                producer_schedule = ctrl.fetch_block_state_by_number(cert_num)->active_schedule;
+            if ( cert_num > 0 && cert_bs) {
+                producer_schedule = cert_bs->active_schedule;
             }
+
             auto bp_threshold = producer_schedule.producers.size() * 2 / 3 + 1;
 
             {
@@ -757,9 +773,7 @@ namespace eosio {
                         longest_fork = f;
                     }
                 }
-                if (longest_fork.size() < bp_threshold) {
-                    return false;
-                }
+                if (longest_fork.size() < bp_threshold) return false;
 //                ilog("prepare longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
@@ -769,7 +783,6 @@ namespace eosio {
                     return false;
                 }
 //                ilog("prepare block id and num valid!");
-
             }
 
             return true;
@@ -783,20 +796,22 @@ namespace eosio {
             if (certificate.block_num == ctrl.last_irreversible_block_num()
             && certificate.block_id == ctrl.last_irreversible_block_id()) return true;
 
-            auto valid_sig = true;
-            valid_sig &= certificate.is_signature_valid();
+            auto valid = true;
+            valid &= certificate.is_signature_valid();
             for(auto const &c : certificate.commits){
-                valid_sig &= c.is_signature_valid();
+                valid &= is_valid_commit(c);
+                if (!valid) return false;
             }
 
-            if (!valid_sig) return false;
 //            ilog("commit signature valid!");
 
             auto cert_num = certificate.block_num;
+            auto cert_bs = ctrl.fetch_block_state_by_number(cert_num);
             auto producer_schedule = lib_active_producers();
-            if (cert_num > 0 && ctrl.fetch_block_state_by_number(cert_num)) {
-                producer_schedule = ctrl.fetch_block_state_by_number(cert_num)->active_schedule;
+            if ( cert_num > 0 && cert_bs) {
+                producer_schedule = cert_bs->active_schedule;
             }
+
             auto bp_threshold = producer_schedule.producers.size() * 2 / 3 + 1;
 
             {
@@ -813,15 +828,13 @@ namespace eosio {
                         longest_fork = f;
                     }
                 }
-                if (longest_fork.size() < bp_threshold) {
-                    return false;
-                }
+                if (longest_fork.size() < bp_threshold) return false;
 //                ilog("commit longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
                 if (certificate.block_id != calculated_block_info.block_id
-                    || certificate.block_num != calculated_block_info.block_num) {
+                || certificate.block_num != calculated_block_info.block_num) {
                     return false;
                 }
 //                ilog("commit block id and num valid!");

@@ -27,13 +27,13 @@ namespace eosio {
 
         struct block_info {
             block_id_type block_id;
-            uint32_t block_num;
+            block_num_type block_num = 0;
         };
 
         struct pbft_prepare {
             string uuid;
             uint32_t view;
-            uint32_t block_num;
+            block_num_type block_num = 0;
             block_id_type block_id;
             public_key_type public_key;
             signature_type producer_signature;
@@ -75,7 +75,7 @@ namespace eosio {
         struct pbft_commit {
             string uuid;
             uint32_t view;
-            uint32_t block_num;
+            block_num_type block_num = 0;
             block_id_type block_id;
             public_key_type public_key;
             signature_type producer_signature;
@@ -118,7 +118,7 @@ namespace eosio {
         struct pbft_prepared_certificate {
             //TODO: add view??
             block_id_type block_id;
-            uint32_t block_num = 0;
+            block_num_type block_num = 0;
             vector<pbft_prepare> prepares;
 
             public_key_type public_key;
@@ -153,7 +153,7 @@ namespace eosio {
 
         struct pbft_committed_certificate {
             block_id_type block_id;
-            uint32_t block_num = 0;
+            block_num_type block_num = 0;
             vector<pbft_commit> commits;
 
             public_key_type public_key;
@@ -299,7 +299,7 @@ namespace eosio {
 
         struct pbft_checkpoint {
             string uuid;
-            uint32_t block_num = 0;
+            block_num_type block_num = 0;
             block_id_type block_id;
 
             public_key_type public_key;
@@ -335,7 +335,7 @@ namespace eosio {
         };
 
         struct pbft_stable_checkpoint {
-            uint32_t block_num = 0;
+            block_num_type block_num = 0;
             block_id_type block_id;
             vector<pbft_checkpoint> checkpoints;
 
@@ -372,7 +372,7 @@ namespace eosio {
 
         struct pbft_state {
             block_id_type block_id;
-            uint32_t block_num = 0;
+            block_num_type block_num = 0;
             vector<pbft_prepare> prepares;
             bool should_prepared = false;
             vector<pbft_commit> commits;
@@ -387,7 +387,7 @@ namespace eosio {
 
         struct pbft_checkpoint_state {
             block_id_type block_id;
-            uint32_t block_num = 0;
+            block_num_type block_num = 0;
             vector<pbft_checkpoint> checkpoints;
             bool is_stable = false;
         };
@@ -486,8 +486,7 @@ namespace eosio {
 
         class pbft_database {
         public:
-            pbft_database(controller &ctrl);
-
+            explicit pbft_database(controller &ctrl);
             ~pbft_database();
 
             void close();
@@ -532,9 +531,9 @@ namespace eosio {
 
             vector<pbft_checkpoint> generate_and_add_pbft_checkpoint();
 
-            bool is_valid_prepare(pbft_prepare &p);
+            bool is_valid_prepare(const pbft_prepare &p);
 
-            bool is_valid_commit(pbft_commit &c);
+            bool is_valid_commit(const pbft_commit &c);
 
             void commit_local();
 
