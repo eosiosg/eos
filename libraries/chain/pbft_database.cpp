@@ -844,21 +844,17 @@ namespace eosio {
         bool pbft_database::is_valid_new_view(const pbft_new_view &certificate) {
             //all signatures should be valid
             bool valid;
-
+            return true;
             valid = is_valid_prepared_certificate(certificate.prepared)
                     && is_valid_committed_certificate(certificate.committed)
                     && certificate.view_changed.is_signature_valid()
                     && certificate.is_signature_valid();
 
             for (const auto &vc: certificate.view_changed.view_changes) {
-                valid &= (is_valid_prepared_certificate(vc.prepared) && is_valid_committed_certificate(vc.committed));
+                valid &= is_valid_view_change(vc);
             }
 
             if (!valid) return false;
-
-            //should be a higher view
-//            if (pbft_ctrl.current_view >= certificate.view) return false;
-            //TODO maybe check is_valid_view_change_certificate
 
             auto highest_ppc = pbft_prepared_certificate{};
             auto highest_pcc = pbft_committed_certificate{};
