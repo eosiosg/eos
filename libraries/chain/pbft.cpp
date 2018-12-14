@@ -14,7 +14,7 @@ namespace eosio {
         state_machine(pbft_db)
         {
 //            ilog("pbft ctrl initialising...");
-            config.view_change_timeout = 6;
+            config.view_change_timeout = 8;
             config.bp_candidate = true;
             datadir = ctrl.state_dir();
 
@@ -493,7 +493,7 @@ namespace eosio {
                         new_view);
                 ilog("[VIEW CHANGE] new view msg: ${nv}", ("nv", nv_msg));
 
-                if (nv_msg == pbft_new_view{} || pbft_db.is_valid_new_view(nv_msg)) return;
+                if (nv_msg == pbft_new_view{} || !pbft_db.is_valid_new_view(nv_msg)) return;
 
                 ilog("[VIEW CHANGE] I am the primary, transit to new view");
                 m->transit_to_new_view(nv_msg, this);
@@ -526,7 +526,7 @@ namespace eosio {
                         new_view);
                 ilog("[VIEW CHANGE] new view msg: ${nv}", ("nv", nv_msg));
 
-                if (nv_msg == pbft_new_view{} || pbft_db.is_valid_new_view(nv_msg)) return;
+                if (nv_msg == pbft_new_view{} || !pbft_db.is_valid_new_view(nv_msg)) return;
 
                 ilog("[VIEW CHANGE] I am the primary, transit to new view");
                 m->transit_to_new_view(nv_msg, this);
