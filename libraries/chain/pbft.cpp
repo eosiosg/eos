@@ -251,7 +251,7 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
-//            ilog("[PREPARED] valid view change msg");
+            ilog("[PREPARED] valid view change msg");
             //do action add view change
             pbft_db.add_pbft_view_change(e);
 
@@ -395,7 +395,7 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
-//            ilog("[COMMITTED] valid view change msg");
+            ilog("[COMMITTED] valid view change msg");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
@@ -474,20 +474,19 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (!pbft_db.is_valid_view_change(e)) return;
-//            ilog("[VIEW CHANGE] valid view change msg");
+            ilog("[VIEW CHANGE] valid view change msg");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
             if (pbft_db.should_new_view(m->get_target_view()) && pbft_db.is_new_primary(m->get_target_view())) {
-//                ilog("I am the chosen primary for new view!");
                 //TODO: retry new view???
                 m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
                 if (new_view != m->get_target_view()) return;
-//                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
+
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),
                         new_view);
@@ -519,7 +518,6 @@ namespace eosio {
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
                 if (new_view != m->get_target_view()) return;
-//                ilog("[VIEW CHANGE] new view is ${nv}", ("nv", new_view));
 
                 auto nv_msg = pbft_db.send_pbft_new_view(
                         m->get_view_changed_certificate(),

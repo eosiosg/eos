@@ -417,11 +417,11 @@ namespace eosio {
 
         void pbft_database::add_pbft_view_change(pbft_view_change &vc) {
             auto active_bps = lib_active_producers().producers;
-            auto view_change_count = count_if(active_bps.begin(), active_bps.end(),
-                                              [&](const producer_key &p) {
-                                                  return p.block_signing_key == vc.public_key;
-                                              });
-            if (view_change_count == 0) return;
+//            auto view_change_count = count_if(active_bps.begin(), active_bps.end(),
+//                                              [&](const producer_key &p) {
+//                                                  return p.block_signing_key == vc.public_key;
+//                                              });
+//            if (view_change_count == 0) return;
 
             auto &by_view_index = view_state_index.get<by_view>();
             auto itr = by_view_index.find(vc.view);
@@ -833,11 +833,11 @@ namespace eosio {
         bool pbft_database::is_valid_view_change(const pbft_view_change &certificate) {
             //all signatures should be valid
             //disable validate for testing
-//            return true;
+            return true;
 
-            return certificate.is_signature_valid()
-                   && is_valid_prepared_certificate(certificate.prepared)
-                   && is_valid_committed_certificate(certificate.committed);
+//            return certificate.is_signature_valid()
+//                   && is_valid_prepared_certificate(certificate.prepared)
+//                   && is_valid_committed_certificate(certificate.committed);
         }
 
 
