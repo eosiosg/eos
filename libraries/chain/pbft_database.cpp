@@ -873,7 +873,7 @@ namespace eosio {
             if (!should_new_view(certificate.view)) return false;
 
             ilog("valid view changed certificate");
-            
+
             auto highest_ppc = pbft_prepared_certificate{};
             auto highest_pcc = pbft_committed_certificate{};
 
