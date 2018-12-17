@@ -778,14 +778,14 @@ namespace eosio {
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
-                if (certificate.block_id != calculated_block_info.block_id
-                    || certificate.block_num != calculated_block_info.block_num) {
-                    return false;
+                auto current = ctrl.fetch_block_state_by_id(calculated_block_info.block_id);
+                while (current) {
+                    if (certificate.block_id == current->id && certificate.block_num == current->block_num) return true;
+                    current = ctrl.fetch_block_state_by_id(current->prev());
                 }
+                return false;
 //                ilog("prepare block id and num valid!");
             }
-
-            return true;
         }
 
         bool pbft_database::is_valid_committed_certificate(const pbft_committed_certificate &certificate) {
@@ -833,31 +833,31 @@ namespace eosio {
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
-                if (certificate.block_id != calculated_block_info.block_id
-                || certificate.block_num != calculated_block_info.block_num) {
-                    return false;
+                auto current = ctrl.fetch_block_state_by_id(calculated_block_info.block_id);
+                while (current) {
+                    if (certificate.block_id == current->id && certificate.block_num == current->block_num) return true;
+                    current = ctrl.fetch_block_state_by_id(current->prev());
                 }
+                return false;
 //                ilog("commit block id and num valid!");
             }
-
-            return true;
         }
 
         bool pbft_database::is_valid_view_change(const pbft_view_change &certificate) {
             //all signatures should be valid
             //disable validate for testing
-            return true;
+//            return true;
 
-//            return certificate.is_signature_valid()
-//                   && is_valid_prepared_certificate(certificate.prepared)
-//                   && is_valid_committed_certificate(certificate.committed);
+            return certificate.is_signature_valid()
+                   && is_valid_prepared_certificate(certificate.prepared)
+                   && is_valid_committed_certificate(certificate.committed);
         }
 
 
         bool pbft_database::is_valid_new_view(const pbft_new_view &certificate) {
             //all signatures should be valid
             bool valid;
-            return true;
+//            return true;
             valid = is_valid_prepared_certificate(certificate.prepared)
                     && is_valid_committed_certificate(certificate.committed)
                     && certificate.view_changed.is_signature_valid()
