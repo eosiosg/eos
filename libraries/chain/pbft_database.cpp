@@ -748,7 +748,7 @@ namespace eosio {
                 valid &= is_valid_prepare(p);
                 if (!valid) return false;
             }
-//            ilog("prepare signature valid!");
+            ilog("prepare signature valid!");
 
             auto cert_num = certificate.block_num;
             auto cert_bs = ctrl.fetch_block_state_by_number(cert_num);
@@ -774,17 +774,17 @@ namespace eosio {
                     }
                 }
                 if (longest_fork.size() < bp_threshold) return false;
-//                ilog("prepare longest fork valid!");
+                ilog("prepare longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
-                auto current = ctrl.fetch_block_state_by_id(calculated_block_info.block_id);
+                auto current = ctrl.fetch_block_by_id(calculated_block_info.block_id);
                 while (current) {
-                    if (certificate.block_id == current->id && certificate.block_num == current->block_num) return true;
-                    current = ctrl.fetch_block_state_by_id(current->prev());
+                    if (certificate.block_id == current->id() && certificate.block_num == current->block_num()) return true;
+                    current = ctrl.fetch_block_by_id(current->previous);
                 }
                 return false;
-//                ilog("prepare block id and num valid!");
+                ilog("prepare block id and num valid!");
             }
         }
 
@@ -803,7 +803,7 @@ namespace eosio {
                 if (!valid) return false;
             }
 
-//            ilog("commit signature valid!");
+            ilog("commit signature valid!");
 
             auto cert_num = certificate.block_num;
             auto cert_bs = ctrl.fetch_block_state_by_number(cert_num);
@@ -829,17 +829,17 @@ namespace eosio {
                     }
                 }
                 if (longest_fork.size() < bp_threshold) return false;
-//                ilog("commit longest fork valid!");
+                ilog("commit longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
 
-                auto current = ctrl.fetch_block_state_by_id(calculated_block_info.block_id);
+                auto current = ctrl.fetch_block_by_id(calculated_block_info.block_id);
                 while (current) {
-                    if (certificate.block_id == current->id && certificate.block_num == current->block_num) return true;
-                    current = ctrl.fetch_block_state_by_id(current->prev());
+                    if (certificate.block_id == current->id() && certificate.block_num == current->block_num()) return true;
+                    current = ctrl.fetch_block_by_id(current->previous);
                 }
                 return false;
-//                ilog("commit block id and num valid!");
+                ilog("commit block id and num valid!");
             }
         }
 
@@ -865,10 +865,15 @@ namespace eosio {
 
             for (const auto &vc: certificate.view_changed.view_changes) {
                 valid &= is_valid_view_change(vc);
+                if (!valid) return false;
+                auto v = vc;
+                add_pbft_view_change(v);
             }
 
-            if (!valid) return false;
+            if (!should_new_view(certificate.view)) return false;
 
+            ilog("valid view changed certificate");
+            
             auto highest_ppc = pbft_prepared_certificate{};
             auto highest_pcc = pbft_committed_certificate{};
 
@@ -883,8 +888,7 @@ namespace eosio {
                 }
             }
 
-            valid = highest_ppc == certificate.prepared && highest_pcc == certificate.committed;
-            return valid;
+            return highest_ppc == certificate.prepared && highest_pcc == certificate.committed;
         }
 
         vector<vector<block_info>> pbft_database::fetch_fork_from(const vector<block_info> block_infos) {
