@@ -396,12 +396,9 @@ namespace eosio {
 
 
         void pbft_database::add_pbft_view_change(pbft_view_change &vc) {
+            if (!is_valid_view_change(vc)) return;
+
             auto active_bps = lib_active_producers().producers;
-//            auto view_change_count = count_if(active_bps.begin(), active_bps.end(),
-//                                              [&](const producer_key &p) {
-//                                                  return p.block_signing_key == vc.public_key;
-//                                              });
-//            if (view_change_count == 0) return;
 
             auto &by_view_index = view_state_index.get<by_view>();
             auto itr = by_view_index.find(vc.view);
@@ -1043,6 +1040,8 @@ namespace eosio {
 
 
         void pbft_database::add_pbft_checkpoint(pbft_checkpoint &cp) {
+
+            if (!is_valid_checkpoint(cp)) return;
 
             auto lscb_num = ctrl.last_stable_checkpoint_block_num();
             if (cp.block_num <= lscb_num) return;

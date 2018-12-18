@@ -97,9 +97,7 @@ namespace eosio {
         }
 
         void pbft_controller::on_pbft_checkpoint(pbft_checkpoint &cp) {
-            if (pbft_db.is_valid_checkpoint(cp)) {
-                pbft_db.add_pbft_checkpoint(cp);
-            }
+            pbft_db.add_pbft_checkpoint(cp);
         }
 
         psm_state::psm_state() = default;
@@ -170,9 +168,7 @@ namespace eosio {
 
         void psm_prepared_state::on_prepare(psm_machine *m, pbft_prepare &e, pbft_database &pbft_db) {
             //ignore
-            if (e.view < m->get_current_view()) return;
 
-            if (!e.is_signature_valid()) return;
         }
 
         void psm_prepared_state::send_prepare(psm_machine *m, pbft_database &pbft_db) {
@@ -184,8 +180,6 @@ namespace eosio {
         void psm_prepared_state::on_commit(psm_machine *m, pbft_commit &e, pbft_database &pbft_db) {
 
             if (e.view < m->get_current_view()) return;
-
-            if (!e.is_signature_valid()) return;
 
             pbft_db.add_pbft_commit(e);
 
@@ -238,8 +232,6 @@ namespace eosio {
             ilog("[PREPARED] received view change, view num: ${a}, my current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
-            if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("[PREPARED] valid view change msg");
             //do action add view change
             pbft_db.add_pbft_view_change(e);
 
@@ -289,8 +281,6 @@ namespace eosio {
             //validate
             if (e.view < m->get_current_view()) return;
 
-            if (!e.is_signature_valid()) return;
-
             //do action add prepare
             pbft_db.add_pbft_prepare(e);
 
@@ -313,8 +303,6 @@ namespace eosio {
 
             if (e.view < m->get_current_view()) return;
 
-            if (!e.is_signature_valid()) return;
-
             pbft_db.add_pbft_commit(e);
         }
 
@@ -329,9 +317,6 @@ namespace eosio {
             //validate
             ilog("[COMMITTED] received view change, view num: ${a}, my current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
-
-            if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("[COMMITTED] valid view change msg");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
@@ -397,9 +382,6 @@ namespace eosio {
             //validate
             ilog("[VIEW CHANGE] received view change, view num: ${a}, my current view: ${b}",("a", e.view)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
-
-            if (!pbft_db.is_valid_view_change(e)) return;
-            ilog("[VIEW CHANGE] valid view change msg");
 
             //do action add view change
             pbft_db.add_pbft_view_change(e);
