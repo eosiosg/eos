@@ -22,8 +22,8 @@ namespace eosio {
 
         boost::asio::steady_timer::duration prepare_timeout{std::chrono::seconds{2}};
         boost::asio::steady_timer::duration commit_timeout{std::chrono::seconds{2}};
-        boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{1}};
-        boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{4}};
+        boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{2}};
+        boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{2}};
 
         void prepare_timer_tick();
 
@@ -37,7 +37,7 @@ namespace eosio {
 
     pbft_plugin::pbft_plugin() : my(new pbft_plugin_impl()) {}
 
-    pbft_plugin::~pbft_plugin() {}
+    pbft_plugin::~pbft_plugin() = default;
 
     void pbft_plugin::set_program_options(options_description &, options_description &cfg) {
     }
