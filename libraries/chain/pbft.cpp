@@ -14,7 +14,7 @@ namespace eosio {
         state_machine(pbft_db)
         {
 //            ilog("pbft ctrl initialising...");
-            config.view_change_timeout = 12;
+            config.view_change_timeout = 6;
             config.bp_candidate = true;
             datadir = ctrl.state_dir();
 
