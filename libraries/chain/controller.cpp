@@ -110,9 +110,16 @@ struct pending_state {
 
    optional<block_id_type>            _producer_block_id;
 
+    std::function<signature_type(digest_type)> _signer;
+
    void push() {
       _db_session.push();
    }
+};
+
+struct pending_pbft_state {
+    block_id_type    pbft_lib;
+    bool             contains_proposed_schedule = false;
 };
 
 struct controller_impl {
@@ -121,8 +128,13 @@ struct controller_impl {
    chainbase::database            reversible_blocks; ///< a special database to persist blocks that have successfully been applied but are still reversible
    block_log                      blog;
    optional<pending_state>        pending;
+   optional<pending_pbft_state>   pending_pbft_lib;
+   optional<block_id_type>        pending_pbft_checkpoint;
+   optional<block_num_type>       last_proposed_schedule_block_num;
+   optional<block_num_type>       last_promoted_proposed_schedule_block_num;
    block_state_ptr                head;
    fork_database                  fork_db;
+   optional<block_id_type>        pbft_prepared_block_id;
    wasm_interface                 wasmif;
    resource_limits_manager        resource_limits;
    authorization_manager          authorization;
@@ -697,9 +709,13 @@ struct controller_impl {
    void commit_block( bool add_to_fork_db ) {
       auto reset_pending_on_exit = fc::make_scoped_exit([this]{
          pending.reset();
+         set_pbft_lib();
+         set_pbft_lscb();
       });
 
       try {
+         set_pbft_lib();
+         set_pbft_lscb();
          if (add_to_fork_db) {
             pending->_pending_block_state->validated = true;
             auto new_bsp = fork_db.add(pending->_pending_block_state, true);
@@ -1130,7 +1146,7 @@ struct controller_impl {
       pending->_pending_block_state = std::make_shared<block_state>( *head, when ); // promotes pending schedule (if any) to active
       pending->_pending_block_state->in_current_chain = true;
 
-      pending->_pending_block_state->set_confirmed(confirm_block_count);
+//      pending->_pending_block_state->set_confirmed(confirm_block_count);
 
       auto was_pending_promoted = pending->_pending_block_state->maybe_promote_pending();
 
@@ -1139,17 +1155,21 @@ struct controller_impl {
 
          const auto& gpo = db.get<global_property_object>();
          if( gpo.proposed_schedule_block_num.valid() && // if there is a proposed schedule that was proposed in a block ...
-             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->dpos_irreversible_blocknum ) && // ... that has now become irreversible ...
+//             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
              pending->_pending_block_state->pending_schedule.producers.size() == 0 && // ... and there is room for a new pending schedule ...
-             !was_pending_promoted // ... and not just because it was promoted to active at the start of this block, then:
+             !was_pending_promoted && // ... and not just because it was promoted to active at the start of this block, then:
+             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 1 //TODO: to be optimised.
+//             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + (12*head->active_schedule.producers.size()) //TODO: to be optimised.
          )
             {
                // Promote proposed schedule to pending schedule.
                if( !replaying ) {
                   ilog( "promoting proposed schedule (set in block ${proposed_num}) to pending; current block: ${n} lib: ${lib} schedule: ${schedule} ",
                         ("proposed_num", *gpo.proposed_schedule_block_num)("n", pending->_pending_block_state->block_num)
-                        ("lib", pending->_pending_block_state->dpos_irreversible_blocknum)
+                        ("lib", pending->_pending_block_state->bft_irreversible_blocknum)
                         ("schedule", static_cast<producer_schedule_type>(gpo.proposed_schedule) ) );
+                   last_promoted_proposed_schedule_block_num.reset();
+                   last_promoted_proposed_schedule_block_num.emplace(pending->_pending_block_state->block_num);
                }
                pending->_pending_block_state->set_new_producers( gpo.proposed_schedule );
                db.modify( gpo, [&]( auto& gp ) {
@@ -1302,10 +1322,14 @@ struct controller_impl {
       auto reset_prod_light_validation = fc::make_scoped_exit([old_value=trusted_producer_light_validation, this]() {
          trusted_producer_light_validation = old_value;
       });
+
       try {
          block_state_ptr new_header_state = block_state_future.get();
          auto& b = new_header_state->block;
          emit( self.pre_accepted_block, b );
+
+          set_pbft_lib();
+          set_pbft_lscb();
 
          fork_db.add( new_header_state, false );
 
@@ -1346,6 +1370,44 @@ struct controller_impl {
             emit( self.irreversible_block, new_header_state );
 
       } FC_LOG_AND_RETHROW( )
+   }
+
+   void pbft_commit_local( const block_id_type& id ) {
+      pending_pbft_lib.reset();
+      auto contains_proposed_schedule = false;
+      const auto& gpo = db.get<global_property_object>();
+      if (gpo.proposed_schedule_block_num.valid() && fork_db.get_block(id)->block_num == *gpo.proposed_schedule_block_num) {
+         contains_proposed_schedule = true;
+         last_proposed_schedule_block_num.reset();
+         last_proposed_schedule_block_num.emplace(*gpo.proposed_schedule_block_num);
+      }
+      pending_pbft_lib.emplace(pending_pbft_state{id, contains_proposed_schedule});
+   }
+
+   void set_pbft_lib() {
+
+      if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
+         fork_db.set_bft_irreversible(pending_pbft_lib->pbft_lib);
+//         ilog("=====Committed local===== [lib: ${num}]", ("num", fork_db.get_block(pending_pbft_lib->pbft_lib)->block_num));
+         pending_pbft_lib.reset();
+         if (read_mode != db_read_mode::IRREVERSIBLE) {
+             maybe_switch_forks(controller::block_status::complete);
+         }
+      }
+   }
+
+   void set_pbft_latest_checkpoint( const block_id_type& id ) {
+      pending_pbft_checkpoint.reset();
+      pending_pbft_checkpoint.emplace(id);
+   }
+
+   void set_pbft_lscb() {
+       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_checkpoint) {
+           fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
+//           ilog("======set stable checkpoint====== [lscb: ${h}]", ("h", fork_db.get_block(*pending_pbft_checkpoint)->block_num));
+           pending_pbft_checkpoint.reset();
+
+       }
    }
 
    void maybe_switch_forks( controller::block_status s ) {
@@ -1758,6 +1820,15 @@ chainbase::database& controller::mutable_db()const { return my->db; }
 
 const fork_database& controller::fork_db()const { return my->fork_db; }
 
+//pbft_controller& controller::pbft()const { return my->pbft_ctrl; }
+
+set<chain::account_name> controller::my_producers()const{
+   return my->conf.my_producers;
+}
+
+std::map<chain::public_key_type, signature_provider_type> controller::my_signature_providers()const{
+   return my->conf.my_signature_providers;
+}
 
 void controller::start_block( block_timestamp_type when, uint16_t confirm_block_count) {
    validate_db_available_size();
@@ -1791,6 +1862,24 @@ void controller::push_block( std::future<block_state_ptr>& block_state_future ) 
    validate_db_available_size();
    validate_reversible_available_size();
    my->push_block( block_state_future );
+}
+
+void controller::pbft_commit_local( const block_id_type& id ) {
+   validate_db_available_size();
+   my->pbft_commit_local(id);
+}
+
+bool controller::pending_pbft_lib() {
+    if (my->pending_pbft_lib) return true;
+    return false;
+}
+
+void controller::set_pbft_latest_checkpoint( const block_id_type& id ) {
+   my->set_pbft_latest_checkpoint(id);
+}
+
+void controller::set_pbft_prepared_block_id(optional<block_id_type> bid){
+    my->pbft_prepared_block_id = bid;
 }
 
 transaction_trace_ptr controller::push_transaction( const transaction_metadata_ptr& trx, fc::time_point deadline, uint32_t billed_cpu_time_us ) {
@@ -1898,7 +1987,8 @@ optional<block_id_type> controller::pending_producer_block_id()const {
 }
 
 uint32_t controller::last_irreversible_block_num() const {
-   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
+//   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
+   return my->head->bft_irreversible_blocknum;
 }
 
 block_id_type controller::last_irreversible_block_id() const {
@@ -1910,6 +2000,32 @@ block_id_type controller::last_irreversible_block_id() const {
 
    return fetch_block_by_number(lib_num)->id();
 
+}
+
+uint32_t controller::last_stable_checkpoint_block_num() const {
+    return my->head->pbft_stable_checkpoint_blocknum;
+}
+
+signed_block_ptr controller::last_irreversible_block() const {
+   auto lib_num = last_irreversible_block_num();
+
+   if (lib_num > 0)
+      return fetch_block_by_number(lib_num);
+   return signed_block_ptr();
+}
+
+block_num_type controller::last_proposed_schedule_block_num() const {
+   if (my->last_proposed_schedule_block_num) {
+      return *my->last_proposed_schedule_block_num;
+   }
+   return block_num_type{};
+}
+
+block_num_type controller::last_promoted_proposed_schedule_block_num() const {
+    if (my->last_promoted_proposed_schedule_block_num) {
+        return *my->last_promoted_proposed_schedule_block_num;
+    }
+    return block_num_type{};
 }
 
 const dynamic_global_property_object& controller::get_dynamic_global_properties()const {
@@ -2217,6 +2333,19 @@ void controller::validate_reversible_available_size() const {
    EOS_ASSERT(free >= guard, reversible_guard_exception, "reversible free: ${f}, guard size: ${g}", ("f", free)("g",guard));
 }
 
+path controller::state_dir() const {
+   return my->conf.state_dir;
+}
+
+path controller::blocks_dir() const {
+    return my->conf.blocks_dir;
+}
+
+producer_schedule_type controller::initial_schedule() const {
+   return producer_schedule_type{ 0, {{eosio::chain::config::system_account_name, my->conf.genesis.initial_key}} };
+}
+
+
 bool controller::is_known_unexpired_transaction( const transaction_id_type& id) const {
    return db().find<transaction_object, by_trx_id>(id);
 }
@@ -2240,5 +2369,4 @@ bool controller::is_resource_greylisted(const account_name &name) const {
 const flat_set<account_name> &controller::get_resource_greylist() const {
    return  my->conf.resource_greylist;
 }
-
 } } /// eosio::chain
