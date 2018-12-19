@@ -844,7 +844,7 @@ void chain_plugin_impl::on_pbft_incoming_commit(pbft_commit c){
 }
 
 void chain_plugin_impl::on_pbft_incoming_view_change(pbft_view_change vc){
-//   ilog("received incoming pbft_view_change: ${v}, from ${k}, uuid: ${u}", ("v", vc.view)("k", vc.public_key)("u", vc.uuid));
+//   ilog("received incoming pbft_view_change: ${v}, from ${k}, uuid: ${u}", ("v", vc.view)("k", vc.public_key));
    pbft_ctrl->on_pbft_view_change(vc);
 }
 
