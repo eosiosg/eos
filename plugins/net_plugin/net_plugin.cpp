@@ -156,7 +156,7 @@ namespace eosio {
       boost::asio::steady_timer::duration   txn_exp_period;
       boost::asio::steady_timer::duration   resp_expected_period;
       boost::asio::steady_timer::duration   keepalive_interval{std::chrono::seconds{32}};
-      boost::asio::steady_timer::duration   pbft_message_cache_tick_interval{std::chrono::seconds{1}};
+      boost::asio::steady_timer::duration   pbft_message_cache_tick_interval{std::chrono::milliseconds{500}};
       int                           max_cleanup_time_ms = 0;
 
       const std::chrono::system_clock::duration peer_authentication_interval{std::chrono::seconds{1}}; ///< Peer clock may be no more than 1 second skewed from our clock, including network latency.
@@ -176,7 +176,7 @@ namespace eosio {
       bool                          use_socket_read_watermark = false;
 
       std::unordered_map<digest_type, time_point_sec> pbft_message_cache{};
-      const int                     pbft_message_cache_TTL = 12;
+      const int                     pbft_message_cache_TTL = 2;
 
       channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::prepare_channel::channel_type::handle pbft_outgoing_prepare_subscription;
@@ -2733,15 +2733,15 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
 //        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
-        pbft_incoming_prepare_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
-            for(auto conn: connections){
-                if(conn != c){
+            for (auto conn: connections) {
+                if (conn != c) {
                     conn->enqueue(msg);
                 }
             }
+            pbft_incoming_prepare_channel.publish(msg);
         }
 //        if (!msg.is_signature_valid()) return;
     }
@@ -2749,60 +2749,60 @@ namespace eosio {
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
 //        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
 //        if (!msg.is_signature_valid()) return;
-        pbft_incoming_commit_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
-        if(added){
-            for(auto conn: connections){
-                if(conn != c){
+        if (added) {
+            for (auto conn: connections) {
+                if (conn != c) {
                     conn->enqueue(msg);
                 }
             }
+            pbft_incoming_commit_channel.publish(msg);
         }
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
 //       ilog("net plugin received pbft_view_change ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
 //        if(!msg.is_signature_valid()) return;
-        pbft_incoming_view_change_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
-        if(added){
-            for(auto conn: connections){
-                if(conn != c){
+        if (added) {
+            for (auto conn: connections) {
+                if (conn != c) {
                     conn->enqueue(msg);
                 }
             }
+            pbft_incoming_view_change_channel.publish(msg);
         }
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
 //        ilog("net plugin received new view ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
 //        if(!msg.is_signature_valid()) return;
-        pbft_incoming_new_view_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
-        if(added){
-            for(auto conn: connections){
-                if(conn != c){
+        if (added) {
+            for (auto conn: connections) {
+                if (conn != c) {
                     conn->enqueue(msg);
                 }
             }
+            pbft_incoming_new_view_channel.publish(msg);
         }
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 //        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
 //        if(!msg.is_signature_valid()) return;
-        pbft_incoming_checkpoint_channel.publish(msg);
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
-        if(added){
-            for(auto conn: connections){
-                if(conn != c){
+        if (added) {
+            for (auto conn: connections) {
+                if (conn != c) {
                     conn->enqueue(msg);
                 }
             }
+            pbft_incoming_checkpoint_channel.publish(msg);
         }
     }
 

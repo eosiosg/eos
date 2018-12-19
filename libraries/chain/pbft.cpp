@@ -387,8 +387,8 @@ namespace eosio {
             pbft_db.add_pbft_view_change(e);
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
-            for (auto nv = m->get_target_view(); nv > m->get_current_view(); --nv) {
-
+//            for (auto nv = m->get_target_view(); nv > m->get_current_view(); --nv) {
+            auto nv = m->get_target_view();
                 if (pbft_db.should_new_view(nv) && pbft_db.is_new_primary(nv)) {
 
                     m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
@@ -407,7 +407,7 @@ namespace eosio {
                     m->transit_to_new_view(nv_msg, this);
                     return;
                 }
-            }
+//            }
 
         }
 
@@ -418,8 +418,8 @@ namespace eosio {
             ilog("[VIEW CHANGE] send_view_change: current view: ${v1}, target view: ${v2}",("v1", m->get_current_view())("v2", m->get_target_view()));
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
-            for (auto nv = m->get_target_view(); nv > m->get_current_view(); --nv) {
-
+//            for (auto nv = m->get_target_view(); nv > m->get_current_view(); --nv) {
+                auto nv = m->get_target_view();
                 if (pbft_db.should_new_view(nv) && pbft_db.is_new_primary(nv)) {
 
                     m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
@@ -438,7 +438,7 @@ namespace eosio {
                     m->transit_to_new_view(nv_msg, this);
                     return;
                 }
-            }
+//            }
         }
 
 
