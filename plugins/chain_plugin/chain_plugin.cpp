@@ -860,12 +860,12 @@ void chain_plugin_impl::on_pbft_incoming_commit(pbft_commit c){
 }
 
 void chain_plugin_impl::on_pbft_incoming_view_change(pbft_view_change vc){
-   ilog("received incoming pbft_view_change: ${v}, from ${k}, uuid: ${u}", ("v", vc.view)("k", vc.public_key)("u", vc.uuid));
+//   ilog("received incoming pbft_view_change: ${v}, from ${k}, uuid: ${u}", ("v", vc.view)("k", vc.public_key)("u", vc.uuid));
    pbft_ctrl->on_pbft_view_change(vc);
 }
 
 void chain_plugin_impl::on_pbft_incoming_new_view(pbft_new_view nv){
-    ilog("received incoming pbft_new_view: ${v}, from ${k}",("v",nv.view)("k", nv.public_key));
+//    ilog("received incoming pbft_new_view: ${v}, from ${k}",("v",nv.view)("k", nv.public_key));
    pbft_ctrl->on_pbft_new_view(nv);
 }
 
