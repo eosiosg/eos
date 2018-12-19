@@ -119,7 +119,6 @@ namespace eosio {
 
 
         struct pbft_prepared_certificate {
-            //TODO: add view??
             block_id_type block_id;
             block_num_type block_num = 0;
             vector<pbft_prepare> prepares;
@@ -424,7 +423,7 @@ namespace eosio {
                                         pbft_state,
                                         member<pbft_state, uint32_t, &pbft_state::block_num>
                                 >,
-                                composite_key_compare<less<uint32_t>>
+                                composite_key_compare<less<>>
                         >,
                         ordered_non_unique<
                                 tag<by_prepare_and_num>,
@@ -433,7 +432,7 @@ namespace eosio {
                                         member<pbft_state, bool, &pbft_state::should_prepared>,
                                         member<pbft_state, uint32_t, &pbft_state::block_num>
                                 >,
-                                composite_key_compare<greater<>, greater<uint32_t>>
+                                composite_key_compare<greater<>, greater<>>
                         >,
                         ordered_non_unique<
                                 tag<by_commit_and_num>,
@@ -442,7 +441,7 @@ namespace eosio {
                                         member<pbft_state, bool, &pbft_state::should_committed>,
                                         member<pbft_state, uint32_t, &pbft_state::block_num>
                                 >,
-                                composite_key_compare<greater<>, greater<uint32_t>>
+                                composite_key_compare<greater<>, greater<>>
                         >
                 >
         >
@@ -465,7 +464,7 @@ namespace eosio {
                                         member<pbft_view_state, bool, &pbft_view_state::should_view_changed>,
                                         member<pbft_view_state, uint32_t, &pbft_view_state::view>
                                 >,
-                                composite_key_compare<greater<>, greater<uint32_t>>
+                                composite_key_compare<greater<>, greater<>>
                         >
                 >
         >
@@ -488,7 +487,7 @@ namespace eosio {
 //                                        member<pbft_checkpoint_state, bool, &pbft_checkpoint_state::is_stable>,
                                         member<pbft_checkpoint_state, uint32_t, &pbft_checkpoint_state::block_num>
                                 >,
-                                composite_key_compare<less<uint32_t>>
+                                composite_key_compare<less<>>
                         >
                 >
         >
@@ -507,9 +506,9 @@ namespace eosio {
 
             uint32_t should_view_change();
 
-            bool should_new_view(const uint32_t target_view);
+            bool should_new_view(uint32_t target_view);
 
-            bool is_new_primary(const uint32_t target_view);
+            bool is_new_primary(uint32_t target_view);
 
             uint32_t get_proposed_new_view_num();
 
@@ -605,9 +604,9 @@ namespace eosio {
 
             bool is_valid_committed_certificate(const pbft_committed_certificate &certificate);
 
-            public_key_type get_new_view_primary_key(const uint32_t target_view);
+            public_key_type get_new_view_primary_key(uint32_t target_view);
 
-            vector<vector<block_info>> fetch_fork_from(const vector<block_info> block_infos);
+            vector<vector<block_info>> fetch_fork_from(vector<block_info> block_infos);
 
             vector<block_info> fetch_first_fork_from(vector<block_info> &bi);
 
