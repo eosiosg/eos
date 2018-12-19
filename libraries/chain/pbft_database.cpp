@@ -243,7 +243,6 @@ namespace eosio {
 
                 auto curr_itr = by_block_id_index.find(current->id);
 
-
                 if (curr_itr == by_block_id_index.end()) {
                     try {
                         auto curr_ps = pbft_state{current->id, current->block_num, .commits={c}};
@@ -267,6 +266,8 @@ namespace eosio {
                 }
 
                 curr_itr = by_block_id_index.find(current->id);
+                if (curr_itr == by_block_id_index.end()) return;
+
                 auto commits = (*curr_itr)->commits;
                 auto as = current->active_schedule;
                 flat_map<uint32_t,uint32_t> commit_count;
@@ -346,9 +347,7 @@ namespace eosio {
             pbft_state_ptr psp = *itr;
             auto blk_state = ctrl.fetch_block_state_by_id((*itr)->block_id);
             if (!blk_state) return new_view;
-//            ilog("try to fetch block state");
             auto as = blk_state->active_schedule.producers;
-//            ilog("fetched block state");
 
             auto commits = (*itr)->commits;
 
@@ -394,7 +393,6 @@ namespace eosio {
             return ctrl.pending_pbft_lib();
         }
 
-
         void pbft_database::add_pbft_view_change(pbft_view_change &vc) {
             if (!is_valid_view_change(vc)) return;
 
@@ -421,6 +419,7 @@ namespace eosio {
             }
 
             itr = by_view_index.find(vc.view);
+            if (itr == by_view_index.end()) return;
 //            wlog("view change state === ${v} === ${s}", ("v", (*itr)->view_changes)("s", (*itr)->should_view_changed));
             auto vc_count = 0;
             if (!(*itr)->should_view_changed) {
@@ -430,8 +429,7 @@ namespace eosio {
                     }
                 }
                 if (vc_count >= active_bps.size() * 2 / 3 + 1) {
-                    by_view_index.modify(itr,
-                            [&](const pbft_view_state_ptr &pvsp) {
+                    by_view_index.modify(itr, [&](const pbft_view_state_ptr &pvsp) {
                         pvsp->should_view_changed = true;
 //                        wlog("view ${v} is potential new view", ("v", (*itr)->view));
                     });
@@ -759,7 +757,7 @@ namespace eosio {
 
             auto valid = true;
             valid &= certificate.is_signature_valid();
-            for(auto const &c : certificate.commits){
+            for (auto const &c : certificate.commits) {
                 valid &= is_valid_commit(c);
                 if (!valid) return false;
             }
@@ -942,20 +940,19 @@ namespace eosio {
 
                     auto head_checkpoint_schedule = ctrl.fetch_block_state_by_id(
                             (*itr)->block_id)->active_schedule;
-//
-//
+
                     auto current_schedule = lib_active_producers();
                     auto new_schedule = lib_active_producers();
-//
+
                     if (lib) {
                         current_schedule = lib->active_schedule;
                         new_schedule = lib->pending_schedule;
                     }
-
 //                    wlog("head checkpoint schedule version ${c}, lib_sv: ${l}, new_sv: ${n}",
 //                            ("c", head_checkpoint_schedule)("l", current_schedule)("n", new_schedule));
 
-                    if ((*itr)->is_stable && (head_checkpoint_schedule == current_schedule || head_checkpoint_schedule == new_schedule)) {
+                    if ((*itr)->is_stable
+                    && (head_checkpoint_schedule == current_schedule || head_checkpoint_schedule == new_schedule)) {
                         lscb_num = (*itr)->block_num;
                     }
                 }
@@ -1038,7 +1035,6 @@ namespace eosio {
             return new_pc;
         }
 
-
         void pbft_database::add_pbft_checkpoint(pbft_checkpoint &cp) {
 
             if (!is_valid_checkpoint(cp)) return;
@@ -1100,18 +1096,17 @@ namespace eosio {
         }
 
         void pbft_database::send_pbft_checkpoint(const vector<pbft_checkpoint> &cps) {
-            if (!cps.empty()) {
-                for (auto const &cp: cps) {
-                    emit(pbft_outgoing_checkpoint, cp);
+            if (cps.empty()) return;
+            for (auto const &cp: cps) {
+                emit(pbft_outgoing_checkpoint, cp);
 //                    ilog("sending pbft checkpoint at ${h}", ("h", cp.block_num));
-                }
             }
         }
 
 
         bool pbft_database::is_valid_checkpoint(const pbft_checkpoint &cp) {
-            auto valid = cp.is_signature_valid();
-            if (!valid) return false;
+            if (!cp.is_signature_valid()) return false;
+
             auto bs = ctrl.fetch_block_state_by_id(cp.block_id);
             if (bs) {
                 auto active_bps = bs->active_schedule.producers;
