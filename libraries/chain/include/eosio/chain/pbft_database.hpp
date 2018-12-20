@@ -36,6 +36,7 @@ namespace eosio {
             block_num_type block_num = 0;
             block_id_type block_id;
             public_key_type public_key;
+            chain_id_type chain_id;
             signature_type producer_signature;
             uint16_t type = 0;
 
@@ -80,6 +81,7 @@ namespace eosio {
             block_num_type block_num = 0;
             block_id_type block_id;
             public_key_type public_key;
+            chain_id_type chain_id;
             signature_type producer_signature;
             uint16_t type = 1;
 
@@ -193,8 +195,8 @@ namespace eosio {
             pbft_prepared_certificate prepared;
             pbft_committed_certificate committed;
             public_key_type public_key;
+            chain_id_type chain_id;
             signature_type producer_signature;
-            uint32_t chain_id = 0;
             uint16_t type = 2;
 
             bool operator==(const pbft_view_change &rhs) const {
@@ -266,6 +268,7 @@ namespace eosio {
             pbft_committed_certificate committed;
             pbft_view_changed_certificate view_changed;
             public_key_type public_key;
+            chain_id_type chain_id;
             signature_type producer_signature;
             uint16_t type = 3;
 
@@ -308,6 +311,7 @@ namespace eosio {
             block_num_type block_num = 0;
             block_id_type block_id;
             public_key_type public_key;
+            chain_id_type chain_id;
             signature_type producer_signature;
             uint16_t type = 4;
 
@@ -345,8 +349,8 @@ namespace eosio {
             block_num_type block_num = 0;
             block_id_type block_id;
             vector<pbft_checkpoint> checkpoints;
-
             public_key_type public_key;
+            chain_id_type chain_id;
             signature_type producer_signature;
 
             bool operator==(const pbft_stable_checkpoint &rhs) const {
@@ -554,6 +558,7 @@ namespace eosio {
 
             uint32_t get_committed_view();
 
+            chain_id_type chain_id();
 
             vector<pbft_prepared_certificate> generate_prepared_certificate();
 
@@ -627,15 +632,15 @@ namespace eosio {
 } /// namespace eosio::chain
 
 FC_REFLECT(eosio::chain::block_info, (block_id)(block_num))
-FC_REFLECT(eosio::chain::pbft_prepare, (view)(block_num)(block_id)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_commit, (view)(block_num)(block_id)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_view_change, (view)(prepared)(committed)(public_key)(producer_signature)(chain_id))
-FC_REFLECT(eosio::chain::pbft_new_view, (view)(prepared)(committed)(view_changed)(public_key)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_prepare, (view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(type))
+FC_REFLECT(eosio::chain::pbft_commit, (view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(type))
+FC_REFLECT(eosio::chain::pbft_view_change, (view)(prepared)(committed)(public_key)(chain_id)(producer_signature)(type))
+FC_REFLECT(eosio::chain::pbft_new_view, (view)(prepared)(committed)(view_changed)(public_key)(chain_id)(producer_signature)(type))
 FC_REFLECT(eosio::chain::pbft_state, (block_id)(block_num)(prepares)(should_prepared)(commits)(should_committed))
 FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepares)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_committed_certificate, (block_id)(block_num)(commits)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_view_changed_certificate, (view)(view_changes)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_checkpoint, (block_num)(block_id)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_stable_checkpoint, (block_num)(block_id)(checkpoints)(public_key)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_checkpoint, (block_num)(block_id)(public_key)(chain_id)(producer_signature)(type))
+FC_REFLECT(eosio::chain::pbft_stable_checkpoint, (block_num)(block_id)(checkpoints)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_checkpoint_state, (block_id)(block_num)(checkpoints)(is_stable))
 //#endif //EOSIO_PBFT_HPP

@@ -561,7 +561,7 @@ namespace eosio {
                 this->set_committed_certificate(pbft_db.generate_committed_certificate());
             }
 
-            if (this->get_target_view_retries() < this->get_target_view() - this->get_current_view()) {
+            if (this->get_target_view_retries() < pow(2, this->get_target_view() - this->get_current_view() - 1)) {
                 this->set_target_view_retries(this->get_target_view_retries() + 1);
             } else {
                 this->set_target_view_retries(0);

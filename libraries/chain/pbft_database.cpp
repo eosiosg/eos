@@ -199,7 +199,7 @@ namespace eosio {
                 block_id_type high_water_mark_block_id = ctrl.get_block_id_for_num(high_water_mark_block_num);
                 for (auto const &sp : ctrl.my_signature_providers()) {
 //                    auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                    auto p = pbft_prepare{current_view, high_water_mark_block_num, high_water_mark_block_id, sp.first};
+                    auto p = pbft_prepare{current_view, high_water_mark_block_num, high_water_mark_block_id, sp.first, chain_id()};
                     p.producer_signature = sp.second(p.digest());
                     add_pbft_prepare(p);
                     emit(pbft_outgoing_prepare, p);
@@ -317,7 +317,7 @@ namespace eosio {
 
                     for (auto const &sp : ctrl.my_signature_providers()) {
 //                        auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                        auto c = pbft_commit{current_view, psp->block_num, psp->block_id, sp.first};
+                        auto c = pbft_commit{current_view, psp->block_num, psp->block_id, sp.first, chain_id()};
                         c.producer_signature = sp.second(c.digest());
                         add_pbft_commit(c);
                         emit(pbft_outgoing_commit, c);
@@ -498,7 +498,7 @@ namespace eosio {
                     if (pcc_ptr != pcc.end()) my_pcc = *pcc_ptr;
 
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                    auto vc = pbft_view_change{new_view, my_ppc, my_pcc, my_sp.first};
+                    auto vc = pbft_view_change{new_view, my_ppc, my_pcc, my_sp.first, chain_id()};
                     vc.producer_signature = my_sp.second(vc.digest());
 //                    ilog("starting new round of view change: ${nv}", ("nv", vc.view));
                     emit(pbft_outgoing_view_change, vc);
@@ -574,7 +574,7 @@ namespace eosio {
             }
 
             auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-            auto nv = pbft_new_view{current_view, .prepared=highest_ppc, .committed=highest_pcc, .view_changed=*vcc_ptr, .public_key=sp_itr->first};
+            auto nv = pbft_new_view{current_view, .prepared=highest_ppc, .committed=highest_pcc, .view_changed=*vcc_ptr, .public_key=sp_itr->first, .chain_id=chain_id()};
             nv.producer_signature = sp_itr->second(nv.digest());
             emit(pbft_outgoing_new_view, nv);
             return nv;
@@ -921,7 +921,7 @@ namespace eosio {
 
             if (cpp->is_stable) {
                 if (ctrl.my_signature_providers().empty()) return pbft_stable_checkpoint{};
-                auto psc = pbft_stable_checkpoint{cpp->block_num, cpp->block_id, cpp->checkpoints, ctrl.my_signature_providers().begin()->first };
+                auto psc = pbft_stable_checkpoint{cpp->block_num, cpp->block_id, cpp->checkpoints, ctrl.my_signature_providers().begin()->first, .chain_id=chain_id() };
                 psc.producer_signature = ctrl.my_signature_providers().begin()->second(psc.digest());
                 return psc;
             } else return pbft_stable_checkpoint{};
@@ -1004,8 +1004,8 @@ namespace eosio {
             if (!pending_checkpoint_block_num.empty()) {
                 for (auto h: pending_checkpoint_block_num) {
                     for (auto const &my_sp : ctrl.my_signature_providers()) {
-                        auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                        auto cp = pbft_checkpoint{h, ctrl.get_block_id_for_num(h), my_sp.first};
+//                        auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
+                        auto cp = pbft_checkpoint{h, ctrl.get_block_id_for_num(h), my_sp.first, .chain_id=chain_id()};
                         cp.producer_signature = my_sp.second(cp.digest());
 //                        ilog("generating checkpoint: ${cp}", ("cp", cp.block_num));
                         add_pbft_checkpoint(cp);
@@ -1118,6 +1118,7 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_stable_checkpoint(const pbft_stable_checkpoint &scp) {
+
             bool valid;
             valid = scp.is_signature_valid();
             if (!valid) return false;
@@ -1181,6 +1182,11 @@ namespace eosio {
                 return  lib_state->pending_schedule;
             return lib_state->active_schedule;
         }
+
+        chain_id_type pbft_database::chain_id() {
+            return ctrl.get_chain_id();
+        }
+
 
         void pbft_database::set(pbft_state_ptr s) {
             auto result = index.insert(s);
