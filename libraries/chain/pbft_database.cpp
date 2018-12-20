@@ -720,9 +720,16 @@ namespace eosio {
 
             {
                 //validate prepare
+                auto lscb = ctrl.last_stable_checkpoint_block_num();
+                auto non_fork_bp_count = 0;
                 vector<block_info> prepare_infos(certificate.prepares.size());
                 for (auto const &p : certificate.prepares) {
-                    prepare_infos.push_back(block_info{p.block_id, p.block_num});
+                    //only search in fork db
+                    if(p.block_num<=lscb){
+                        ++non_fork_bp_count;
+                    }else{
+                        prepare_infos.push_back(block_info{p.block_id, p.block_num});
+                    }
                 }
 
                 auto prepare_forks = fetch_fork_from(prepare_infos);
@@ -732,7 +739,7 @@ namespace eosio {
                         longest_fork = f;
                     }
                 }
-                if (longest_fork.size() < bp_threshold) return false;
+                if (longest_fork.size() + non_fork_bp_count < bp_threshold) return false;
 //                ilog("prepare longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
@@ -775,9 +782,16 @@ namespace eosio {
 
             {
                 //validate commit
+                auto lscb = ctrl.last_stable_checkpoint_block_num();
+                auto non_fork_bp_count = 0;
                 vector<block_info> commit_infos(certificate.commits.size());
                 for (auto const &c : certificate.commits) {
-                    commit_infos.push_back(block_info{c.block_id, c.block_num});
+                    //only search in fork db
+                    if(c.block_num<=lscb){
+                        ++non_fork_bp_count;
+                    }else{
+                        commit_infos.push_back(block_info{c.block_id, c.block_num});
+                    }
                 }
 
                 auto commit_forks = fetch_fork_from(commit_infos);
@@ -787,7 +801,7 @@ namespace eosio {
                         longest_fork = f;
                     }
                 }
-                if (longest_fork.size() < bp_threshold) return false;
+                if (longest_fork.size() + non_fork_bp_count < bp_threshold) return false;
 //                ilog("commit longest fork valid!");
 
                 auto calculated_block_info = longest_fork[bp_threshold-1];
@@ -888,11 +902,11 @@ namespace eosio {
             auto id = bi.front().block_id;
             auto num = bi.front().block_num;
             while (num <= high && num >= low && !bi.empty()) {
-                auto b = ctrl.fetch_block_by_id(id);
+                auto bs = ctrl.fetch_block_state_by_id(id);
 
                 for (auto it = bi.begin(); it != bi.end();) {
                     if (it->block_id == id) {
-                        if (b) {
+                        if (bs) {
                             //add to result only if b exist
                             result.emplace_back((*it));
                         }
@@ -901,8 +915,8 @@ namespace eosio {
                         it++;
                     }
                 }
-                if (b) {
-                    id = b->previous;
+                if (bs) {
+                    id = bs->prev();
                     num--;
                 } else {
                     break;
