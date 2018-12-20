@@ -229,7 +229,7 @@ namespace eosio {
 
         void psm_prepared_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("[PREPARED] received view change, view num: ${a}, my current view: ${b}",("a", e.view)("b", m->get_current_view()));
+            ilog("[PREPARED] received view change, view num: ${a}, my current view: ${b}",("a", e)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             //do action add view change
@@ -315,7 +315,7 @@ namespace eosio {
 
         void psm_committed_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("[COMMITTED] received view change, view num: ${a}, my current view: ${b}",("a", e.view)("b", m->get_current_view()));
+            ilog("[COMMITTED] received view change, view num: ${a}, my current view: ${b}",("a", e)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             //do action add view change
@@ -380,7 +380,8 @@ namespace eosio {
 
         void psm_view_change_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("[VIEW CHANGE] received view change, view num: ${a}, my current view: ${b}",("a", e.view)("b", m->get_current_view()));
+
+            ilog("[VIEW CHANGE] received view change, view num: ${a}, my current view: ${b}",("a", e)("b", m->get_current_view()));
             if (e.view <= m->get_current_view()) return;
 
             //do action add view change

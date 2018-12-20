@@ -222,7 +222,9 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_prepare(const pbft_prepare &p) {
-//            if (!p.is_signature_valid()) return false;
+            // a prepare msg under lscb (which is no longer in fork_db), can be treated as null, thus true.
+            if (p.block_num <= ctrl.last_stable_checkpoint_block_num()) return true;
+            if (!p.is_signature_valid()) return false;
             auto bs = ctrl.fetch_block_state_by_id(p.block_id);
             if (!bs) return false;
             auto as = bs->active_schedule.producers;
@@ -370,7 +372,8 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_commit(const pbft_commit &c) {
-//            if (!c.is_signature_valid()) return false;
+            if (c.block_num <= ctrl.last_stable_checkpoint_block_num()) return true;
+            if (!c.is_signature_valid()) return false;
             auto bs = ctrl.fetch_block_state_by_id(c.block_id);
             if (!bs) return false;
             auto as = bs->active_schedule.producers;
@@ -420,6 +423,7 @@ namespace eosio {
 
             itr = by_view_index.find(vc.view);
             if (itr == by_view_index.end()) return;
+//            wlog("last promoted schedule: ${h}", ("h", ctrl.last_promoted_proposed_schedule_block_num()));
 //            wlog("view change state === ${v} === ${s}", ("v", (*itr)->view_changes)("s", (*itr)->should_view_changed));
             auto vc_count = 0;
             if (!(*itr)->should_view_changed) {
@@ -431,7 +435,7 @@ namespace eosio {
                 if (vc_count >= active_bps.size() * 2 / 3 + 1) {
                     by_view_index.modify(itr, [&](const pbft_view_state_ptr &pvsp) {
                         pvsp->should_view_changed = true;
-//                        wlog("view ${v} is potential new view", ("v", (*itr)->view));
+                        ilog("view ${v} is potential new view", ("v", (*itr)->view));
                     });
                 }
             }
@@ -639,9 +643,7 @@ namespace eosio {
 
             auto committed_block_state = ctrl.fetch_block_state_by_id(psp->block_id);
             if (!committed_block_state) return vector<pbft_committed_certificate>{};
-//            ilog("try to fetch block state");
             auto as = committed_block_state->active_schedule.producers;
-//            ilog("fetched block state");
             if (psp->should_committed && (psp->block_num >= (ctrl.last_irreversible_block_num()))) {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
                     auto commits = psp->commits;
@@ -700,9 +702,11 @@ namespace eosio {
         bool pbft_database::is_valid_prepared_certificate(const eosio::chain::pbft_prepared_certificate &certificate) {
             // an empty certificate is valid since it acts as a null digest in pbft.
             if (certificate == pbft_prepared_certificate{}) return true;
+            // a certificate under lscb (no longer in fork_db) is also treated as null.
+            if (certificate.block_num <= ctrl.last_stable_checkpoint_block_num()) return true;
             //all signatures should be valid
             auto valid = true;
-//            valid &= certificate.is_signature_valid();
+            valid &= certificate.is_signature_valid();
             for (auto const &p : certificate.prepares) {
                 valid &= is_valid_prepare(p);
                 if (!valid) return false;
@@ -725,9 +729,9 @@ namespace eosio {
                 vector<block_info> prepare_infos(certificate.prepares.size());
                 for (auto const &p : certificate.prepares) {
                     //only search in fork db
-                    if(p.block_num<=lscb){
+                    if (p.block_num<=lscb) {
                         ++non_fork_bp_count;
-                    }else{
+                    } else {
                         prepare_infos.push_back(block_info{p.block_id, p.block_num});
                     }
                 }
@@ -746,13 +750,15 @@ namespace eosio {
 
                 auto calculated_block_info = longest_fork.back();
 
-                auto current = ctrl.fetch_block_by_id(calculated_block_info.block_id);
-                while (current) {
-                    if (certificate.block_id == current->id() && certificate.block_num == current->block_num()) return true;
-                    current = ctrl.fetch_block_by_id(current->previous);
+                auto current_bs = ctrl.fetch_block_state_by_id(calculated_block_info.block_id);
+                while (current_bs) {
+                    if (certificate.block_id == current_bs->id && certificate.block_num == current_bs->block_num) {
+//                        ilog("prepare block id and num valid!");
+                        return true;
+                    }
+                    current_bs = ctrl.fetch_block_state_by_id(current_bs->prev());
                 }
                 return false;
-//                ilog("prepare block id and num valid!");
             }
         }
 
@@ -764,8 +770,10 @@ namespace eosio {
             if (certificate.block_num == ctrl.last_irreversible_block_num()
             && certificate.block_id == ctrl.last_irreversible_block_id()) return true;
 
+            if (certificate.block_num <= ctrl.last_stable_checkpoint_block_num()) return true;
+
             auto valid = true;
-//            valid &= certificate.is_signature_valid();
+            valid &= certificate.is_signature_valid();
             for (auto const &c : certificate.commits) {
                 valid &= is_valid_commit(c);
                 if (!valid) return false;
@@ -789,9 +797,9 @@ namespace eosio {
                 vector<block_info> commit_infos(certificate.commits.size());
                 for (auto const &c : certificate.commits) {
                     //only search in fork db
-                    if(c.block_num<=lscb){
+                    if (c.block_num<=lscb) {
                         ++non_fork_bp_count;
-                    }else{
+                    } else {
                         commit_infos.push_back(block_info{c.block_id, c.block_num});
                     }
                 }
@@ -810,22 +818,23 @@ namespace eosio {
 
                 auto calculated_block_info = longest_fork.back();
 
-                auto current = ctrl.fetch_block_by_id(calculated_block_info.block_id);
-                while (current) {
-                    if (certificate.block_id == current->id() && certificate.block_num == current->block_num()) return true;
-                    current = ctrl.fetch_block_by_id(current->previous);
+                auto current_bs = ctrl.fetch_block_state_by_id(calculated_block_info.block_id);
+                while (current_bs) {
+                    if (certificate.block_id == current_bs->id && certificate.block_num == current_bs->block_num) {
+//                        ilog("commit block id and num valid!");
+                        return true;
+                    }
+                    current_bs = ctrl.fetch_block_state_by_id(current_bs->prev());
                 }
                 return false;
-//                ilog("commit block id and num valid!");
             }
         }
 
         bool pbft_database::is_valid_view_change(const pbft_view_change &certificate) {
             //all signatures should be valid
 
-//            return certificate.is_signature_valid()
-//                   &&
-            return is_valid_prepared_certificate(certificate.prepared)
+            return certificate.is_signature_valid()
+                   && is_valid_prepared_certificate(certificate.prepared)
                    && is_valid_committed_certificate(certificate.committed);
         }
 
@@ -833,9 +842,9 @@ namespace eosio {
         bool pbft_database::is_valid_new_view(const pbft_new_view &certificate) {
             //all signatures should be valid
             auto valid = is_valid_prepared_certificate(certificate.prepared)
-                    && is_valid_committed_certificate(certificate.committed);
-//                    && certificate.view_changed.is_signature_valid()
-//                    && certificate.is_signature_valid();
+                    && is_valid_committed_certificate(certificate.committed)
+                    && certificate.view_changed.is_signature_valid()
+                    && certificate.is_signature_valid();
 
             for (const auto &vc: certificate.view_changed.view_changes) {
                 valid &= is_valid_view_change(vc);
@@ -852,12 +861,10 @@ namespace eosio {
             auto highest_pcc = pbft_committed_certificate{};
 
             for (const auto &vc: certificate.view_changed.view_changes) {
-                if (vc.prepared.block_num > highest_ppc.block_num
-                    && is_valid_prepared_certificate(vc.prepared)) {
+                if (vc.prepared.block_num > highest_ppc.block_num) {
                     highest_ppc = vc.prepared;
                 }
-                if (vc.committed.block_num > highest_pcc.block_num
-                    && is_valid_committed_certificate(vc.committed)) {
+                if (vc.committed.block_num > highest_pcc.block_num) {
                     highest_pcc = vc.committed;
                 }
             }
@@ -1124,7 +1131,7 @@ namespace eosio {
 
 
         bool pbft_database::is_valid_checkpoint(const pbft_checkpoint &cp) {
-//            if (!cp.is_signature_valid()) return false;
+            if (!cp.is_signature_valid()) return false;
 
             auto bs = ctrl.fetch_block_state_by_id(cp.block_id);
             if (bs) {
@@ -1138,9 +1145,8 @@ namespace eosio {
 
         bool pbft_database::is_valid_stable_checkpoint(const pbft_stable_checkpoint &scp) {
 
-            bool valid = true;
-//            valid = scp.is_signature_valid();
-//            if (!valid) return false;
+            auto valid = scp.is_signature_valid();
+            if (!valid) return false;
             for (const auto &c: scp.checkpoints) {
                 valid &= c.block_id == scp.block_id && c.block_num == scp.block_num;
                 if (!valid) return false;
@@ -1197,9 +1203,12 @@ namespace eosio {
             if (lib_num == 0) return ctrl.initial_schedule();
             auto lib_state = ctrl.fetch_block_state_by_number(lib_num);
 
-            if  (lib_num == ctrl.last_promoted_proposed_schedule_block_num())
-                return  lib_state->pending_schedule;
-            return lib_state->active_schedule;
+//            if  (lib_num == ctrl.last_promoted_proposed_schedule_block_num())
+//                return  lib_state->pending_schedule;
+//            return lib_state->active_schedule;
+
+            if (lib_state->pending_schedule.producers.empty()) return lib_state->active_schedule;
+            return lib_state->pending_schedule;
         }
 
         chain_id_type pbft_database::chain_id() {
