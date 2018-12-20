@@ -742,7 +742,9 @@ namespace eosio {
                 if (longest_fork.size() + non_fork_bp_count < bp_threshold) return false;
 //                ilog("prepare longest fork valid!");
 
-                auto calculated_block_info = longest_fork[bp_threshold-1];
+                if (longest_fork.empty()) return true;
+
+                auto calculated_block_info = longest_fork.back();
 
                 auto current = ctrl.fetch_block_by_id(calculated_block_info.block_id);
                 while (current) {
@@ -804,7 +806,9 @@ namespace eosio {
                 if (longest_fork.size() + non_fork_bp_count < bp_threshold) return false;
 //                ilog("commit longest fork valid!");
 
-                auto calculated_block_info = longest_fork[bp_threshold-1];
+                if (longest_fork.empty()) return true;
+
+                auto calculated_block_info = longest_fork.back();
 
                 auto current = ctrl.fetch_block_by_id(calculated_block_info.block_id);
                 while (current) {
