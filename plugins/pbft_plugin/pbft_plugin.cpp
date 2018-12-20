@@ -20,8 +20,8 @@ namespace eosio {
         unique_ptr<boost::asio::steady_timer> view_change_timer;
         unique_ptr<boost::asio::steady_timer> checkpoint_timer;
 
-        boost::asio::steady_timer::duration prepare_timeout{std::chrono::seconds{1}};
-        boost::asio::steady_timer::duration commit_timeout{std::chrono::seconds{1}};
+        boost::asio::steady_timer::duration prepare_timeout{std::chrono::milliseconds{500}};
+        boost::asio::steady_timer::duration commit_timeout{std::chrono::milliseconds{500}};
         boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{2}};
         boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{2}};
 
