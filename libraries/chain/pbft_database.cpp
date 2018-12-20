@@ -222,7 +222,7 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_prepare(const pbft_prepare &p) {
-            if (!p.is_signature_valid()) return false;
+//            if (!p.is_signature_valid()) return false;
             auto bs = ctrl.fetch_block_state_by_id(p.block_id);
             if (!bs) return false;
             auto as = bs->active_schedule.producers;
@@ -370,7 +370,7 @@ namespace eosio {
         }
 
         bool pbft_database::is_valid_commit(const pbft_commit &c) {
-            if (!c.is_signature_valid()) return false;
+//            if (!c.is_signature_valid()) return false;
             auto bs = ctrl.fetch_block_state_by_id(c.block_id);
             if (!bs) return false;
             auto as = bs->active_schedule.producers;
@@ -702,7 +702,7 @@ namespace eosio {
             if (certificate == pbft_prepared_certificate{}) return true;
             //all signatures should be valid
             auto valid = true;
-            valid &= certificate.is_signature_valid();
+//            valid &= certificate.is_signature_valid();
             for (auto const &p : certificate.prepares) {
                 valid &= is_valid_prepare(p);
                 if (!valid) return false;
@@ -756,7 +756,7 @@ namespace eosio {
             && certificate.block_id == ctrl.last_irreversible_block_id()) return true;
 
             auto valid = true;
-            valid &= certificate.is_signature_valid();
+//            valid &= certificate.is_signature_valid();
             for (auto const &c : certificate.commits) {
                 valid &= is_valid_commit(c);
                 if (!valid) return false;
@@ -805,8 +805,9 @@ namespace eosio {
         bool pbft_database::is_valid_view_change(const pbft_view_change &certificate) {
             //all signatures should be valid
 
-            return certificate.is_signature_valid()
-                   && is_valid_prepared_certificate(certificate.prepared)
+//            return certificate.is_signature_valid()
+//                   &&
+            return is_valid_prepared_certificate(certificate.prepared)
                    && is_valid_committed_certificate(certificate.committed);
         }
 
@@ -814,9 +815,9 @@ namespace eosio {
         bool pbft_database::is_valid_new_view(const pbft_new_view &certificate) {
             //all signatures should be valid
             auto valid = is_valid_prepared_certificate(certificate.prepared)
-                    && is_valid_committed_certificate(certificate.committed)
-                    && certificate.view_changed.is_signature_valid()
-                    && certificate.is_signature_valid();
+                    && is_valid_committed_certificate(certificate.committed);
+//                    && certificate.view_changed.is_signature_valid()
+//                    && certificate.is_signature_valid();
 
             for (const auto &vc: certificate.view_changed.view_changes) {
                 valid &= is_valid_view_change(vc);
@@ -1105,7 +1106,7 @@ namespace eosio {
 
 
         bool pbft_database::is_valid_checkpoint(const pbft_checkpoint &cp) {
-            if (!cp.is_signature_valid()) return false;
+//            if (!cp.is_signature_valid()) return false;
 
             auto bs = ctrl.fetch_block_state_by_id(cp.block_id);
             if (bs) {
@@ -1119,9 +1120,9 @@ namespace eosio {
 
         bool pbft_database::is_valid_stable_checkpoint(const pbft_stable_checkpoint &scp) {
 
-            bool valid;
-            valid = scp.is_signature_valid();
-            if (!valid) return false;
+            bool valid = true;
+//            valid = scp.is_signature_valid();
+//            if (!valid) return false;
             for (const auto &c: scp.checkpoints) {
                 valid &= c.block_id == scp.block_id && c.block_num == scp.block_num;
                 if (!valid) return false;
