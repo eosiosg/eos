@@ -177,7 +177,7 @@ namespace eosio {
       bool                          use_socket_read_watermark = false;
 
       std::unordered_map<digest_type, time_point_sec> pbft_message_cache{};
-      const int                     pbft_message_cache_TTL = 2;
+      const int                     pbft_message_cache_TTL = 1000;
 
       channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::prepare_channel::channel_type::handle pbft_outgoing_prepare_subscription;
@@ -2715,7 +2715,7 @@ namespace eosio {
 
     bool net_plugin_impl::maybe_add_pbft_cache(const digest_type &digest){
        auto itr = pbft_message_cache.find(digest);
-       if(itr == pbft_message_cache.end()){
+       if (itr == pbft_message_cache.end()) {
            //add to cache
            pbft_message_cache[digest] = time_point_sec(time_point::now()) + pbft_message_cache_TTL;
            return true;
@@ -2736,6 +2736,9 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
 //        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
+        auto chain_id = my_impl->chain_plug->chain().get_chain_id();
+        if (chain_id != msg.chain_id) return;
+
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
@@ -2751,7 +2754,9 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
 //        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
-//        if (!msg.is_signature_valid()) return;
+        auto chain_id = my_impl->chain_plug->chain().get_chain_id();
+        if (chain_id != msg.chain_id) return;
+
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
@@ -2766,7 +2771,9 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
 //       ilog("net plugin received pbft_view_change ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
-//        if(!msg.is_signature_valid()) return;
+        auto chain_id = my_impl->chain_plug->chain().get_chain_id();
+        if (chain_id != msg.chain_id) return;
+
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
@@ -2781,7 +2788,9 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
 //        ilog("net plugin received new view ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
-//        if(!msg.is_signature_valid()) return;
+        auto chain_id = my_impl->chain_plug->chain().get_chain_id();
+        if (chain_id != msg.chain_id) return;
+
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
@@ -2796,7 +2805,9 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 //        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
-//        if(!msg.is_signature_valid()) return;
+        auto chain_id = my_impl->chain_plug->chain().get_chain_id();
+        if (chain_id != msg.chain_id) return;
+
         auto digest = msg.digest();
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
@@ -2811,8 +2822,9 @@ namespace eosio {
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_stable_checkpoint &msg) {
 //        ilog("received stable checkpoint at ${h}", ("h", msg.block_num));
-//        if(!msg.is_signature_valid()) return;
         controller &cc = my_impl->chain_plug->chain();
+        if (cc.get_chain_id() != msg.chain_id) return;
+
         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
         if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
             for (auto cp: msg.checkpoints) {
