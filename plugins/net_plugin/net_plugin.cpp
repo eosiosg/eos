@@ -157,7 +157,7 @@ namespace eosio {
       boost::asio::steady_timer::duration   txn_exp_period;
       boost::asio::steady_timer::duration   resp_expected_period;
       boost::asio::steady_timer::duration   keepalive_interval{std::chrono::seconds{32}};
-      boost::asio::steady_timer::duration   pbft_message_cache_tick_interval{std::chrono::milliseconds{500}};
+      boost::asio::steady_timer::duration   pbft_message_cache_tick_interval{std::chrono::seconds{10}};
       int                           max_cleanup_time_ms = 0;
 
       const std::chrono::system_clock::duration peer_authentication_interval{std::chrono::seconds{1}}; ///< Peer clock may be no more than 1 second skewed from our clock, including network latency.
@@ -176,8 +176,8 @@ namespace eosio {
 
       bool                          use_socket_read_watermark = false;
 
-      std::unordered_map<digest_type, time_point_sec> pbft_message_cache{};
-      const int                     pbft_message_cache_TTL = 6;
+      std::unordered_map<string, time_point_sec> pbft_message_cache{};
+      const int                     pbft_message_cache_TTL = 600;
 
       channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::prepare_channel::channel_type::handle pbft_outgoing_prepare_subscription;
@@ -239,7 +239,7 @@ namespace eosio {
       void handle_message( connection_ptr c, const signed_block &msg);
       void handle_message( connection_ptr c, const packed_transaction &msg);
       //pbft messages
-      bool maybe_add_pbft_cache(const digest_type &digest);
+      bool maybe_add_pbft_cache(const string &uuid);
       void clean_expired_pbft_cache();
 
       void pbft_outgoing_prepare(const pbft_prepare &prepare);
@@ -257,7 +257,7 @@ namespace eosio {
       void handle_message( connection_ptr c, const checkpoint_request_message &msg);
 
 
-       void start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection);
+      void start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection);
       void start_txn_timer( );
       void start_monitors( );
 
@@ -2713,11 +2713,11 @@ namespace eosio {
         }
     }
 
-    bool net_plugin_impl::maybe_add_pbft_cache(const digest_type &digest){
-       auto itr = pbft_message_cache.find(digest);
+    bool net_plugin_impl::maybe_add_pbft_cache(const string &uuid){
+       auto itr = pbft_message_cache.find(uuid);
        if (itr == pbft_message_cache.end()) {
            //add to cache
-           pbft_message_cache[digest] = time_point_sec(time_point::now()) + pbft_message_cache_TTL;
+           pbft_message_cache[uuid] = time_point_sec(time_point::now()) + pbft_message_cache_TTL;
            return true;
        }
        return false;
@@ -2738,8 +2738,8 @@ namespace eosio {
 //        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
         if (chain_id != msg.chain_id) return;
 
-        auto digest = msg.digest();
-        auto added = maybe_add_pbft_cache(digest);
+        auto uuid = msg.uuid;
+        auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
                 if (conn != c) {
@@ -2755,8 +2755,8 @@ namespace eosio {
 //        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
         if (chain_id != msg.chain_id) return;
 
-        auto digest = msg.digest();
-        auto added = maybe_add_pbft_cache(digest);
+        auto uuid = msg.uuid;
+        auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
                 if (conn != c) {
@@ -2771,8 +2771,8 @@ namespace eosio {
 //       ilog("net plugin received pbft_view_change ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
         if (chain_id != msg.chain_id) return;
 
-        auto digest = msg.digest();
-        auto added = maybe_add_pbft_cache(digest);
+        auto uuid = msg.uuid;
+        auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
                 if (conn != c) {
@@ -2787,8 +2787,8 @@ namespace eosio {
 //        ilog("net plugin received new view ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
         if (chain_id != msg.chain_id) return;
 
-        auto digest = msg.digest();
-        auto added = maybe_add_pbft_cache(digest);
+        auto uuid = msg.uuid;
+        auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
                 if (conn != c) {
@@ -2803,8 +2803,8 @@ namespace eosio {
 //        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
         if (chain_id != msg.chain_id) return;
 
-        auto digest = msg.digest();
-        auto added = maybe_add_pbft_cache(digest);
+        auto uuid = msg.uuid;
+        auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
                 if (conn != c) {

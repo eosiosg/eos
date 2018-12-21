@@ -397,7 +397,10 @@ namespace eosio {
         }
 
         void pbft_database::add_pbft_view_change(pbft_view_change &vc) {
-            if (!is_valid_view_change(vc)) return;
+            if (!is_valid_view_change(vc)) {
+                wlog("invalid view change msg: ${vc}", ("vc", vc));
+                return;
+            }
 
             auto active_bps = lib_active_producers().producers;
 

@@ -22,7 +22,7 @@ namespace eosio {
 
         boost::asio::steady_timer::duration prepare_timeout{std::chrono::milliseconds{500}};
         boost::asio::steady_timer::duration commit_timeout{std::chrono::milliseconds{500}};
-        boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{2}};
+        boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{10}};
         boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{2}};
 
         void prepare_timer_tick();
