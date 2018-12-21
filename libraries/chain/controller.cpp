@@ -1838,8 +1838,7 @@ optional<block_id_type> controller::pending_producer_block_id()const {
 }
 
 uint32_t controller::last_irreversible_block_num() const {
-//   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
-   return my->head->bft_irreversible_blocknum;
+   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
 }
 
 block_id_type controller::last_irreversible_block_id() const {
@@ -1857,22 +1856,25 @@ uint32_t controller::last_stable_checkpoint_block_num() const {
     return my->head->pbft_stable_checkpoint_blocknum;
 }
 
-signed_block_ptr controller::last_irreversible_block() const {
-   auto lib_num = last_irreversible_block_num();
+block_id_type controller::last_stable_checkpoint_block_id() const {
+    auto lscb_num = last_stable_checkpoint_block_num();
+    const auto& tapos_block_summary = db().get<block_summary_object>((uint16_t)lscb_num);
 
-   if (lib_num > 0)
-      return fetch_block_by_number(lib_num);
-   return signed_block_ptr();
+    if( block_header::num_from_id(tapos_block_summary.block_id) == lscb_num )
+        return tapos_block_summary.block_id;
+
+    return fetch_block_by_number(lscb_num)->id();
 }
 
-block_num_type controller::last_proposed_schedule_block_num() const {
+
+uint32_t controller::last_proposed_schedule_block_num() const {
    if (my->last_proposed_schedule_block_num) {
       return *my->last_proposed_schedule_block_num;
    }
    return block_num_type{};
 }
 
-block_num_type controller::last_promoted_proposed_schedule_block_num() const {
+uint32_t controller::last_promoted_proposed_schedule_block_num() const {
     if (my->last_promoted_proposed_schedule_block_num) {
         return *my->last_promoted_proposed_schedule_block_num;
     }

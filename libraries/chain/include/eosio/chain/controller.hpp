@@ -163,13 +163,12 @@ namespace eosio { namespace chain {
 
          void set_pbft_prepared_block_id(optional<block_id_type> bid);
 
-         signed_block_ptr last_irreversible_block()const;
-
-         block_num_type last_proposed_schedule_block_num()const;
-         block_num_type last_promoted_proposed_schedule_block_num()const;
+         uint32_t last_proposed_schedule_block_num()const;
+         uint32_t last_promoted_proposed_schedule_block_num()const;
 
          void set_pbft_latest_checkpoint( const block_id_type& id );
-         uint32_t last_stable_checkpoint_block_num() const;
+         uint32_t last_stable_checkpoint_block_num()const;
+         block_id_type last_stable_checkpoint_block_id()const;
 
 
          const fork_database& fork_db()const;

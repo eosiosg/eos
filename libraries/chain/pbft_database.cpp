@@ -500,7 +500,7 @@ namespace eosio {
 //                    auto my_pcc = pbft_committed_certificate{};
                     if (ppc_ptr != ppc.end()) my_ppc = *ppc_ptr;
 //                    if (pcc_ptr != pcc.end()) my_pcc = *pcc_ptr;
-                    auto my_lsc = get_stable_checkpoint_by_id(ctrl.get_block_id_for_num(ctrl.last_stable_checkpoint_block_num()));
+                    auto my_lsc = get_stable_checkpoint_by_id(ctrl.last_stable_checkpoint_block_id());
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
 //                    auto vc = pbft_view_change{uuid, new_view, my_ppc, my_pcc, my_sp.first, chain_id()};
                     auto vc = pbft_view_change{uuid, new_view, my_ppc, my_lsc, my_sp.first, chain_id()};
@@ -884,8 +884,8 @@ namespace eosio {
         }
 
         bool pbft_database::should_stop_view_change(const pbft_view_change &vc) {
-            auto lib_num = ctrl.last_irreversible_block_num();
-            if (lib_num > vc.prepared.block_num && lib_num > vc.stable_checkpoint.block_num) return true;
+            auto lscb_num = ctrl.last_stable_checkpoint_block_num();
+            if (lscb_num > vc.prepared.block_num && lscb_num > vc.stable_checkpoint.block_num) return true;
             return false;
         }
 

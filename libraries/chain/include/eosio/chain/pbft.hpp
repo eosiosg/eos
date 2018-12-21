@@ -185,8 +185,6 @@ namespace eosio {
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
 
             bool pending_commit_local;
-
-            std::chrono::time_point<std::chrono::system_clock> pending_commit_local_set_time;
         };
 
         class psm_view_change_state final: public psm_state {
@@ -207,7 +205,7 @@ namespace eosio {
         };
 
         struct pbft_config {
-            uint32_t view_change_timeout;
+            uint32_t view_change_timeout = 6;
             bool     bp_candidate = false;
         };
 
