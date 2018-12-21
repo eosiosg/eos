@@ -435,7 +435,7 @@ namespace eosio {
                 if (vc_count >= active_bps.size() * 2 / 3 + 1) {
                     by_view_index.modify(itr, [&](const pbft_view_state_ptr &pvsp) {
                         pvsp->should_view_changed = true;
-                        ilog("view ${v} is potential new view", ("v", (*itr)->view));
+//                        ilog("view ${v} is potential new view", ("v", (*itr)->view));
                     });
                 }
             }

@@ -475,8 +475,9 @@ namespace eosio {
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) {
                 this->set_current_view(nv);
-                this->set_target_view(nv+1);
             }
+            this->set_target_view(this->get_current_view()+1);
+
             this->set_prepares_cache(vector<pbft_prepare>{});
             this->set_view_change_timer(0);
             this->set_current(new psm_committed_state);
@@ -503,6 +504,7 @@ namespace eosio {
             this->set_view_change_timer(0);
             this->set_current(new psm_view_change_state);
 //            ilog("deleting state, transit to view change");
+            send_pbft_view_change();
             delete s;
 //            ilog("deleted state, transit to view change");
         }

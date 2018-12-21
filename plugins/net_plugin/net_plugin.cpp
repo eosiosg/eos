@@ -1556,7 +1556,7 @@ namespace eosio {
       }
 
       if (head_checkpoint < peer_lib) {
-          wlog("request checkpoints from peer");
+          fc_dlog(logger, "request checkpoints from peer");
           checkpoint_request_message crm;
           crm.start_block = head_checkpoint;
           crm.end_block = peer_lib;
@@ -2555,7 +2555,7 @@ namespace eosio {
 
        if ( msg.end_block == 0) return;
 
-       wlog("received checkpoint request message");
+       fc_ilog(logger, "received checkpoint request message");
        vector<pbft_stable_checkpoint> scp_stack;
        controller &cc = my_impl->chain_plug->chain();
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
