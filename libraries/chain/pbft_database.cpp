@@ -474,7 +474,7 @@ namespace eosio {
         vector<pbft_view_change> pbft_database::send_and_add_pbft_view_change(
                 const vector<pbft_view_change> &vcv,
                 const vector<pbft_prepared_certificate> &ppc,
-                const vector<pbft_committed_certificate> &pcc,
+//                const vector<pbft_committed_certificate> &pcc,
                 uint32_t new_view)
         {
             if (!vcv.empty()) {
@@ -493,16 +493,17 @@ namespace eosio {
                 for (auto const &my_sp : ctrl.my_signature_providers()) {
                     auto ppc_ptr = find_if( ppc.begin(), ppc.end(),
                             [&](const pbft_prepared_certificate &v) { return v.public_key == my_sp.first; });
-                    auto pcc_ptr = find_if( pcc.begin(), pcc.end(),
-                            [&](const pbft_committed_certificate &v) { return v.public_key == my_sp.first; });
+//                    auto pcc_ptr = find_if( pcc.begin(), pcc.end(),
+//                            [&](const pbft_committed_certificate &v) { return v.public_key == my_sp.first; });
 
                     auto my_ppc = pbft_prepared_certificate{};
-                    auto my_pcc = pbft_committed_certificate{};
+//                    auto my_pcc = pbft_committed_certificate{};
                     if (ppc_ptr != ppc.end()) my_ppc = *ppc_ptr;
-                    if (pcc_ptr != pcc.end()) my_pcc = *pcc_ptr;
-
+//                    if (pcc_ptr != pcc.end()) my_pcc = *pcc_ptr;
+                    auto my_lsc = get_stable_checkpoint_by_id(ctrl.get_block_id_for_num(ctrl.last_stable_checkpoint_block_num()));
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                    auto vc = pbft_view_change{uuid, new_view, my_ppc, my_pcc, my_sp.first, chain_id()};
+//                    auto vc = pbft_view_change{uuid, new_view, my_ppc, my_pcc, my_sp.first, chain_id()};
+                    auto vc = pbft_view_change{uuid, new_view, my_ppc, my_lsc, my_sp.first, chain_id()};
                     vc.producer_signature = my_sp.second(vc.digest());
 //                    ilog("starting new round of view change: ${nv}", ("nv", vc.view));
                     emit(pbft_outgoing_view_change, vc);
@@ -564,21 +565,24 @@ namespace eosio {
             }
 
             auto highest_ppc = pbft_prepared_certificate{};
-            auto highest_pcc = pbft_committed_certificate{};
+//            auto highest_pcc = pbft_committed_certificate{};
+            auto highest_sc = pbft_stable_checkpoint{};
 
             for (const auto &vc: vcc_ptr->view_changes) {
-                if (vc.prepared.block_num > highest_ppc.block_num
-                && is_valid_prepared_certificate(vc.prepared)) {
+                if (vc.prepared.block_num > highest_ppc.block_num) {
                     highest_ppc = vc.prepared;
                 }
-                if (vc.committed.block_num > highest_pcc.block_num
-                && is_valid_committed_certificate(vc.committed)) {
-                    highest_pcc = vc.committed;
+//                if (vc.committed.block_num > highest_pcc.block_num {
+//                    highest_pcc = vc.committed;
+//                }
+                if (vc.stable_checkpoint.block_num > highest_sc.block_num) {
+                    highest_sc = vc.stable_checkpoint;
                 }
             }
 
             auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-            auto nv = pbft_new_view{uuid, current_view, .prepared=highest_ppc, .committed=highest_pcc, .view_changed=*vcc_ptr, .public_key=sp_itr->first, .chain_id=chain_id()};
+//            auto nv = pbft_new_view{uuid, current_view, .prepared=highest_ppc, .committed=highest_pcc, .view_changed=*vcc_ptr, .public_key=sp_itr->first, .chain_id=chain_id()};
+            auto nv = pbft_new_view{uuid, current_view, .prepared=highest_ppc, .stable_checkpoint=highest_sc, .view_changed=*vcc_ptr, .public_key=sp_itr->first, .chain_id=chain_id()};
             nv.producer_signature = sp_itr->second(nv.digest());
             emit(pbft_outgoing_new_view, nv);
             return nv;
@@ -835,14 +839,16 @@ namespace eosio {
 
             return certificate.is_signature_valid()
                    && is_valid_prepared_certificate(certificate.prepared)
-                   && is_valid_committed_certificate(certificate.committed);
+                   && is_valid_stable_checkpoint(certificate.stable_checkpoint);
+//                   && is_valid_committed_certificate(certificate.committed);
         }
 
 
         bool pbft_database::is_valid_new_view(const pbft_new_view &certificate) {
             //all signatures should be valid
             auto valid = is_valid_prepared_certificate(certificate.prepared)
-                    && is_valid_committed_certificate(certificate.committed)
+//                    && is_valid_committed_certificate(certificate.committed)
+                    && is_valid_stable_checkpoint(certificate.stable_checkpoint)
                     && certificate.view_changed.is_signature_valid()
                     && certificate.is_signature_valid();
 
@@ -858,19 +864,31 @@ namespace eosio {
 //            ilog("valid view changed certificate");
 
             auto highest_ppc = pbft_prepared_certificate{};
-            auto highest_pcc = pbft_committed_certificate{};
+//            auto highest_pcc = pbft_committed_certificate{};
+            auto highest_scp = pbft_stable_checkpoint{};
 
             for (const auto &vc: certificate.view_changed.view_changes) {
                 if (vc.prepared.block_num > highest_ppc.block_num) {
                     highest_ppc = vc.prepared;
                 }
-                if (vc.committed.block_num > highest_pcc.block_num) {
-                    highest_pcc = vc.committed;
+//                if (vc.committed.block_num > highest_pcc.block_num) {
+//                    highest_pcc = vc.committed;
+//                }
+                if (vc.stable_checkpoint.block_num > highest_scp.block_num) {
+                    highest_scp = vc.stable_checkpoint;
                 }
             }
 
-            return highest_ppc == certificate.prepared && highest_pcc == certificate.committed;
+            return highest_ppc == certificate.prepared && highest_scp == certificate.stable_checkpoint;
+//            return highest_ppc == certificate.prepared && highest_pcc == certificate.committed;
         }
+
+        bool pbft_database::should_stop_view_change(const pbft_view_change &vc) {
+            auto lib_num = ctrl.last_irreversible_block_num();
+            if (lib_num > vc.prepared.block_num && lib_num > vc.stable_checkpoint.block_num) return true;
+            return false;
+        }
+
 
         vector<vector<block_info>> pbft_database::fetch_fork_from(const vector<block_info> block_infos) {
             auto bi = block_infos;

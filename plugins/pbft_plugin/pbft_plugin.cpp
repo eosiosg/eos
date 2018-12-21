@@ -1,12 +1,10 @@
 #include <memory>
 
-#include <memory>
-
-
 #include <eosio/pbft_plugin/pbft_plugin.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <eosio/chain/pbft.hpp>
 #include <eosio/chain_plugin/chain_plugin.hpp>
+#include <eosio/net_plugin/net_plugin.hpp>
 
 namespace eosio {
     static appbase::abstract_plugin &_pbft_plugin = app().register_plugin<pbft_plugin>();
@@ -33,6 +31,9 @@ namespace eosio {
 
         void checkpoint_timer_tick();
 
+    private:
+        bool is_syncing();
+        bool is_replaying();
     };
 
     pbft_plugin::pbft_plugin() : my(new pbft_plugin_impl()) {}
@@ -68,7 +69,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin prepare timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.maybe_pbft_prepare();
+                if (!is_syncing() && !is_replaying()) pbft_ctrl.maybe_pbft_prepare();
             }
         });
     }
@@ -81,7 +82,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin commit timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.maybe_pbft_commit();
+                if (!is_syncing() && !is_replaying()) pbft_ctrl.maybe_pbft_commit();
             }
         });
     }
@@ -99,7 +100,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin view change timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.maybe_pbft_view_change();
+                if (!is_syncing() && !is_replaying()) pbft_ctrl.maybe_pbft_view_change();
             }
         });
     }
@@ -112,9 +113,20 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin checkpoint timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.send_pbft_checkpoint();
+                if (!is_syncing() && !is_replaying()) pbft_ctrl.send_pbft_checkpoint();
             }
         });
     }
 
+    bool pbft_plugin_impl::is_syncing() {
+        auto connections =  app().get_plugin<net_plugin>().connections();
+        for (const auto &conn: connections) {
+            if (conn.syncing) return true;
+        }
+        return false;
+    }
+
+    bool pbft_plugin_impl::is_replaying() {
+        return app().get_plugin<chain_plugin>().chain().is_replaying();
+    }
 }

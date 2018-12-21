@@ -1879,6 +1879,10 @@ block_num_type controller::last_promoted_proposed_schedule_block_num() const {
     return block_num_type{};
 }
 
+bool controller::is_replaying() const {
+   return my->replaying;
+}
+
 const dynamic_global_property_object& controller::get_dynamic_global_properties()const {
   return my->db.get<dynamic_global_property_object>();
 }
