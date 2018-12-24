@@ -445,7 +445,7 @@ namespace eosio {
             ilog("[VIEW CHANGE] on_new_view: current view: ${v1} new view: ${v2}", ("v1",m->get_current_view())("v2",e.view));
             //transit to committed or prepare
             if (pbft_db.is_valid_new_view(e)) {
-                ilog("VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
+                ilog("[VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
                 m->transit_to_new_view(e, this);
             } else {
                 wlog("invalid new view msg: ${nv}", ("nv", e));
