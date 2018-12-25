@@ -119,6 +119,7 @@ namespace eosio {
     }
 
     bool pbft_plugin_impl::is_syncing() {
+        return false; //test
         auto connections =  app().get_plugin<net_plugin>().connections();
         for (const auto &conn: connections) {
             if (conn.syncing) return true;

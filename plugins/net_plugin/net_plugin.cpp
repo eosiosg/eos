@@ -1561,6 +1561,8 @@ namespace eosio {
           crm.start_block = head_checkpoint;
           crm.end_block = peer_lib;
           c->enqueue( crm );
+          c->syncing = true;
+          return;
       }
 
       if (head <= msg.head_num ) {
@@ -2742,7 +2744,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2759,7 +2761,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2775,7 +2777,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2791,7 +2793,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2807,7 +2809,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(digest);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }

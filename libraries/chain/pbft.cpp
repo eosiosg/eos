@@ -115,7 +115,6 @@ namespace eosio {
             this->set_view_changes_cache(vector<pbft_view_change>{});
 
             this->set_prepared_certificate(vector<pbft_prepared_certificate>{});
-//            this->set_committed_certificate(vector<pbft_committed_certificate>{});
             this->set_view_changed_certificate(vector<pbft_view_changed_certificate>{});
             this->set_checkpoints_cache(vector<pbft_checkpoint>{});
 
@@ -398,9 +397,8 @@ namespace eosio {
 
                 if (nv_msg == pbft_new_view{} || !pbft_db.is_valid_new_view(nv_msg)) return;
 
-                ilog("[VIEW CHANGE] I am the primary, transit to new view");
+                ilog("[VIEW CHANGE] I am the primary, transit to new view: ${nv}", ("nv", nv_msg.view));
                 m->transit_to_new_view(nv_msg, this);
-                return;
             }
 //            }
 
@@ -417,7 +415,7 @@ namespace eosio {
             }
 
             m->send_pbft_view_change();
-            ilog("[VIEW CHANGE] send_view_change: current view: ${v1}, target view: ${v2}",("v1", m->get_current_view())("v2", m->get_target_view()));
+//            ilog("[VIEW CHANGE] send_view_change: current view: ${v1}, target view: ${v2}",("v1", m->get_current_view())("v2", m->get_target_view()));
 
             //if view_change >= 2f+1, calculate next primary, send new view if is primary
 //            for (auto nv = m->get_target_view(); nv > m->get_current_view(); --nv) {
@@ -436,7 +434,7 @@ namespace eosio {
 
                 if (nv_msg == pbft_new_view{} || !pbft_db.is_valid_new_view(nv_msg)) return;
 
-                ilog("[VIEW CHANGE] I am the primary, transit to new view");
+                ilog("[VIEW CHANGE] I am the primary, transit to new view: ${nv}", ("nv", nv_msg.view));
                 m->transit_to_new_view(nv_msg, this);
                 return;
             }
@@ -451,9 +449,9 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             ilog("[VIEW CHANGE] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e));
-            //transit to committed or prepare
+            //transit to committed or prepared
             if (pbft_db.is_valid_new_view(e)) {
-                ilog("VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
+                ilog("[VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));
 
                 m->transit_to_new_view(e, this);
             }
@@ -473,7 +471,7 @@ namespace eosio {
             this->set_current(new psm_committed_state);
 //            ilog("deleting state, transit to committed");
             delete s;
-//            ilog("deleted state, transit to committed");
+//            ilog("transit to committed");
         }
 
         template<typename T>
@@ -483,7 +481,7 @@ namespace eosio {
             this->set_current(new psm_prepared_state);
 //            ilog("deleting state, transit to prepared");
             delete s;
-//            ilog("deleted state, transit to prepared");
+//            ilog("transit to prepared");
         }
 
         template<typename T>
@@ -497,7 +495,7 @@ namespace eosio {
 //            ilog("deleting state, transit to view change");
             send_pbft_view_change();
             delete s;
-//            ilog("deleted state, transit to view change");
+//            ilog("transit to view change");
         }
 
         template<typename T>
@@ -537,7 +535,7 @@ namespace eosio {
                     try {
                         pbft_db.add_pbft_checkpoint(cp);
                     } catch (...) {
-                        wlog("insert commit failed");
+                        wlog("insert checkpoint failed");
                     }
                 }
             }
@@ -548,11 +546,7 @@ namespace eosio {
                     try {
                         pbft_db.add_pbft_prepare(p);
                         if (pbft_db.should_prepared()) {
-//                            ilog("Changing to PREPARED!");
-                            this->set_current(new psm_prepared_state);
-//                            ilog("deleting state, transit to prepared");
-                            delete s;
-//                            ilog("deleted state, transit to prepared");
+                            transit_to_prepared_state(s);
                             return;
                         }
                     } catch (...) {
@@ -563,12 +557,8 @@ namespace eosio {
 
 
 
-//            ilog("Changing to COMMITTED!");
             this->set_current(new psm_committed_state);
-//            ilog("deleting state, transit to committed");
             delete s;
-//            ilog("deleted state, transit to committed");
-//            ilog("validated new view request, finished change new view");
         }
 
         void psm_machine::send_pbft_view_change() {
@@ -576,7 +566,6 @@ namespace eosio {
             if (this->get_target_view_retries() == 0) {
                 this->set_view_changes_cache(vector<pbft_view_change>{});
                 this->set_prepared_certificate(pbft_db.generate_prepared_certificate());
-//                this->set_committed_certificate(pbft_db.generate_committed_certificate());
             }
 
             if (this->get_target_view_retries() < pow(2, this->get_target_view() - this->get_current_view() - 1)) {
@@ -591,13 +580,12 @@ namespace eosio {
             auto view_changes = pbft_db.send_and_add_pbft_view_change(
                     this->get_view_changes_cache(),
                     this->get_prepared_certificate(),
-//                    this->get_committed_certificate(),
                     this->get_target_view());
 
             if (!view_changes.empty()) {
                 this->set_view_changes_cache(view_changes);
             }
-            ilog("view change msg: ${vc}", ("vc", view_changes));
+//            ilog("view change msg: ${vc}", (`"vc", view_changes));
         }
 
         const vector<pbft_prepare> &psm_machine::get_prepares_cache() const {
@@ -643,14 +631,6 @@ namespace eosio {
 
         void psm_machine::set_prepared_certificate(const vector<pbft_prepared_certificate> &prepared_certificate) {
             this->cache.prepared_certificate = prepared_certificate;
-        }
-
-        const vector<pbft_committed_certificate> &psm_machine::get_committed_certificate() const {
-            return this->cache.committed_certificate;
-        }
-
-        void psm_machine::set_committed_certificate(const vector<pbft_committed_certificate> &committed_certificate) {
-            this->cache.committed_certificate = committed_certificate;
         }
 
         const vector<pbft_view_changed_certificate> &psm_machine::get_view_changed_certificate() const {

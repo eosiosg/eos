@@ -1258,12 +1258,9 @@ struct controller_impl {
          EOS_ASSERT( s != controller::block_status::incomplete, block_validate_exception, "invalid block status for a completed block" );
          emit( self.pre_accepted_block, b );
 
-
-//         if (!last_promoted_proposed_schedule_block_num || b->block_num() != *last_promoted_proposed_schedule_block_num + 1) {
          set_pbft_lib();
          set_pbft_lscb();
-//         }
-//         ilog("set lib done");
+
          bool trust = !conf.force_all_checks && (s == controller::block_status::irreversible || s == controller::block_status::validated);
          auto new_header_state = fork_db.add( b, trust );
          if (conf.trusted_producers.count(b->producer)) {
@@ -1307,7 +1304,6 @@ struct controller_impl {
 
       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
          fork_db.set_bft_irreversible(pending_pbft_lib->pbft_lib);
-//         ilog("=====Committed local===== [lib: ${num}]", ("num", fork_db.get_block(pending_pbft_lib->pbft_lib)->block_num));
          pending_pbft_lib.reset();
          if (read_mode != db_read_mode::IRREVERSIBLE) {
              maybe_switch_forks();
@@ -1323,7 +1319,6 @@ struct controller_impl {
    void set_pbft_lscb() {
        if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_checkpoint) {
            fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
-//           ilog("======set stable checkpoint====== [lscb: ${h}]", ("h", fork_db.get_block(*pending_pbft_checkpoint)->block_num));
            pending_pbft_checkpoint.reset();
 
        }
