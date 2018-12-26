@@ -16,6 +16,7 @@ namespace eosio {
             config.view_change_timeout = 6;
             config.bp_candidate = true;
             datadir = ctrl.state_dir();
+            ilog("initialising pbft controller...");
 
             if (!fc::is_directory(datadir))
                 fc::create_directories(datadir);
@@ -38,7 +39,7 @@ namespace eosio {
         }
 
         pbft_controller::~pbft_controller() {
-
+            ilog("destroying pbft controller...");
             fc::path pbft_db_dat = datadir / config::pbftdb_filename;
             std::ofstream out(pbft_db_dat.generic_string().c_str(),
                               std::ios::out | std::ios::binary | std::ofstream::trunc);
@@ -108,6 +109,7 @@ namespace eosio {
         psm_machine::psm_machine(pbft_database& pbft_db):
         pbft_db(pbft_db)
         {
+            ilog("initialising pbft state machine");
             this->set_current(new psm_committed_state);
 
             this->set_prepares_cache(vector<pbft_prepare>{});
@@ -123,9 +125,10 @@ namespace eosio {
             this->current_view = 0;
             this->target_view = this->current_view + 1;
         }
-        psm_machine::~psm_machine() = default;
-
-
+        psm_machine::~psm_machine() {
+            ilog("destroying pbft state machine");
+        }
+        
         //psm_machine
         void psm_machine::on_prepare(pbft_prepare &e) {
             current->on_prepare(this, e, pbft_db);
