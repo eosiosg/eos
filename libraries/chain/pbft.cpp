@@ -71,22 +71,22 @@ namespace eosio {
         }
 
         void pbft_controller::on_pbft_prepare(pbft_prepare &p) {
-            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
+            if (!config.bp_candidate) return;
             state_machine.on_prepare(p);
         }
 
         void pbft_controller::on_pbft_commit(pbft_commit &c) {
-            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
+            if (!config.bp_candidate) return;
             state_machine.on_commit(c);
         }
 
         void pbft_controller::on_pbft_view_change(pbft_view_change &vc) {
-            if (!pbft_db.should_send_pbft_msg()) return;
+            if (!config.bp_candidate) return;
             state_machine.on_view_change(vc);
         }
 
         void pbft_controller::on_pbft_new_view(pbft_new_view &nv) {
-            if (!pbft_db.should_send_pbft_msg() && !config.bp_candidate) return;
+            if (!config.bp_candidate) return;
             state_machine.on_new_view(nv);
         }
 
