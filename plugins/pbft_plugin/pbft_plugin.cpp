@@ -119,12 +119,13 @@ namespace eosio {
     }
 
     bool pbft_plugin_impl::is_syncing() {
-        return false; //test
+//        return false; //test
+        // I am syncing if all peers notify me so.
         auto connections =  app().get_plugin<net_plugin>().connections();
         for (const auto &conn: connections) {
-            if (conn.syncing) return true;
+            if (!conn.syncing) return false;
         }
-        return false;
+        return true;
     }
 
     bool pbft_plugin_impl::is_replaying() {
