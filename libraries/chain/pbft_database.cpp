@@ -393,7 +393,7 @@ namespace eosio {
 
         void pbft_database::add_pbft_view_change(pbft_view_change &vc) {
             if (!is_valid_view_change(vc)) {
-                wlog("invalid view change msg: ${vc}", ("vc", vc));
+                wlog("invalid view change msg: ${vc}", ("vc", vc.public_key));
                 return;
             }
             auto active_bps = lib_active_producers().producers;
@@ -499,7 +499,7 @@ namespace eosio {
                     auto ts = time_point::now();
                     auto vc = pbft_view_change{uuid, current_view, new_view, ts, my_ppc, my_lsc, my_sp.first, chain_id()};
                     vc.producer_signature = my_sp.second(vc.digest());
-                    ilog("[VIEW CHANGE] starting new round of view change: ${nv}, my current view: ${c}", ("nv", vc)("c", current_view));
+                    ilog("[VIEW CHANGE] starting new round of view change: ${nv}, my current view: ${c}", ("nv", vc.target_view)("c", current_view));
                     emit(pbft_outgoing_view_change, vc);
                     add_pbft_view_change(vc);
                     new_vcv.emplace_back(vc);
