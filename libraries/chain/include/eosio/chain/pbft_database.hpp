@@ -66,12 +66,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -110,12 +111,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -149,12 +151,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -174,7 +177,7 @@ namespace eosio {
                        && chain_id == rhs.chain_id;
             }
 
-            bool operator<(const pbft_checkpoint &rhs) const {
+            bool operator<(const pbft_stable_checkpoint &rhs) const {
                 return block_num < rhs.block_num;
             }
 
@@ -189,12 +192,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -223,12 +227,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -236,6 +241,7 @@ namespace eosio {
             string uuid;
             uint32_t current_view;
             uint32_t target_view;
+            time_point timestamp;
             pbft_prepared_certificate prepared;
             pbft_stable_checkpoint stable_checkpoint;
             public_key_type public_key;
@@ -245,6 +251,7 @@ namespace eosio {
             bool operator==(const pbft_view_change &rhs) const {
                 return current_view == rhs.current_view
                        && target_view == rhs.target_view
+                       && timestamp == rhs.timestamp
                        && prepared == rhs.prepared
                        && stable_checkpoint == rhs.stable_checkpoint
                        && public_key == rhs.public_key
@@ -260,6 +267,7 @@ namespace eosio {
                 fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, current_view);
                 fc::raw::pack(enc, target_view);
+                fc::raw::pack(enc, timestamp);
                 fc::raw::pack(enc, prepared);
                 fc::raw::pack(enc, stable_checkpoint);
                 fc::raw::pack(enc, public_key);
@@ -268,12 +276,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -299,12 +308,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -344,12 +354,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
+                return true;
+//                try {
+//                    auto pk = crypto::public_key(producer_signature, digest(), true);
+//                    return public_key == pk;
+//                } catch (fc::exception & /*e*/) {
+//                    return false;
+//                }
             }
         };
 
@@ -604,7 +615,7 @@ namespace eosio {
 FC_REFLECT(eosio::chain::block_info, (block_id)(block_num))
 FC_REFLECT(eosio::chain::pbft_prepare, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_commit, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(current_view)(target_view)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(current_view)(target_view)(timestamp)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_new_view, (uuid)(view)(prepared)(stable_checkpoint)(view_changed)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_state, (block_id)(block_num)(prepares)(should_prepared)(commits)(should_committed))
 FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepares)(public_key)(producer_signature))

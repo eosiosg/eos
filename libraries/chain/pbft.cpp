@@ -224,8 +224,8 @@ namespace eosio {
 
         void psm_prepared_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("[PREPARED] on_view_change: {target_view:${tv},public_key:${k},uuid:${u},current_view: ${cv}}, my current view: ${mcv}",
-                    ("tv", e.target_view)("k", e.public_key)("u", e.uuid)("cv", e.current_view)("mcv", m->get_current_view()));
+            ilog("[PREPARED] on_view_change: {\"target_view\":${tv},\"public_key\":\"${k}\",\"uuid\":\"${u}\",\"current_view\":${cv},\"timestamp\":\"${ts}\"}, my current view: ${mcv}",
+                    ("tv", e.target_view)("k", e.public_key)("u", e.uuid)("cv", e.current_view)("ts", e.timestamp)("mcv", m->get_current_view()));
             if (e.target_view <= m->get_current_view()) return;
 
             //do action add view change
@@ -307,8 +307,8 @@ namespace eosio {
 
         void psm_committed_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
-            ilog("[COMMITTED] on_view_change: {target_view:${tv},public_key:${k},uuid:${u},current_view: ${cv}}, my current view: ${mcv}",
-                 ("tv", e.target_view)("k", e.public_key)("u", e.uuid)("cv", e.current_view)("mcv", m->get_current_view()));
+            ilog("[COMMITTED] on_view_change: {\"target_view\":${tv},\"public_key\":\"${k}\",\"uuid\":\"${u}\",\"current_view\":${cv},\"timestamp\":\"${ts}\"}, my current view: ${mcv}",
+                 ("tv", e.target_view)("k", e.public_key)("u", e.uuid)("cv", e.current_view)("ts", e.timestamp)("mcv", m->get_current_view()));
             if (e.target_view <= m->get_current_view()) return;
 
             //do action add view change
@@ -335,7 +335,7 @@ namespace eosio {
 
             if (e.view <= m->get_current_view()) return;
 
-            ilog("[COMMITTED] on_new_view: current view: ${v1} new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
+            ilog("[COMMITTED] on_new_view: current view: ${v1}, new view: ${v2}",("v1",m->get_current_view())("v2",e.view));
 
             //handle new view
             if (pbft_db.is_valid_new_view(e)) {
@@ -370,8 +370,16 @@ namespace eosio {
         void psm_view_change_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
             //validate
 
-            ilog("[VIEW CHANGE] on_view_change: {target_view:${tv},public_key:${k},uuid:${u},current_view: ${cv}}, my current view: ${mcv}",
-                 ("tv", e.target_view)("k", e.public_key)("u", e.uuid)("cv", e.current_view)("mcv", m->get_current_view()));
+            //skip from view change state if my lib is higher than my view change state height.
+            auto vc = m->get_view_changes_cache();
+            if (!vc.empty() && pbft_db.should_stop_view_change(vc.front())) {
+                m->transit_to_committed_state(this);
+                ilog("[VIEW CHANGE] lscb is higher than my view change height, transit to committed state");
+                return;
+            }
+
+            ilog("[VIEW CHANGE] on_view_change: {\"target_view\":${tv},\"public_key\":\"${k}\",\"uuid\":\"${u}\",\"current_view\":${cv},\"timestamp\":\"${ts}\"}, my current view: ${mcv}",
+                 ("tv", e.target_view)("k", e.public_key)("u", e.uuid)("cv", e.current_view)("ts", e.timestamp)("mcv", m->get_current_view()));
             if (e.target_view <= m->get_current_view()) return;
 
             //do action add view change
@@ -405,6 +413,13 @@ namespace eosio {
 
         void psm_view_change_state::send_view_change(psm_machine *m, pbft_database &pbft_db) {
 
+            //skip from view change state if my lib is higher than my view change state height.
+            auto vc = m->get_view_changes_cache();
+            if (!vc.empty() && pbft_db.should_stop_view_change(vc.front())) {
+                m->transit_to_committed_state(this);
+                ilog("[VIEW CHANGE] lscb is higher than my view change height, transit to committed state");
+                return;
+            }
 
             m->send_pbft_view_change();
             ilog("[VIEW CHANGE] send_view_change: current view: ${v1}, target view: ${v2}", ("v1", m->get_current_view())("v2", m->get_target_view()));
@@ -442,7 +457,7 @@ namespace eosio {
             //handle new view
             if (e.view <= m->get_current_view()) return;
 
-            ilog("[VIEW CHANGE] on_new_view: current view: ${v1} new view: ${v2}", ("v1",m->get_current_view())("v2",e.view));
+            ilog("[VIEW CHANGE] on_new_view: current view: ${v1}, new view: ${v2}", ("v1",m->get_current_view())("v2",e.view));
             //transit to committed or prepare
             if (pbft_db.is_valid_new_view(e)) {
                 ilog("[VIEW CHANGE] valid new view, transit to new view: ${v2}",("v2",e.view));

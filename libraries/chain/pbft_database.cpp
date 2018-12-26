@@ -496,7 +496,8 @@ namespace eosio {
 
                     auto my_lsc = get_stable_checkpoint_by_id(ctrl.last_stable_checkpoint_block_id());
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                    auto vc = pbft_view_change{uuid, current_view, new_view, my_ppc, my_lsc, my_sp.first, chain_id()};
+                    auto ts = time_point::now();
+                    auto vc = pbft_view_change{uuid, current_view, new_view, ts, my_ppc, my_lsc, my_sp.first, chain_id()};
                     vc.producer_signature = my_sp.second(vc.digest());
                     ilog("[VIEW CHANGE] starting new round of view change: ${nv}, my current view: ${c}", ("nv", vc)("c", current_view));
                     emit(pbft_outgoing_view_change, vc);
