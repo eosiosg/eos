@@ -234,7 +234,8 @@ namespace eosio {
 
         struct pbft_view_change {
             string uuid;
-            uint32_t view;
+            uint32_t current_view;
+            uint32_t target_view;
             pbft_prepared_certificate prepared;
             pbft_stable_checkpoint stable_checkpoint;
             public_key_type public_key;
@@ -242,7 +243,8 @@ namespace eosio {
             signature_type producer_signature;
 
             bool operator==(const pbft_view_change &rhs) const {
-                return view == rhs.view
+                return current_view == rhs.current_view
+                       && target_view == rhs.target_view
                        && prepared == rhs.prepared
                        && stable_checkpoint == rhs.stable_checkpoint
                        && public_key == rhs.public_key
@@ -250,13 +252,14 @@ namespace eosio {
             }
 
             bool operator<(const pbft_view_change &rhs) const {
-                return view < rhs.view;
+                return target_view < rhs.target_view;
             }
 
             digest_type digest() const {
                 digest_type::encoder enc;
                 fc::raw::pack(enc, uuid);
-                fc::raw::pack(enc, view);
+                fc::raw::pack(enc, current_view);
+                fc::raw::pack(enc, target_view);
                 fc::raw::pack(enc, prepared);
                 fc::raw::pack(enc, stable_checkpoint);
                 fc::raw::pack(enc, public_key);
@@ -324,7 +327,7 @@ namespace eosio {
                 && chain_id == rhs.chain_id;
             }
 
-            bool operator<(const pbft_view_change &rhs) const {
+            bool operator<(const pbft_new_view &rhs) const {
                 return view < rhs.view;
             }
 
@@ -333,7 +336,7 @@ namespace eosio {
                 fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, view);
                 fc::raw::pack(enc, prepared);
-                pbft_stable_checkpoint stable_checkpoint;
+                fc::raw::pack(enc, stable_checkpoint);
                 fc::raw::pack(enc, view_changed);
                 fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
@@ -502,6 +505,7 @@ namespace eosio {
             vector<pbft_view_change> send_and_add_pbft_view_change(
                     const vector<pbft_view_change> &vcv = vector<pbft_view_change>{},
                     const vector<pbft_prepared_certificate> &ppc = vector<pbft_prepared_certificate>{},
+                    uint32_t current_view = 0,
                     uint32_t new_view = 1);
 
             pbft_new_view send_pbft_new_view(
@@ -600,7 +604,7 @@ namespace eosio {
 FC_REFLECT(eosio::chain::block_info, (block_id)(block_num))
 FC_REFLECT(eosio::chain::pbft_prepare, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_commit, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(view)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(current_view)(target_view)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_new_view, (uuid)(view)(prepared)(stable_checkpoint)(view_changed)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_state, (block_id)(block_num)(prepares)(should_prepared)(commits)(should_committed))
 FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepares)(public_key)(producer_signature))

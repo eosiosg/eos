@@ -399,9 +399,9 @@ namespace eosio {
             auto active_bps = lib_active_producers().producers;
 
             auto &by_view_index = view_state_index.get<by_view>();
-            auto itr = by_view_index.find(vc.view);
+            auto itr = by_view_index.find(vc.target_view);
             if (itr == by_view_index.end()) {
-                auto vs = pbft_view_state{vc.view, .view_changes={vc}};
+                auto vs = pbft_view_state{vc.target_view, .view_changes={vc}};
                 auto vsp = make_shared<pbft_view_state>(vs);
                 view_state_index.insert(vsp);
 //                ilog("insert view change msg");
@@ -418,7 +418,7 @@ namespace eosio {
                 }
             }
 
-            itr = by_view_index.find(vc.view);
+            itr = by_view_index.find(vc.target_view);
             if (itr == by_view_index.end()) return;
 
             auto vc_count = 0;
@@ -470,6 +470,7 @@ namespace eosio {
         vector<pbft_view_change> pbft_database::send_and_add_pbft_view_change(
                 const vector<pbft_view_change> &vcv,
                 const vector<pbft_prepared_certificate> &ppc,
+                uint32_t current_view,
                 uint32_t new_view)
         {
             if (!vcv.empty()) {
@@ -478,7 +479,7 @@ namespace eosio {
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
                     vc.uuid = uuid;
                     vc.producer_signature = ctrl.my_signature_providers()[vc.public_key](vc.digest());
-                    ilog("[VIEW CHANGE] retry pbft outgoing view change msg: ${v}",("v", vc.view));
+                    ilog("[VIEW CHANGE] retry pbft outgoing view change msg: ${v}, my current view: ${c}",("v", vc.target_view)("c", vc.current_view));
                     emit(pbft_outgoing_view_change, vc);
                 }
                 return vector<pbft_view_change>{};
@@ -495,9 +496,9 @@ namespace eosio {
 
                     auto my_lsc = get_stable_checkpoint_by_id(ctrl.last_stable_checkpoint_block_id());
                     auto uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-                    auto vc = pbft_view_change{uuid, new_view, my_ppc, my_lsc, my_sp.first, chain_id()};
+                    auto vc = pbft_view_change{uuid, current_view, new_view, my_ppc, my_lsc, my_sp.first, chain_id()};
                     vc.producer_signature = my_sp.second(vc.digest());
-                    ilog("[VIEW CHANGE] starting new round of view change: ${nv}", ("nv", vc));
+                    ilog("[VIEW CHANGE] starting new round of view change: ${nv}, my current view: ${c}", ("nv", vc)("c", current_view));
                     emit(pbft_outgoing_view_change, vc);
                     add_pbft_view_change(vc);
                     new_vcv.emplace_back(vc);
