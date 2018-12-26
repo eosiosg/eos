@@ -1032,11 +1032,13 @@ namespace eosio {
         }
 
         void pbft_database::send_pbft_checkpoint(const vector<pbft_checkpoint> &cps) {
-            if (cps.empty()) return;
-            for (auto const &cp: cps) {
+            vector<pbft_checkpoint> cps_to_send = cps;
+            if (cps_to_send.empty()) cps_to_send = generate_and_add_pbft_checkpoint();
+            for (auto const &cp: cps_to_send) {
                 emit(pbft_outgoing_checkpoint, cp);
-//                    ilog("sending pbft checkpoint at ${h}", ("h", cp.block_num));
+//                ilog("sending pbft checkpoint at ${h}", ("h", cp.block_num));
             }
+
         }
 
 

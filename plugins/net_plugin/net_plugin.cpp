@@ -2684,34 +2684,44 @@ namespace eosio {
    }
 
    void net_plugin_impl::pbft_outgoing_prepare(const pbft_prepare &prepare){
-       for(auto conn: connections){
-           conn->enqueue(prepare);
+       for (auto conn: connections) {
+           if (conn->current()) {
+               conn->enqueue(prepare);
+           }
        }
    }
 
     void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &commit){
-        for(auto conn: connections){
-            conn->enqueue(commit);
+        for (auto conn: connections) {
+            if (conn->current()) {
+                conn->enqueue(commit);
+            }
         }
     }
 
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &view_change){
-        for(auto conn: connections){
+        for (auto conn: connections) {
 //            ilog("net_plugin sending view change msg: ${v}",("v", view_change.view));
-            conn->enqueue(view_change);
+            if (conn->current()) {
+                conn->enqueue(view_change);
+            }
         }
     }
 
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &new_view){
-        for(auto conn: connections){
+        for (auto conn: connections) {
 //            ilog("net_plugin sending new view msg: ${v}",("v", new_view));
-            conn->enqueue(new_view);
+            if (conn->current()) {
+                conn->enqueue(new_view);
+            }
         }
     }
 
     void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &checkpoint){
-        for(auto conn: connections){
-            conn->enqueue(checkpoint);
+        for (auto conn: connections) {
+            if (conn->current()) {
+                conn->enqueue(checkpoint);
+            }
         }
     }
 
