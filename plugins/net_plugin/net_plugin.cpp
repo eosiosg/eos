@@ -1556,11 +1556,13 @@ namespace eosio {
       }
 
       if (head_checkpoint < peer_lib) {
-          wlog("request checkpoints from peer");
+          fc_dlog(logger, "request checkpoints from peer");
           checkpoint_request_message crm;
           crm.start_block = head_checkpoint;
           crm.end_block = peer_lib;
           c->enqueue( crm );
+          c->syncing = true;
+          return;
       }
 
       if (head <= msg.head_num ) {
@@ -2555,7 +2557,7 @@ namespace eosio {
 
        if ( msg.end_block == 0) return;
 
-       wlog("received checkpoint request message");
+       fc_ilog(logger, "received checkpoint request message");
        vector<pbft_stable_checkpoint> scp_stack;
        controller &cc = my_impl->chain_plug->chain();
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
@@ -2742,7 +2744,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2759,7 +2761,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2775,7 +2777,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2791,7 +2793,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }
@@ -2807,7 +2809,7 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
             for (auto conn: connections) {
-                if (conn != c) {
+                if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
             }

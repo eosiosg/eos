@@ -21,7 +21,6 @@ namespace eosio {
             vector<pbft_commit> commits_cache;
             vector<pbft_view_change> view_changes_cache;
             vector<pbft_prepared_certificate> prepared_certificate;
-            vector<pbft_committed_certificate> committed_certificate;
             vector<pbft_view_changed_certificate> view_changed_certificate;
             vector<pbft_checkpoint> checkpoints_cache;
         };
@@ -81,10 +80,6 @@ namespace eosio {
             const vector<pbft_prepared_certificate> &get_prepared_certificate() const;
 
             void set_prepared_certificate(const vector<pbft_prepared_certificate> &prepared_certificate);
-
-            const vector<pbft_committed_certificate> &get_committed_certificate() const;
-
-            void set_committed_certificate(const vector<pbft_committed_certificate> &committed_certificate);
 
             const vector<pbft_view_changed_certificate> &get_view_changed_certificate() const;
 
@@ -185,8 +180,6 @@ namespace eosio {
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
 
             bool pending_commit_local;
-
-            std::chrono::time_point<std::chrono::system_clock> pending_commit_local_set_time;
         };
 
         class psm_view_change_state final: public psm_state {
@@ -207,7 +200,7 @@ namespace eosio {
         };
 
         struct pbft_config {
-            uint32_t view_change_timeout;
+            uint32_t view_change_timeout = 6;
             bool     bp_candidate = false;
         };
 
