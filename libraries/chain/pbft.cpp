@@ -59,6 +59,7 @@ namespace eosio {
         }
 
         void pbft_controller::maybe_pbft_view_change() {
+            ilog("view change cache size: ${s}", ("s", this->state_machine.get_view_changes_cache().size()));
             if (!pbft_db.should_send_pbft_msg()) return;
             if (state_machine.get_view_change_timer() <= config.view_change_timeout) {
                 if (!state_machine.get_view_changes_cache().empty()) {
@@ -557,6 +558,9 @@ namespace eosio {
                 this->set_view_changes_cache(vector<pbft_view_change>{});
                 this->set_prepared_certificate(pbft_db.generate_prepared_certificate());
             }
+
+            EOS_ASSERT((this->get_target_view() > this->get_current_view()), pbft_exception,
+                       "target view should be always greater than current view");
 
             if (this->get_target_view_retries() < pow(2, this->get_target_view() - this->get_current_view() - 1)) {
                 this->set_target_view_retries(this->get_target_view_retries() + 1);
