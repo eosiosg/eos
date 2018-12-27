@@ -2924,6 +2924,16 @@ namespace eosio {
 //                paddr.insert(0, 20 - paddr.length(), ' ');
                 std::ostringstream ss;
 
+                auto so = is_open?"1":"0";
+                auto con = conn->connecting ?"1":"0";
+                auto syn = conn->syncing ?"1":"0";
+                auto cur = conn->current() ?"1":"0";
+                ss << so << con << syn << cur ;
+                auto status = ss.str();
+
+                ss.str("");
+                ss.clear();
+
                 ss << std::setfill(' ') << std::setw(20) << conn->peer_addr;
                 auto paddr = ss.str();
 
@@ -2939,7 +2949,7 @@ namespace eosio {
                 ss << std::setfill(' ') << std::setw(6) << conn->out_queue.size();
                 auto out_queue = ss.str();
 
-                wlog("connection: ${conn}  \tis_open: ${is_open}\t|\tcurrent: ${current}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}", ("is_open",is_open)("current",conn->current()) ("conn",paddr)("write",write_queue)("out",out_queue));
+                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}", ("status",status)("conn",paddr)("write",write_queue)("out",out_queue));
             }
             wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
             wlog("================================================================================================");
