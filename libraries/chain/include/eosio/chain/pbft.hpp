@@ -22,7 +22,7 @@ namespace eosio {
             vector<pbft_view_change> view_changes_cache;
             vector<pbft_prepared_certificate> prepared_certificate;
             vector<pbft_view_changed_certificate> view_changed_certificate;
-            vector<pbft_checkpoint> checkpoints_cache;
+//            vector<pbft_checkpoint> checkpoints_cache;
         };
 
         class psm_machine {
@@ -97,9 +97,9 @@ namespace eosio {
 
             void set_view_change_timer(const uint32_t &view_change_timer);
 
-            const vector<pbft_checkpoint> &get_checkpoints_cache() const;
+//            const vector<pbft_checkpoint> &get_checkpoints_cache() const;
 
-            void set_checkpoints_cache(const vector<pbft_checkpoint> &checkpoints_cache);
+//            void set_checkpoints_cache(const vector<pbft_checkpoint> &checkpoints_cache);
 
         protected:
             psm_cache cache;
@@ -157,7 +157,6 @@ namespace eosio {
 
             bool pending_commit_local;
 
-            std::chrono::time_point<std::chrono::system_clock> pending_commit_local_set_time;
         };
 
         class psm_committed_state final: public psm_state {
@@ -235,5 +234,4 @@ namespace eosio {
 
 
 FC_REFLECT(eosio::chain::pbft_controller, (pbft_db)(state_machine)(config))
-//FC_REFLECT(eosio::chain::psm_machine, (cache)(current_view)(target_view_retries)(target_view)(view_change_timer))
 //#endif //EOSIO_PBFT_HPP

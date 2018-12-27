@@ -132,7 +132,7 @@ struct controller_impl {
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
    block_state_ptr                head;
    fork_database                  fork_db;
-   optional<block_id_type>        pbft_prepared_block_id;
+//   optional<block_id_type>        pbft_prepared_block_id;
    wasm_interface                 wasmif;
    resource_limits_manager        resource_limits;
    authorization_manager          authorization;
@@ -1724,9 +1724,9 @@ void controller::set_pbft_latest_checkpoint( const block_id_type& id ) {
    my->set_pbft_latest_checkpoint(id);
 }
 
-void controller::set_pbft_prepared_block_id(optional<block_id_type> bid){
-    my->pbft_prepared_block_id = bid;
-}
+//void controller::set_pbft_prepared_block_id(optional<block_id_type> bid){
+//    my->pbft_prepared_block_id = bid;
+//}
 
 transaction_trace_ptr controller::push_transaction( const transaction_metadata_ptr& trx, fc::time_point deadline, uint32_t billed_cpu_time_us ) {
    validate_db_available_size();
@@ -1838,6 +1838,7 @@ uint32_t controller::last_irreversible_block_num() const {
 
 block_id_type controller::last_irreversible_block_id() const {
    auto lib_num = last_irreversible_block_num();
+   if (lib_num == 0) return block_id_type{}; //is this necessary?
    const auto& tapos_block_summary = db().get<block_summary_object>((uint16_t)lib_num);
 
    if( block_header::num_from_id(tapos_block_summary.block_id) == lib_num )
@@ -1853,6 +1854,7 @@ uint32_t controller::last_stable_checkpoint_block_num() const {
 
 block_id_type controller::last_stable_checkpoint_block_id() const {
     auto lscb_num = last_stable_checkpoint_block_num();
+    if (lscb_num == 0) return block_id_type{};
     const auto& tapos_block_summary = db().get<block_summary_object>((uint16_t)lscb_num);
 
     if( block_header::num_from_id(tapos_block_summary.block_id) == lscb_num )

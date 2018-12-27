@@ -123,7 +123,7 @@ namespace eosio {
         // I am syncing if all peers notify me so.
         auto connections =  app().get_plugin<net_plugin>().connections();
         for (const auto &conn: connections) {
-            if (!conn.syncing) return false;
+            if (!conn.syncing && !conn.connecting) return false;
         }
         return true;
     }

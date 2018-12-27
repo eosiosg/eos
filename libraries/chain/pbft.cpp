@@ -93,8 +93,8 @@ namespace eosio {
 
         void pbft_controller::send_pbft_checkpoint() {
             if (!pbft_db.should_send_pbft_msg()) return;
-            auto cps = state_machine.get_checkpoints_cache();
-            pbft_db.send_pbft_checkpoint(cps);
+//            auto cps = state_machine.get_checkpoints_cache();
+            pbft_db.send_pbft_checkpoint();
         }
 
         void pbft_controller::on_pbft_checkpoint(pbft_checkpoint &cp) {
@@ -118,7 +118,7 @@ namespace eosio {
 
             this->set_prepared_certificate(vector<pbft_prepared_certificate>{});
             this->set_view_changed_certificate(vector<pbft_view_changed_certificate>{});
-            this->set_checkpoints_cache(vector<pbft_checkpoint>{});
+//            this->set_checkpoints_cache(vector<pbft_checkpoint>{});
 
             this->view_change_timer = 0;
             this->target_view_retries = 0;
@@ -194,9 +194,9 @@ namespace eosio {
 
             if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
 
-                auto cp = pbft_db.generate_and_add_pbft_checkpoint();
+//                auto cp = pbft_db.generate_and_add_pbft_checkpoint();
 
-                m->set_checkpoints_cache(cp);
+//                m->set_checkpoints_cache(cp);
 
                 m->transit_to_committed_state(this);
             }
@@ -217,9 +217,9 @@ namespace eosio {
 
             if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
 
-                auto cp = pbft_db.generate_and_add_pbft_checkpoint();
+//                auto cp = pbft_db.generate_and_add_pbft_checkpoint();
 
-                m->set_checkpoints_cache(cp);
+//                m->set_checkpoints_cache(cp);
 
                 m->transit_to_committed_state(this);
             }
@@ -553,7 +553,6 @@ namespace eosio {
         }
 
         void psm_machine::send_pbft_view_change() {
-
             if (this->get_target_view_retries() == 0) {
                 this->set_view_changes_cache(vector<pbft_view_change>{});
                 this->set_prepared_certificate(pbft_db.generate_prepared_certificate());
@@ -585,12 +584,12 @@ namespace eosio {
 
         void psm_machine::set_prepares_cache(const vector<pbft_prepare> &prepares_cache) {
             this->cache.prepares_cache = prepares_cache;
-            if (prepares_cache.empty()) {
-                pbft_db.set_pbft_prepared_block_id(fc::optional<block_id_type >());
-            } else {
-                pbft_db.set_pbft_prepared_block_id(prepares_cache.front().block_id);
-
-            }
+//            if (prepares_cache.empty()) {
+//                pbft_db.set_pbft_prepared_block_id(fc::optional<block_id_type >());
+//            } else {
+//                pbft_db.set_pbft_prepared_block_id(prepares_cache.front().block_id);
+//
+//            }
         }
 
         const vector<pbft_commit> &psm_machine::get_commits_cache() const {
@@ -656,12 +655,12 @@ namespace eosio {
             this->view_change_timer = view_change_timer;
         }
 
-        const vector<pbft_checkpoint> &psm_machine::get_checkpoints_cache() const {
-            return this->cache.checkpoints_cache;
-        }
+//        const vector<pbft_checkpoint> &psm_machine::get_checkpoints_cache() const {
+//            return this->cache.checkpoints_cache;
+//        }
 
-        void psm_machine::set_checkpoints_cache(const vector<pbft_checkpoint> &checkpoints_cache) {
-            this->cache.checkpoints_cache = checkpoints_cache;
-        }
+//        void psm_machine::set_checkpoints_cache(const vector<pbft_checkpoint> &checkpoints_cache) {
+//            this->cache.checkpoints_cache = checkpoints_cache;
+//        }
     }
 }

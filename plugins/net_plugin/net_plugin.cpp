@@ -178,8 +178,9 @@ namespace eosio {
 
       std::unordered_map<string, time_point_sec> pbft_message_cache{};
       const int                     pbft_message_cache_TTL = 600;
+      const int                     pbft_message_TTL = 10;
 
-      channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
+       channels::transaction_ack::channel_type::handle  incoming_transaction_ack_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::prepare_channel::channel_type::handle pbft_outgoing_prepare_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::commit_channel::channel_type::handle pbft_outgoing_commit_subscription;
       eosio::chain::plugin_interface::pbft::outgoing::view_change_channel::channel_type::handle pbft_outgoing_view_change_subscription;
@@ -2683,33 +2684,49 @@ namespace eosio {
       }
    }
 
-   void net_plugin_impl::pbft_outgoing_prepare(const pbft_prepare &prepare){
-       for (auto conn: connections) {
+   void net_plugin_impl::pbft_outgoing_prepare(const pbft_prepare &prepare) {
+       auto added = maybe_add_pbft_cache(prepare.uuid);
+       if (!added) {
+           wlog("The prepare message trying to send is existed! msg: ${p}",("p", prepare));
+       }
+       for (auto &conn: connections) {
            if (conn->current()) {
                conn->enqueue(prepare);
            }
        }
    }
 
-    void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &commit){
-        for (auto conn: connections) {
+    void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &commit) {
+        auto added = maybe_add_pbft_cache(commit.uuid);
+        if (!added) {
+            wlog("The commit message trying to send is existed! msg: ${p}",("p", commit));
+        }
+        for (auto &conn: connections) {
             if (conn->current()) {
                 conn->enqueue(commit);
             }
         }
     }
 
-    void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &view_change){
-        for (auto conn: connections) {
-//            ilog("net_plugin sending view change msg: ${v}",("v", view_change.view));
+    void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &view_change) {
+        auto added = maybe_add_pbft_cache(view_change.uuid);
+        if (!added) {
+            wlog("The view change message trying to send is existed! msg: ${p}",("p", view_change));
+        }
+        ilog("net_plugin sending view change msg: ${v}",("v", view_change.target_view));
+        for (auto &conn: connections) {
             if (conn->current()) {
                 conn->enqueue(view_change);
             }
         }
     }
 
-    void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &new_view){
-        for (auto conn: connections) {
+    void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &new_view) {
+        auto added = maybe_add_pbft_cache(new_view.uuid);
+        if (!added) {
+            wlog("The new view message trying to send is existed! msg: ${p}",("p", new_view));
+        }
+        for (auto &conn: connections) {
 //            ilog("net_plugin sending new view msg: ${v}",("v", new_view));
             if (conn->current()) {
                 conn->enqueue(new_view);
@@ -2717,8 +2734,12 @@ namespace eosio {
         }
     }
 
-    void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &checkpoint){
-        for (auto conn: connections) {
+    void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &checkpoint) {
+        auto added = maybe_add_pbft_cache(checkpoint.uuid);
+        if (!added) {
+            wlog("The checkpoint message trying to send is existed! msg: ${p}",("p", checkpoint));
+        }
+        for (auto &conn: connections) {
             if (conn->current()) {
                 conn->enqueue(checkpoint);
             }
@@ -2749,11 +2770,12 @@ namespace eosio {
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
 //        ilog("net plugin received pbft_prepare block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
         if (chain_id != msg.chain_id) return;
+        if (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL) return;
 
         auto uuid = msg.uuid;
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
-            for (auto conn: connections) {
+            for (auto &conn: connections) {
                 if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
@@ -2766,11 +2788,12 @@ namespace eosio {
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
 //        ilog("net plugin received pbft_commit block num: ${num} public key: ${pk}",("num",msg.block_num)("pk",msg.public_key));
         if (chain_id != msg.chain_id) return;
+        if (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL) return;
 
         auto uuid = msg.uuid;
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
-            for (auto conn: connections) {
+            for (auto &conn: connections) {
                 if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
@@ -2782,11 +2805,12 @@ namespace eosio {
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
 //       ilog("net plugin received pbft_view_change ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
         if (chain_id != msg.chain_id) return;
+        if (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL) return;
 
         auto uuid = msg.uuid;
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
-            for (auto conn: connections) {
+            for (auto &conn: connections) {
                 if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
@@ -2798,11 +2822,12 @@ namespace eosio {
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
 //        ilog("net plugin received new view ${v}, from ${k}",("v", msg.view)("k", msg.public_key));
         if (chain_id != msg.chain_id) return;
+        if (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL) return;
 
         auto uuid = msg.uuid;
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
-            for (auto conn: connections) {
+            for (auto &conn: connections) {
                 if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }
@@ -2814,11 +2839,12 @@ namespace eosio {
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 //        ilog("net plugin received pbft_checkpoint public key: ${pk}",("pk",msg.public_key));
         if (chain_id != msg.chain_id) return;
+        if (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL) return;
 
         auto uuid = msg.uuid;
         auto added = maybe_add_pbft_cache(uuid);
         if (added) {
-            for (auto conn: connections) {
+            for (auto &conn: connections) {
                 if (conn != c && conn->current()) {
                     conn->enqueue(msg);
                 }

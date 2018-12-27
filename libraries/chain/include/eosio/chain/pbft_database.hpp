@@ -16,6 +16,8 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/composite_key.hpp>
 #include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 namespace eosio {
     namespace chain {
@@ -38,6 +40,7 @@ namespace eosio {
             public_key_type public_key;
             chain_id_type chain_id;
             signature_type producer_signature;
+            time_point timestamp = time_point::now();
 
 
             bool operator==(const pbft_prepare &rhs) const {
@@ -45,7 +48,8 @@ namespace eosio {
                        && block_num == rhs.block_num
                        && block_id == rhs.block_id
                        && public_key == rhs.public_key
-                       && chain_id == rhs.chain_id;
+                       && chain_id == rhs.chain_id
+                       && timestamp == rhs.timestamp;
             }
 
             bool operator<(const pbft_prepare &rhs) const {
@@ -56,23 +60,23 @@ namespace eosio {
 
             digest_type digest() const {
                 digest_type::encoder enc;
-                fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, view);
                 fc::raw::pack(enc, block_num);
                 fc::raw::pack(enc, block_id);
                 fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
+                fc::raw::pack(enc, timestamp);
                 return enc.result();
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -84,13 +88,16 @@ namespace eosio {
             public_key_type public_key;
             chain_id_type chain_id;
             signature_type producer_signature;
+            time_point timestamp = time_point::now();
+
 
             bool operator==(const pbft_commit &rhs) const {
                 return view == rhs.view
                        && block_num == rhs.block_num
                        && block_id == rhs.block_id
                        && public_key == rhs.public_key
-                       && chain_id == rhs.chain_id;
+                       && chain_id == rhs.chain_id
+                       && timestamp == rhs.timestamp;
             }
 
             bool operator<(const pbft_commit &rhs) const {
@@ -101,23 +108,23 @@ namespace eosio {
 
             digest_type digest() const {
                 digest_type::encoder enc;
-                fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, view);
                 fc::raw::pack(enc, block_num);
                 fc::raw::pack(enc, block_id);
                 fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
+                fc::raw::pack(enc, timestamp);
                 return enc.result();
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -128,12 +135,15 @@ namespace eosio {
             public_key_type public_key;
             chain_id_type chain_id;
             signature_type producer_signature;
+            time_point timestamp = time_point::now();
 
             bool operator==(const pbft_checkpoint &rhs) const {
                 return block_num == rhs.block_num
                        && block_id == rhs.block_id
                        && public_key == rhs.public_key
-                       && chain_id == rhs.chain_id;
+                       && chain_id == rhs.chain_id
+                       && timestamp == rhs.timestamp;
+
             }
 
             bool operator<(const pbft_checkpoint &rhs) const {
@@ -142,22 +152,22 @@ namespace eosio {
 
             digest_type digest() const {
                 digest_type::encoder enc;
-                fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, block_num);
                 fc::raw::pack(enc, block_id);
                 fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
+                fc::raw::pack(enc, timestamp);
                 return enc.result();
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -192,13 +202,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -227,13 +237,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -241,21 +251,22 @@ namespace eosio {
             string uuid;
             uint32_t current_view;
             uint32_t target_view;
-            time_point timestamp;
             pbft_prepared_certificate prepared;
             pbft_stable_checkpoint stable_checkpoint;
             public_key_type public_key;
             chain_id_type chain_id;
             signature_type producer_signature;
+            time_point timestamp = time_point::now();
 
             bool operator==(const pbft_view_change &rhs) const {
                 return current_view == rhs.current_view
                        && target_view == rhs.target_view
-                       && timestamp == rhs.timestamp
                        && prepared == rhs.prepared
                        && stable_checkpoint == rhs.stable_checkpoint
                        && public_key == rhs.public_key
-                       && chain_id == rhs.chain_id;
+                       && chain_id == rhs.chain_id
+                       && timestamp == rhs.timestamp;
+
             }
 
             bool operator<(const pbft_view_change &rhs) const {
@@ -264,25 +275,24 @@ namespace eosio {
 
             digest_type digest() const {
                 digest_type::encoder enc;
-                fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, current_view);
                 fc::raw::pack(enc, target_view);
-                fc::raw::pack(enc, timestamp);
                 fc::raw::pack(enc, prepared);
                 fc::raw::pack(enc, stable_checkpoint);
                 fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
+                fc::raw::pack(enc, timestamp);
                 return enc.result();
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -308,13 +318,13 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -327,6 +337,7 @@ namespace eosio {
             public_key_type public_key;
             chain_id_type chain_id;
             signature_type producer_signature;
+            time_point timestamp = time_point::now();
 
             bool operator==(const pbft_new_view &rhs) const {
                 return view == rhs.view
@@ -334,7 +345,8 @@ namespace eosio {
                 && stable_checkpoint == rhs.stable_checkpoint
                 && view_changed == rhs.view_changed
                 && public_key == rhs.public_key
-                && chain_id == rhs.chain_id;
+                && chain_id == rhs.chain_id
+                && timestamp == rhs.timestamp;
             }
 
             bool operator<(const pbft_new_view &rhs) const {
@@ -343,24 +355,24 @@ namespace eosio {
 
             digest_type digest() const {
                 digest_type::encoder enc;
-                fc::raw::pack(enc, uuid);
                 fc::raw::pack(enc, view);
                 fc::raw::pack(enc, prepared);
                 fc::raw::pack(enc, stable_checkpoint);
                 fc::raw::pack(enc, view_changed);
                 fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
+                fc::raw::pack(enc, timestamp);
                 return enc.result();
             }
 
             bool is_signature_valid() const {
-                return true;
-//                try {
-//                    auto pk = crypto::public_key(producer_signature, digest(), true);
-//                    return public_key == pk;
-//                } catch (fc::exception & /*e*/) {
-//                    return false;
-//                }
+//                return true;
+                try {
+                    auto pk = crypto::public_key(producer_signature, digest(), true);
+                    return public_key == pk;
+                } catch (fc::exception & /*e*/) {
+                    return false;
+                }
             }
         };
 
@@ -533,7 +545,7 @@ namespace eosio {
 
             bool pending_pbft_lib();
 
-            void set_pbft_prepared_block_id(optional<block_id_type> bid);
+//            void set_pbft_prepared_block_id(optional<block_id_type> bid);
 
             void prune_view_change_index();
 
@@ -553,7 +565,7 @@ namespace eosio {
 
             bool should_recv_pbft_msg(const public_key_type &pub_key);
 
-            void send_pbft_checkpoint(const vector<pbft_checkpoint> &cps = vector<pbft_checkpoint>{});
+            void send_pbft_checkpoint();
 
             bool is_valid_checkpoint(const pbft_checkpoint &cp);
 
@@ -587,6 +599,7 @@ namespace eosio {
             pbft_checkpoint_state_multi_index_type checkpoint_index;
             fc::path pbft_db_dir;
             fc::path checkpoints_dir;
+            boost::uuids::random_generator uuid_generator;
 
             bool is_valid_prepared_certificate(const pbft_prepared_certificate &certificate);
 
@@ -613,14 +626,14 @@ namespace eosio {
 } /// namespace eosio::chain
 
 FC_REFLECT(eosio::chain::block_info, (block_id)(block_num))
-FC_REFLECT(eosio::chain::pbft_prepare, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_commit, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(current_view)(target_view)(timestamp)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_new_view, (uuid)(view)(prepared)(stable_checkpoint)(view_changed)(public_key)(chain_id)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_prepare, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_commit, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(current_view)(target_view)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_new_view, (uuid)(view)(prepared)(stable_checkpoint)(view_changed)(public_key)(chain_id)(producer_signature)(timestamp))
 FC_REFLECT(eosio::chain::pbft_state, (block_id)(block_num)(prepares)(should_prepared)(commits)(should_committed))
 FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepares)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_view_changed_certificate, (view)(view_changes)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_checkpoint, (uuid)(block_num)(block_id)(public_key)(chain_id)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_checkpoint, (uuid)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
 FC_REFLECT(eosio::chain::pbft_stable_checkpoint, (block_num)(block_id)(checkpoints)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_checkpoint_state, (block_id)(block_num)(checkpoints)(is_stable))
 //#endif //EOSIO_PBFT_HPP
