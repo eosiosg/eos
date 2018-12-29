@@ -156,8 +156,7 @@ namespace eosio {
         }
 
 
-        vector<pbft_prepare>
-        pbft_database::send_and_add_pbft_prepare(const vector<pbft_prepare> &pv, uint32_t current_view) {
+        vector<pbft_prepare> pbft_database::send_and_add_pbft_prepare(const vector<pbft_prepare> &pv, uint32_t current_view) {
 
             auto head_block_num = ctrl.head_block_num();
             if (head_block_num <= 1) return vector<pbft_prepare>{};
@@ -385,10 +384,7 @@ namespace eosio {
         }
 
         void pbft_database::add_pbft_view_change(pbft_view_change &vc) {
-            if (!is_valid_view_change(vc)) {
-//                wlog("invalid view change msg from: ${vc}", ("vc", vc.public_key));
-                return;
-            }
+            if (!is_valid_view_change(vc)) return;
             auto active_bps = lib_active_producers().producers;
 
             auto &by_view_index = view_state_index.get<by_view>();
@@ -422,10 +418,7 @@ namespace eosio {
                     }
                 }
                 if (vc_count >= active_bps.size() * 2 / 3 + 1) {
-                    by_view_index.modify(itr, [&](const pbft_view_state_ptr &pvsp) {
-                        pvsp->should_view_changed = true;
-                        ilog("view ${v} is potential new view", ("v", (*itr)->view));
-                    });
+                    by_view_index.modify(itr, [&](const pbft_view_state_ptr &pvsp) { pvsp->should_view_changed = true; });
                 }
             }
         }
@@ -468,7 +461,6 @@ namespace eosio {
                     vc.uuid = uuid;
                     vc.timestamp = time_point::now();
                     vc.producer_signature = ctrl.my_signature_providers()[vc.public_key](vc.digest());
-//                    ilog("[VIEW CHANGE] retry pbft outgoing view change msg: ${v}, my current view: ${c}",("v", vc.target_view)("c", vc.current_view));
                     emit(pbft_outgoing_view_change, vc);
                 }
                 return vector<pbft_view_change>{};
@@ -487,7 +479,6 @@ namespace eosio {
                     auto uuid = boost::uuids::to_string(uuid_generator());
                     auto vc = pbft_view_change{uuid, current_view, new_view, my_ppc, my_lsc, my_sp.first, chain_id()};
                     vc.producer_signature = my_sp.second(vc.digest());
-//                    ilog("[VIEW CHANGE] starting new round of view change: ${nv}, my current view: ${c}", ("nv", vc.target_view)("c", current_view));
                     emit(pbft_outgoing_view_change, vc);
                     add_pbft_view_change(vc);
                     new_vcv.emplace_back(vc);
@@ -606,13 +597,12 @@ namespace eosio {
             } else return vector<pbft_prepared_certificate>{};
         }
 
-        vector<pbft_view_changed_certificate> pbft_database::generate_view_changed_certificate() {
+        vector<pbft_view_changed_certificate> pbft_database::generate_view_changed_certificate(uint32_t target_view) {
             auto vcc = vector<pbft_view_changed_certificate>{};
 
-            auto &by_count_and_view_index = view_state_index.get<by_count_and_view>();
-            auto itr = by_count_and_view_index.begin();
-            if (itr == by_count_and_view_index.end()) return vector<pbft_view_changed_certificate>{};
-            auto active_bps = lib_active_producers().producers;
+            auto &by_view_index = view_state_index.get<by_view>();
+            auto itr = by_view_index.find(target_view);
+            if (itr == by_view_index.end()) return vcc;
 
             auto pvs = *itr;
 
@@ -726,6 +716,10 @@ namespace eosio {
                          && nv.view_changed.is_signature_valid()
                          && nv.is_signature_valid();
             if (!valid) return false;
+            if (nv.view_changed.view != nv.view) return false;
+            auto schedule_threshold = lib_active_producers().producers.size() * 2 / 3 + 1;
+
+            if (nv.view_changed.view_changes.size() < schedule_threshold) return false;
             for (auto vc: nv.view_changed.view_changes) {
                 add_pbft_view_change(vc);
             }
@@ -870,12 +864,13 @@ namespace eosio {
         }
 
         vector<pbft_checkpoint> pbft_database::generate_and_add_pbft_checkpoint() {
+            auto new_pc = vector<pbft_checkpoint>{};
+
             const auto &by_commit_and_num_index = pbft_state_index.get<by_commit_and_num>();
             auto itr = by_commit_and_num_index.begin();
-            if (itr == by_commit_and_num_index.end()) return vector<pbft_checkpoint>{};
+            if (itr == by_commit_and_num_index.end() || !(*itr)->should_committed) return new_pc;
 
             pbft_state_ptr psp = (*itr);
-            auto new_pc = vector<pbft_checkpoint>{};
 
             vector<block_num_type> pending_checkpoint_block_num;
 

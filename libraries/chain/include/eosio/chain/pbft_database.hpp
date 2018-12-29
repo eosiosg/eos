@@ -543,7 +543,7 @@ namespace eosio {
 
             vector<pbft_prepared_certificate> generate_prepared_certificate();
 
-            vector<pbft_view_changed_certificate> generate_view_changed_certificate();
+            vector<pbft_view_changed_certificate> generate_view_changed_certificate(uint32_t target_view);
 
             pbft_stable_checkpoint get_stable_checkpoint_by_id(const block_id_type &block_id);
 
