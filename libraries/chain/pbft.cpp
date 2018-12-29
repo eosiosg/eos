@@ -333,7 +333,7 @@ namespace eosio {
             auto nv = m->get_target_view();
             if (pbft_db.should_new_view(nv) && pbft_db.is_new_primary(nv)) {
 
-                m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
+                m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate(nv));
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
                 if (new_view != nv) return;
@@ -364,7 +364,7 @@ namespace eosio {
             auto nv = m->get_target_view();
             if (pbft_db.should_new_view(nv) && pbft_db.is_new_primary(nv)) {
 
-                m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate());
+                m->set_view_changed_certificate(pbft_db.generate_view_changed_certificate(nv));
 
                 auto new_view = pbft_db.get_proposed_new_view_num();
                 if (new_view != nv) return;
@@ -389,22 +389,28 @@ namespace eosio {
         }
 
         template<typename T>
-        void psm_machine::transit_to_committed_state(T const &s) {
-
+        void psm_machine::transit_to_committed_state(T const & s) {
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) this->set_current_view(nv);
             this->set_target_view(this->get_current_view() + 1);
 
-            this->set_prepares_cache(vector<pbft_prepare>{});
+            auto prepares = this->pbft_db.send_and_add_pbft_prepare(vector<pbft_prepare>{}, this->get_current_view());
+
+            set_prepares_cache(prepares);
+
+
             this->set_view_change_timer(0);
             this->set_current(new psm_committed_state);
             delete s;
         }
 
         template<typename T>
-        void psm_machine::transit_to_prepared_state(T const &s) {
+        void psm_machine::transit_to_prepared_state(T const & s) {
 
-            this->set_commits_cache(vector<pbft_commit>{});
+            auto commits = this->pbft_db.send_and_add_pbft_commit(vector<pbft_commit>{}, this->get_current_view());
+
+            set_commits_cache(commits);
+
             this->set_current(new psm_prepared_state);
             delete s;
         }
