@@ -133,7 +133,6 @@ struct controller_impl {
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
    block_state_ptr                head;
    fork_database                  fork_db;
-//   optional<block_id_type>        pbft_prepared_block_id;
    wasm_interface                 wasmif;
    resource_limits_manager        resource_limits;
    authorization_manager          authorization;

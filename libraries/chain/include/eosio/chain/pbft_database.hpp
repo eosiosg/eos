@@ -1,9 +1,3 @@
-//
-// Created by deadlock on 17/10/18.
-//
-
-//#ifndef EOSIO_PBFT_HPP
-//#define EOSIO_PBFT_HPP
 #pragma once
 
 #include <eosio/chain/controller.hpp>
@@ -70,7 +64,6 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-//                return true;
                 try {
                     auto pk = crypto::public_key(producer_signature, digest(), true);
                     return public_key == pk;
@@ -118,7 +111,6 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-//                return true;
                 try {
                     auto pk = crypto::public_key(producer_signature, digest(), true);
                     return public_key == pk;
@@ -161,7 +153,6 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-//                return true;
                 try {
                     auto pk = crypto::public_key(producer_signature, digest(), true);
                     return public_key == pk;
@@ -202,7 +193,6 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-//                return true;
                 try {
                     auto pk = crypto::public_key(producer_signature, digest(), true);
                     return public_key == pk;
@@ -237,7 +227,6 @@ namespace eosio {
             }
 
             bool is_signature_valid() const {
-//                return true;
                 try {
                     auto pk = crypto::public_key(producer_signature, digest(), true);
                     return public_key == pk;
@@ -305,8 +294,8 @@ namespace eosio {
 
             bool operator==(const pbft_view_changed_certificate &rhs) const {
                 return view == rhs.view
-                && view_changes == rhs.view_changes
-                && public_key == rhs.public_key;
+                       && view_changes == rhs.view_changes
+                       && public_key == rhs.public_key;
             }
 
             digest_type digest() const {
@@ -341,12 +330,12 @@ namespace eosio {
 
             bool operator==(const pbft_new_view &rhs) const {
                 return view == rhs.view
-                && prepared == rhs.prepared
-                && stable_checkpoint == rhs.stable_checkpoint
-                && view_changed == rhs.view_changed
-                && public_key == rhs.public_key
-                && chain_id == rhs.chain_id
-                && timestamp == rhs.timestamp;
+                       && prepared == rhs.prepared
+                       && stable_checkpoint == rhs.stable_checkpoint
+                       && view_changed == rhs.view_changed
+                       && public_key == rhs.public_key
+                       && chain_id == rhs.chain_id
+                       && timestamp == rhs.timestamp;
             }
 
             bool operator<(const pbft_new_view &rhs) const {
@@ -493,6 +482,7 @@ namespace eosio {
         class pbft_database {
         public:
             explicit pbft_database(controller &ctrl);
+
             ~pbft_database();
 
             void close();
@@ -545,8 +535,6 @@ namespace eosio {
 
             bool pending_pbft_lib();
 
-//            void set_pbft_prepared_block_id(optional<block_id_type> bid);
-
             void prune_view_change_index();
 
             uint32_t get_committed_view();
@@ -559,7 +547,7 @@ namespace eosio {
 
             pbft_stable_checkpoint get_stable_checkpoint_by_id(const block_id_type &block_id);
 
-            block_num_type cal_latest_possible_stable_checkpoint_block_num()const;
+            block_num_type cal_latest_possible_stable_checkpoint_block_num() const;
 
             bool should_send_pbft_msg();
 
@@ -570,7 +558,7 @@ namespace eosio {
             bool is_valid_checkpoint(const pbft_checkpoint &cp);
 
             bool is_valid_stable_checkpoint(const pbft_stable_checkpoint &scp);
-            //pbft
+
             signal<void(const pbft_prepare &)> pbft_outgoing_prepare;
             signal<void(const pbft_prepare &)> pbft_incoming_prepare;
 
@@ -594,7 +582,7 @@ namespace eosio {
 
         private:
             controller &ctrl;
-            pbft_state_multi_index_type index;
+            pbft_state_multi_index_type pbft_state_index;
             pbft_view_state_multi_index_type view_state_index;
             pbft_checkpoint_state_multi_index_type checkpoint_index;
             fc::path pbft_db_dir;
@@ -609,7 +597,7 @@ namespace eosio {
 
             vector<block_info> fetch_first_fork_from(vector<block_info> &bi);
 
-            producer_schedule_type lib_active_producers()const;
+            producer_schedule_type lib_active_producers() const;
 
             template<typename Signal, typename Arg>
             void emit(const Signal &s, Arg &&a);
@@ -618,7 +606,7 @@ namespace eosio {
 
             void set(pbft_checkpoint_state_ptr s);
 
-            void prune(const pbft_state_ptr& h);
+            void prune(const pbft_state_ptr &h);
 
         };
 
@@ -626,14 +614,20 @@ namespace eosio {
 } /// namespace eosio::chain
 
 FC_REFLECT(eosio::chain::block_info, (block_id)(block_num))
-FC_REFLECT(eosio::chain::pbft_prepare, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
-FC_REFLECT(eosio::chain::pbft_commit, (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
-FC_REFLECT(eosio::chain::pbft_view_change, (uuid)(current_view)(target_view)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature)(timestamp))
-FC_REFLECT(eosio::chain::pbft_new_view, (uuid)(view)(prepared)(stable_checkpoint)(view_changed)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_prepare,
+           (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_commit,
+           (uuid)(view)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_view_change,
+           (uuid)(current_view)(target_view)(prepared)(stable_checkpoint)(public_key)(chain_id)(producer_signature)(
+                   timestamp))
+FC_REFLECT(eosio::chain::pbft_new_view,
+           (uuid)(view)(prepared)(stable_checkpoint)(view_changed)(public_key)(chain_id)(producer_signature)(timestamp))
 FC_REFLECT(eosio::chain::pbft_state, (block_id)(block_num)(prepares)(should_prepared)(commits)(should_committed))
 FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepares)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_view_changed_certificate, (view)(view_changes)(public_key)(producer_signature))
-FC_REFLECT(eosio::chain::pbft_checkpoint, (uuid)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
-FC_REFLECT(eosio::chain::pbft_stable_checkpoint, (block_num)(block_id)(checkpoints)(public_key)(chain_id)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_checkpoint,
+           (uuid)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
+FC_REFLECT(eosio::chain::pbft_stable_checkpoint,
+           (block_num)(block_id)(checkpoints)(public_key)(chain_id)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_checkpoint_state, (block_id)(block_num)(checkpoints)(is_stable))
-//#endif //EOSIO_PBFT_HPP

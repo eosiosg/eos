@@ -1,15 +1,8 @@
-//
-// Created by deadlock on 17/10/18.
-//
-
-//#ifndef EOSIO_PBFT_HPP
-//#define EOSIO_PBFT_HPP
 #pragma once
 
 #include <eosio/chain/producer_schedule.hpp>
 #include <eosio/chain/pbft_database.hpp>
 #include <chrono>
-
 
 namespace eosio {
     namespace chain {
@@ -22,7 +15,6 @@ namespace eosio {
             vector<pbft_view_change> view_changes_cache;
             vector<pbft_prepared_certificate> prepared_certificate;
             vector<pbft_view_changed_certificate> view_changed_certificate;
-//            vector<pbft_checkpoint> checkpoints_cache;
         };
 
         class psm_machine {
@@ -59,7 +51,7 @@ namespace eosio {
             void transit_to_view_change_state(T const & s);
 
             template<typename T>
-            void transit_to_new_view(const pbft_new_view &new_view, T const & s);
+            void transit_to_new_view(const pbft_new_view &new_view, T const &s);
 
             const vector<pbft_prepare> &get_prepares_cache() const;
 
@@ -96,10 +88,6 @@ namespace eosio {
             const uint32_t &get_view_change_timer() const;
 
             void set_view_change_timer(const uint32_t &view_change_timer);
-
-//            const vector<pbft_checkpoint> &get_checkpoints_cache() const;
-
-//            void set_checkpoints_cache(const vector<pbft_checkpoint> &checkpoints_cache);
 
         protected:
             psm_cache cache;
@@ -232,6 +220,4 @@ namespace eosio {
     }
 } /// namespace eosio::chain
 
-
 FC_REFLECT(eosio::chain::pbft_controller, (pbft_db)(state_machine)(config))
-//#endif //EOSIO_PBFT_HPP
