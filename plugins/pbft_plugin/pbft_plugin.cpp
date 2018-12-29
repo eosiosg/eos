@@ -18,8 +18,8 @@ namespace eosio {
         unique_ptr<boost::asio::steady_timer> view_change_timer;
         unique_ptr<boost::asio::steady_timer> checkpoint_timer;
 
-        boost::asio::steady_timer::duration prepare_timeout{std::chrono::milliseconds{500}};
-        boost::asio::steady_timer::duration commit_timeout{std::chrono::milliseconds{500}};
+        boost::asio::steady_timer::duration prepare_timeout{std::chrono::milliseconds{1000}};
+        boost::asio::steady_timer::duration commit_timeout{std::chrono::milliseconds{1000}};
         boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{10}};
         boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{2}};
 
@@ -33,6 +33,7 @@ namespace eosio {
 
     private:
         bool is_syncing();
+
         bool is_replaying();
     };
 
@@ -92,7 +93,7 @@ namespace eosio {
         try {
             view_change_timer->cancel();
         } catch (boost::system::system_error &e) {
-            elog("view change timer cancel error: ${e}",("e",e.what()));
+            elog("view change timer cancel error: ${e}", ("e", e.what()));
         }
         view_change_timer->expires_from_now(view_change_timeout);
         view_change_timer->async_wait([&](boost::system::error_code ec) {
@@ -119,9 +120,8 @@ namespace eosio {
     }
 
     bool pbft_plugin_impl::is_syncing() {
-//        return false; //test
         // I am syncing if all peers notify me so.
-        auto connections =  app().get_plugin<net_plugin>().connections();
+        auto connections = app().get_plugin<net_plugin>().connections();
         for (const auto &conn: connections) {
             if (!conn.syncing && !conn.connecting) return false;
         }

@@ -161,8 +161,6 @@ namespace eosio { namespace chain {
 
          bool pending_pbft_lib();
 
-//         void set_pbft_prepared_block_id(optional<block_id_type> bid);
-
          uint32_t last_proposed_schedule_block_num()const;
          uint32_t last_promoted_proposed_schedule_block_num()const;
 
