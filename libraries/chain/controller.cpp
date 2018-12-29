@@ -118,7 +118,7 @@ struct pending_state {
 
 struct pending_pbft_state {
     block_id_type    pbft_lib;
-    bool             contains_proposed_schedule;
+    bool             contains_proposed_schedule = false;
 };
 
 struct controller_impl {
@@ -133,7 +133,7 @@ struct controller_impl {
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
    block_state_ptr                head;
    fork_database                  fork_db;
-   optional<block_id_type>        pbft_prepared_block_id;
+//   optional<block_id_type>        pbft_prepared_block_id;
    wasm_interface                 wasmif;
    resource_limits_manager        resource_limits;
    authorization_manager          authorization;
@@ -404,7 +404,7 @@ struct controller_impl {
          ilog( "database initialized with hash: ${hash}", ("hash", hash) );
       }
 
-  
+
    }
 
    ~controller_impl() {
@@ -1194,7 +1194,7 @@ struct controller_impl {
       pending->_pending_block_state = std::make_shared<block_state>( *head, when ); // promotes pending schedule (if any) to active
       pending->_pending_block_state->in_current_chain = true;
 
-      pending->_pending_block_state->set_confirmed(confirm_block_count);
+//      pending->_pending_block_state->set_confirmed(confirm_block_count);
 
       auto was_pending_promoted = pending->_pending_block_state->maybe_promote_pending();
 
@@ -1203,10 +1203,11 @@ struct controller_impl {
 
          const auto& gpo = db.get<global_property_object>();
          if( gpo.proposed_schedule_block_num.valid() && // if there is a proposed schedule that was proposed in a block ...
-             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
+//             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
              pending->_pending_block_state->pending_schedule.producers.size() == 0 && // ... and there is room for a new pending schedule ...
              !was_pending_promoted && // ... and not just because it was promoted to active at the start of this block, then:
-             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 12 //TODO: to be optimised.
+             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 1 //TODO: to be optimised.
+//             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + (12*head->active_schedule.producers.size()) //TODO: to be optimised.
          )
             {
                // Promote proposed schedule to pending schedule.
@@ -1341,11 +1342,8 @@ struct controller_impl {
          EOS_ASSERT( s != controller::block_status::incomplete, block_validate_exception, "invalid block status for a completed block" );
          emit( self.pre_accepted_block, b );
 
-
-//         if (!last_promoted_proposed_schedule_block_num || b->block_num() != *last_promoted_proposed_schedule_block_num + 1) {
          set_pbft_lib();
          set_pbft_lscb();
-//         }
 
          bool trust = !conf.force_all_checks && (s == controller::block_status::irreversible || s == controller::block_status::validated);
          auto new_header_state = fork_db.add( b, trust );
@@ -1390,7 +1388,6 @@ struct controller_impl {
 
       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
          fork_db.set_bft_irreversible(pending_pbft_lib->pbft_lib);
-//         ilog("=====Committed local===== [lib: ${num}]", ("num", fork_db.get_block(pending_pbft_lib->pbft_lib)->block_num));
          pending_pbft_lib.reset();
          if (read_mode != db_read_mode::IRREVERSIBLE) {
              maybe_switch_forks();
@@ -1406,7 +1403,6 @@ struct controller_impl {
    void set_pbft_lscb() {
        if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_checkpoint) {
            fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
-//           ilog("======set stable checkpoint====== [lscb: ${h}]", ("h", fork_db.get_block(*pending_pbft_checkpoint)->block_num));
            pending_pbft_checkpoint.reset();
 
        }
@@ -1831,9 +1827,9 @@ void controller::set_pbft_latest_checkpoint( const block_id_type& id ) {
    my->set_pbft_latest_checkpoint(id);
 }
 
-void controller::set_pbft_prepared_block_id(optional<block_id_type> bid){
-    my->pbft_prepared_block_id = bid;
-}
+//void controller::set_pbft_prepared_block_id(optional<block_id_type> bid){
+//    my->pbft_prepared_block_id = bid;
+//}
 
 transaction_trace_ptr controller::push_transaction( const transaction_metadata_ptr& trx, fc::time_point deadline, uint32_t billed_cpu_time_us ) {
    validate_db_available_size();
@@ -1954,12 +1950,12 @@ std::function<signature_type(digest_type)> controller::pending_producer_signer()
 }
 
 uint32_t controller::last_irreversible_block_num() const {
-//   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
-   return my->head->bft_irreversible_blocknum;
+   return std::max(std::max(my->head->bft_irreversible_blocknum, my->head->dpos_irreversible_blocknum), my->snapshot_head_block);
 }
 
 block_id_type controller::last_irreversible_block_id() const {
    auto lib_num = last_irreversible_block_num();
+   if (lib_num == 0) return block_id_type{}; //is this necessary?
    const auto& tapos_block_summary = db().get<block_summary_object>((uint16_t)lib_num);
 
    if( block_header::num_from_id(tapos_block_summary.block_id) == lib_num )
@@ -1973,26 +1969,34 @@ uint32_t controller::last_stable_checkpoint_block_num() const {
     return my->head->pbft_stable_checkpoint_blocknum;
 }
 
-signed_block_ptr controller::last_irreversible_block() const {
-   auto lib_num = last_irreversible_block_num();
+block_id_type controller::last_stable_checkpoint_block_id() const {
+    auto lscb_num = last_stable_checkpoint_block_num();
+    if (lscb_num == 0) return block_id_type{};
+    const auto& tapos_block_summary = db().get<block_summary_object>((uint16_t)lscb_num);
 
-   if (lib_num > 0)
-      return fetch_block_by_number(lib_num);
-   return signed_block_ptr();
+    if( block_header::num_from_id(tapos_block_summary.block_id) == lscb_num )
+        return tapos_block_summary.block_id;
+
+    return fetch_block_by_number(lscb_num)->id();
 }
 
-block_num_type controller::last_proposed_schedule_block_num() const {
+
+uint32_t controller::last_proposed_schedule_block_num() const {
    if (my->last_proposed_schedule_block_num) {
       return *my->last_proposed_schedule_block_num;
    }
    return block_num_type{};
 }
 
-block_num_type controller::last_promoted_proposed_schedule_block_num() const {
+uint32_t controller::last_promoted_proposed_schedule_block_num() const {
     if (my->last_promoted_proposed_schedule_block_num) {
         return *my->last_promoted_proposed_schedule_block_num;
     }
     return block_num_type{};
+}
+
+bool controller::is_replaying() const {
+   return my->replaying;
 }
 
 const dynamic_global_property_object& controller::get_dynamic_global_properties()const {
@@ -2317,6 +2321,19 @@ void controller::validate_reversible_available_size() const {
    const auto guard = my->conf.reversible_guard_size;
    EOS_ASSERT(free >= guard, reversible_guard_exception, "reversible free: ${f}, guard size: ${g}", ("f", free)("g",guard));
 }
+
+path controller::state_dir() const {
+   return my->conf.state_dir;
+}
+
+path controller::blocks_dir() const {
+    return my->conf.blocks_dir;
+}
+
+producer_schedule_type controller::initial_schedule() const {
+   return producer_schedule_type{ 0, {{eosio::chain::config::system_account_name, my->conf.genesis.initial_key}} };
+}
+
 
 bool controller::is_known_unexpired_transaction( const transaction_id_type& id) const {
    return db().find<transaction_object, by_trx_id>(id);

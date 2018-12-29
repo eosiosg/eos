@@ -80,6 +80,8 @@ namespace eosio { namespace chain {
             uint64_t                 state_guard_size       =  chain::config::default_state_guard_size;
             uint64_t                 reversible_cache_size  =  chain::config::default_reversible_cache_size;
             uint64_t                 reversible_guard_size  =  chain::config::default_reversible_guard_size;
+            path                     checkpoints_dir        =  blocks_dir;
+
             bool                     read_only              =  false;
             bool                     force_all_checks       =  false;
             bool                     disable_replay_opts    =  false;
@@ -175,15 +177,14 @@ namespace eosio { namespace chain {
 
          bool pending_pbft_lib();
 
-         void set_pbft_prepared_block_id(optional<block_id_type> bid);
+//         void set_pbft_prepared_block_id(optional<block_id_type> bid);
 
-         signed_block_ptr last_irreversible_block()const;
-
-         block_num_type last_proposed_schedule_block_num()const;
-         block_num_type last_promoted_proposed_schedule_block_num()const;
+         uint32_t last_proposed_schedule_block_num()const;
+         uint32_t last_promoted_proposed_schedule_block_num()const;
 
          void set_pbft_latest_checkpoint( const block_id_type& id );
-         uint32_t last_stable_checkpoint_block_num() const;
+         uint32_t last_stable_checkpoint_block_num()const;
+         block_id_type last_stable_checkpoint_block_id()const;
 
 
          const fork_database& fork_db()const;
@@ -294,6 +295,11 @@ namespace eosio { namespace chain {
 
          void set_subjective_cpu_leeway(fc::microseconds leeway);
 
+         path state_dir()const;
+         path blocks_dir()const;
+         producer_schedule_type initial_schedule()const;
+         bool is_replaying()const;
+
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;
          signal<void(const block_state_ptr&)>          accepted_block;
@@ -359,6 +365,7 @@ FC_REFLECT( eosio::chain::controller::config,
             (state_dir)
             (state_size)
             (reversible_cache_size)
+            (checkpoints_dir)
             (read_only)
             (force_all_checks)
             (disable_replay_opts)

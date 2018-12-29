@@ -27,19 +27,19 @@ if [ -z "$EOSIO_NODE" ]; then
     exit -1
 fi
 
-datadir=var/lib/node_$EOSIO_NODE
+pbft_db_dir=var/lib/node_$EOSIO_NODE
 now=`date +'%Y_%m_%d_%H_%M_%S'`
 log=stderr.$now.txt
-touch $datadir/$log
-rm $datadir/stderr.txt
-ln -s $log $datadir/stderr.txt
+touch $pbft_db_dir/$log
+rm $pbft_db_dir/stderr.txt
+ln -s $log $pbft_db_dir/stderr.txt
 
 relaunch() {
-    echo "$rundir/$prog $qargs $* --data-dir $datadir --config-dir etc/eosio/node_$EOSIO_NODE > $datadir/stdout.txt  2>> $datadir/$log "
-    nohup $rundir/$prog $qargs $* --data-dir $datadir --config-dir etc/eosio/node_$EOSIO_NODE > $datadir/stdout.txt  2>> $datadir/$log &
+    echo "$rundir/$prog $qargs $* --data-dir $pbft_db_dir --config-dir etc/eosio/node_$EOSIO_NODE > $pbft_db_dir/stdout.txt  2>> $pbft_db_dir/$log "
+    nohup $rundir/$prog $qargs $* --data-dir $pbft_db_dir --config-dir etc/eosio/node_$EOSIO_NODE > $pbft_db_dir/stdout.txt  2>> $pbft_db_dir/$log &
     pid=$!
     echo pid = $pid
-    echo $pid > $datadir/$prog.pid
+    echo $pid > $pbft_db_dir/$prog.pid
 
     for (( a = 10; $a; a = $(($a - 1)) )); do
         echo checking viability pass $((11 - $a))
@@ -49,7 +49,7 @@ relaunch() {
         if [ -z "$running" ]; then
             break;
         fi
-        connected=`grep -c "net_plugin.cpp:.*connection" $datadir/$log`
+        connected=`grep -c "net_plugin.cpp:.*connection" $pbft_db_dir/$log`
         if [ "$connected" -ne 0 ]; then
             break;
         fi
