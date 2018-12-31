@@ -1062,6 +1062,9 @@ namespace eosio {
          bufs.push_back(boost::asio::buffer(*m.buff));
          out_queue.push_back(m);
          write_queue.pop_front();
+         if(out_queue.size() > 10){
+             break;
+         }
       }
       boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
             try {
@@ -3324,7 +3327,7 @@ namespace eosio {
          my->pbft_message_cache_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->connection_monitor_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->pbft_message_cache_ticker();
-//         my->connection_monitor_ticker();
+         my->connection_monitor_ticker();
       } FC_LOG_AND_RETHROW()
    }
 
