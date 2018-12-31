@@ -567,6 +567,7 @@ namespace eosio {
 
       bool connected();
       bool current();
+      bool pbft_ready();
       void reset();
       void close();
       void send_handshake();
@@ -796,6 +797,10 @@ namespace eosio {
 
    bool connection::current() {
       return (connected() && !syncing);
+   }
+
+   bool connection::pbft_ready(){
+       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
    }
 
    void connection::reset() {
@@ -2705,7 +2710,7 @@ namespace eosio {
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
         for (auto &conn: connections) {
-            if (conn->current()) {
+            if (conn->pbft_ready()) {
                 conn->enqueue(msg);
             }
         }
@@ -2714,7 +2719,7 @@ namespace eosio {
     template<typename M>
     void net_plugin_impl::forward_pbft_msg(connection_ptr c, M const & msg) {
         for (auto &conn: connections) {
-            if (conn != c && conn->current()) {
+            if (conn != c && conn->pbft_ready()) {
                 conn->enqueue(msg);
             }
         }
