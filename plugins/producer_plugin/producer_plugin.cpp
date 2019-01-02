@@ -983,7 +983,7 @@ fc::time_point producer_plugin_impl::calculate_pending_block_time() const {
    fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
 
 
-   if((block_time - now) < fc::microseconds(config::block_interval_us/10) ) {     // we must sleep for at least 50ms
+   if((block_time - now) < fc::microseconds(config::block_interval_us/20) ) {     // we must sleep for at least 50ms
       block_time += fc::microseconds(config::block_interval_us);
    }
    return block_time;
@@ -1333,7 +1333,7 @@ void producer_plugin_impl::schedule_production_loop() {
 
    if (result == start_block_result::failed) {
       elog("Failed to start a pending block, will try again later");
-      _timer.expires_from_now( boost::posix_time::microseconds( config::block_interval_us  / 10 ));
+      _timer.expires_from_now( boost::posix_time::microseconds( config::block_interval_us  / 20 ));
 
       // we failed to start a block, so try again later?
       _timer.async_wait([weak_this,cid=++_timer_corelation_id](const boost::system::error_code& ec) {
