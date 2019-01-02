@@ -29,6 +29,8 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/intrusive/set.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 using namespace eosio::chain::plugin_interface::compat;
 
 namespace fc {
@@ -3027,7 +3029,16 @@ namespace eosio {
                 ss << std::setfill(' ') << std::setw(6) << conn->pbft_queue.size();
                 auto pbft_queue = ss.str();
 
-                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",paddr)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
+                auto conn_str = conn->peer_addr;
+                if(conn_str.empty()) {
+                    try {
+                        conn_str = boost::lexical_cast<std::string>(conn->socket->remote_endpoint());
+                    } catch (...) {
+
+                    }
+                }
+
+                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
             wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
             wlog("================================================================================================");
