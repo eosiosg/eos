@@ -3008,7 +3008,7 @@ namespace eosio {
                 ss.str("");
                 ss.clear();
 
-                ss << std::setfill(' ') << std::setw(20) << conn->peer_addr;
+                ss << std::setfill(' ') << std::setw(22) << conn->peer_addr;
                 auto paddr = ss.str();
 
                 ss.str("");
