@@ -536,8 +536,13 @@ namespace eosio {
          std::shared_ptr<vector<char>> buff;
          std::function<void(boost::system::error_code, std::size_t)> callback;
       };
+      struct queued_pbft_message {
+          std::shared_ptr<net_message> message;
+          fc::time_point_sec deadline;
+      };
       deque<queued_write>     write_queue;
       deque<queued_write>     out_queue;
+      deque<queued_pbft_message>     pbft_queue;
       fc::sha256              node_id;
       handshake_message       last_handshake_recv;
       handshake_message       last_handshake_sent;
@@ -581,6 +586,7 @@ namespace eosio {
 
       bool connected();
       bool current();
+      bool pbft_ready();
       void reset();
       void close();
       void send_handshake();
@@ -621,6 +627,7 @@ namespace eosio {
       void stop_send();
 
       void enqueue( const net_message &msg, bool trigger_send = true );
+      void enqueue_pbft( const net_message &msg, const time_point_sec deadline);
       void cancel_sync(go_away_reason);
       void flush_queues();
       bool enqueue_sync_block();
@@ -725,6 +732,7 @@ namespace eosio {
       void recv_block(connection_ptr c, const block_id_type &blk_id, uint32_t blk_num);
       void recv_handshake(connection_ptr c, const handshake_message& msg);
       void recv_notice(connection_ptr c, const notice_message& msg);
+      bool is_syncing();
    };
 
    class dispatch_manager {
@@ -814,6 +822,10 @@ namespace eosio {
       return (connected() && !syncing);
    }
 
+   bool connection::pbft_ready(){
+       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
+   }
+
    void connection::reset() {
       peer_requested.reset();
       blk_state.clear();
@@ -822,6 +834,7 @@ namespace eosio {
 
    void connection::flush_queues() {
       write_queue.clear();
+      pbft_queue.clear();
    }
 
    void connection::close() {
@@ -1087,7 +1100,7 @@ namespace eosio {
    }
 
    void connection::do_queue_write() {
-      if(write_queue.empty() || !out_queue.empty())
+      if((write_queue.empty() && pbft_queue.empty()) || !out_queue.empty())
          return;
       connection_wptr c(shared_from_this());
       if(!socket->is_open()) {
@@ -1095,13 +1108,78 @@ namespace eosio {
          my_impl->close(c.lock());
          return;
       }
+      const int OUT_QUEUE_SIZE_LIMIT = 100;
       std::vector<boost::asio::const_buffer> bufs;
       while (write_queue.size() > 0) {
          auto& m = write_queue.front();
          bufs.push_back(boost::asio::buffer(*m.buff));
          out_queue.push_back(m);
          write_queue.pop_front();
+         if(out_queue.size() > OUT_QUEUE_SIZE_LIMIT){
+             break;
+         }
       }
+      //prepare pbft msg for out queue
+
+      //delete timeout pbft message
+      auto now = time_point::now();
+      int drop_pbft_count = 0;
+      while(pbft_queue.size()>0){
+          if(pbft_queue.front().deadline <= now){
+              pbft_queue.pop_front();
+              ++drop_pbft_count;
+          }else{
+              break;
+          }
+      }
+
+       if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
+           wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
+       }
+
+
+       //drop timeout messages in mem, init send buffer only when actual send happens
+       //copied from function connection::enqueue
+       connection_wptr weak_this = shared_from_this();
+       go_away_reason close_after_send = no_reason;
+       std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
+           connection_ptr conn = weak_this.lock();
+           if (conn) {
+               if (close_after_send != no_reason) {
+                   elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
+                   my_impl->close(conn);
+                   return;
+               }
+           } else {
+               fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+           }
+       };
+
+       //push to out queue
+      while(out_queue.size() <= OUT_QUEUE_SIZE_LIMIT){
+          if(pbft_queue.size()==0) break;
+
+          queued_pbft_message pbft = pbft_queue.front();
+          pbft_queue.pop_front();
+          auto m = pbft.message;
+          if(m){
+              uint32_t payload_size = fc::raw::pack_size( *m );
+              char * header = reinterpret_cast<char*>(&payload_size);
+              size_t header_size = sizeof(payload_size);
+
+              size_t buffer_size = header_size + payload_size;
+
+              auto send_buffer = std::make_shared<vector<char>>(buffer_size);
+              fc::datastream<char*> ds( send_buffer->data(), buffer_size);
+              ds.write( header, header_size );
+              fc::raw::pack( ds, *m );
+
+              bufs.push_back(boost::asio::buffer(*send_buffer));
+              out_queue.push_back({send_buffer, callback});
+          }
+      }
+
+
       boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
             try {
                auto conn = c.lock();
@@ -1221,6 +1299,12 @@ namespace eosio {
                         fc_wlog(logger, "connection expired before enqueued net_message called callback!");
                      }
                   });
+   }
+
+   void connection::enqueue_pbft(const net_message &m, const time_point_sec deadline){
+       pbft_queue.push_back({std::make_shared<net_message>(m), deadline });
+       if(out_queue.empty())
+           do_queue_write();
    }
 
    void connection::cancel_wait() {
@@ -1410,6 +1494,9 @@ namespace eosio {
          sync_last_requested_num = 0;
          request_next_chunk();
       }
+   }
+   bool sync_manager::is_syncing() {
+       return (state != in_sync);
    }
 
    bool sync_manager::sync_required( ) {
@@ -1604,13 +1691,12 @@ namespace eosio {
          return;
       }
 
-      if (head_checkpoint < peer_lib) {
+      if (lib_num < peer_lib) {
           fc_dlog(logger, "request checkpoints from peer");
           checkpoint_request_message crm;
           crm.start_block = head_checkpoint;
           crm.end_block = peer_lib;
           c->enqueue( crm );
-          c->syncing = true;
           return;
       }
 
@@ -2822,18 +2908,22 @@ namespace eosio {
 
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
+        if (sync_master->is_syncing())return;
+
+        auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
-            if (conn->current()) {
-                conn->enqueue(msg);
+            if (conn->pbft_ready()) {
+                conn->enqueue_pbft(msg, deadline);
             }
         }
     }
 
     template<typename M>
     void net_plugin_impl::forward_pbft_msg(connection_ptr c, M const & msg) {
+        auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
-            if (conn != c && conn->current()) {
-                conn->enqueue(msg);
+            if (conn != c && conn->pbft_ready()) {
+                conn->enqueue_pbft(msg,deadline);
             }
         }
     }
@@ -3042,7 +3132,13 @@ namespace eosio {
                 ss << std::setfill(' ') << std::setw(6) << conn->out_queue.size();
                 auto out_queue = ss.str();
 
-                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}", ("status",status)("conn",paddr)("write",write_queue)("out",out_queue));
+                ss.str("");
+                ss.clear();
+
+                ss << std::setfill(' ') << std::setw(6) << conn->pbft_queue.size();
+                auto pbft_queue = ss.str();
+
+                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",paddr)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
             wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
             wlog("================================================================================================");
@@ -3449,7 +3545,7 @@ namespace eosio {
          my->pbft_message_cache_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->connection_monitor_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->pbft_message_cache_ticker();
-//         my->connection_monitor_ticker();
+         my->connection_monitor_ticker();
       } FC_LOG_AND_RETHROW()
    }
 
