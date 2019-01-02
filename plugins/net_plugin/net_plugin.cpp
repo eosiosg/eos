@@ -1068,14 +1068,15 @@ namespace eosio {
          my_impl->close(c.lock());
          return;
       }
-      const int OUT_QUEUE_SIZE_LIMIT = 100;
+      const int OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE = 100;
+      const int OUT_QUEUE_SIZE_LIMIT = 200;
       std::vector<boost::asio::const_buffer> bufs;
       while (write_queue.size() > 0) {
          auto& m = write_queue.front();
          bufs.push_back(boost::asio::buffer(*m.buff));
          out_queue.push_back(m);
          write_queue.pop_front();
-         if(out_queue.size() > OUT_QUEUE_SIZE_LIMIT){
+         if(out_queue.size() >= OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE){
              break;
          }
       }
