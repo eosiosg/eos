@@ -1649,13 +1649,12 @@ namespace eosio {
          return;
       }
 
-      if (head_checkpoint < peer_lib) {
+      if (lib_num < peer_lib) {
           fc_dlog(logger, "request checkpoints from peer");
           checkpoint_request_message crm;
           crm.start_block = head_checkpoint;
           crm.end_block = peer_lib;
           c->enqueue( crm );
-          c->syncing = true;
           return;
       }
 
@@ -2860,11 +2859,13 @@ namespace eosio {
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
-        if (chain_id != msg.chain_id) return;
+
+       if (chain_id != msg.chain_id) return;
         if (is_pbft_msg_outdated(msg)) return;
 
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+//        ilog("received prepare at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
         forward_pbft_msg(c, msg);
         pbft_incoming_prepare_channel.publish(msg);
@@ -2872,44 +2873,52 @@ namespace eosio {
     }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
+
        if (chain_id != msg.chain_id) return;
        if (is_pbft_msg_outdated(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
+//       ilog("received commit at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        forward_pbft_msg(c, msg);
        pbft_incoming_commit_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
+
        if (chain_id != msg.chain_id) return;
        if (is_pbft_msg_outdated(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
+       ilog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
 
        forward_pbft_msg(c, msg);
        pbft_incoming_view_change_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
+
        if (chain_id != msg.chain_id) return;
        if (is_pbft_msg_outdated(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
+       ilog("received new view at ${n}, from ${v}", ("n", msg.view)("v", msg.public_key));
 
        forward_pbft_msg(c, msg);
        pbft_incoming_new_view_channel.publish(msg);
    }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
+
         if (chain_id != msg.chain_id) return;
         if (is_pbft_msg_outdated(msg)) return;
 
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+//        ilog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
         forward_pbft_msg(c, msg);
         pbft_incoming_checkpoint_channel.publish(msg);
