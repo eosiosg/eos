@@ -716,6 +716,7 @@ namespace eosio {
       void recv_block(connection_ptr c, const block_id_type &blk_id, uint32_t blk_num);
       void recv_handshake(connection_ptr c, const handshake_message& msg);
       void recv_notice(connection_ptr c, const notice_message& msg);
+      bool is_syncing();
    };
 
    class dispatch_manager {
@@ -1455,6 +1456,9 @@ namespace eosio {
          request_next_chunk();
       }
    }
+   bool sync_manager::is_syncing() {
+       return (state != in_sync);
+   }
 
    bool sync_manager::sync_required( ) {
       fc_dlog(logger, "last req = ${req}, last recv = ${recv} known = ${known} our head = ${head}",
@@ -1648,13 +1652,12 @@ namespace eosio {
          return;
       }
 
-      if (head_checkpoint < peer_lib) {
+      if (lib_num < peer_lib) {
           fc_dlog(logger, "request checkpoints from peer");
           checkpoint_request_message crm;
           crm.start_block = head_checkpoint;
           crm.end_block = peer_lib;
           c->enqueue( crm );
-          c->syncing = true;
           return;
       }
 
@@ -2784,6 +2787,8 @@ namespace eosio {
 
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
+        if (sync_master->is_syncing())return;
+
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
             if (conn->pbft_ready()) {

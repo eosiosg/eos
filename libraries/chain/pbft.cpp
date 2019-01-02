@@ -181,7 +181,10 @@ namespace eosio {
                 pending_commit_local = true;
             }
 
-            if (pending_commit_local && !pbft_db.pending_pbft_lib()) m->transit_to_committed_state(this);
+            if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
+                pbft_db.send_pbft_checkpoint();
+                m->transit_to_committed_state(this);
+            }
 
         }
 
@@ -198,7 +201,10 @@ namespace eosio {
                 pending_commit_local = true;
             }
 
-            if (pending_commit_local && !pbft_db.pending_pbft_lib()) m->transit_to_committed_state(this);
+            if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
+                pbft_db.send_pbft_checkpoint();
+                m->transit_to_committed_state(this);
+            }
         }
 
         void psm_prepared_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
