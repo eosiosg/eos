@@ -1092,9 +1092,10 @@ namespace eosio {
               break;
           }
       }
-      if(drop_pbft_count>0){
-          ilog("drop timeout pbft message count: ${c}",("c",drop_pbft_count));
-      }
+
+       if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
+           wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
+       }
 
 
        //drop timeout messages in mem, init send buffer only when actual send happens
