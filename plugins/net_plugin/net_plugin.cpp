@@ -1054,6 +1054,11 @@ namespace eosio {
    void connection::queue_write(std::shared_ptr<vector<char>> buff,
                                 bool trigger_send,
                                 std::function<void(boost::system::error_code, std::size_t)> callback) {
+       if(write_queue.size()>10000){
+           connection_wptr c(shared_from_this());
+           my_impl->close(c.lock());
+           return;
+       }
       write_queue.push_back({buff, callback});
       if(out_queue.empty() && trigger_send)
          do_queue_write();
