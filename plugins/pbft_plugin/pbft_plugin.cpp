@@ -32,6 +32,7 @@ namespace eosio {
         void checkpoint_timer_tick();
 
     private:
+        bool is_syncing();
         bool is_replaying();
     };
 
