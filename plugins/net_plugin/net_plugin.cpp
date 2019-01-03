@@ -29,6 +29,8 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/intrusive/set.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 using namespace eosio::chain::plugin_interface::compat;
 
 namespace fc {
@@ -807,7 +809,8 @@ namespace eosio {
    }
 
    bool connection::pbft_ready(){
-       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
+       return true;
+//       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
    }
 
    void connection::reset() {
@@ -819,6 +822,7 @@ namespace eosio {
    void connection::flush_queues() {
       write_queue.clear();
       pbft_queue.clear();
+      out_queue.clear();
    }
 
    void connection::close() {
@@ -845,6 +849,7 @@ namespace eosio {
    }
 
    void connection::txn_send_pending(const vector<transaction_id_type> &ids) {
+       int count = 0;
       for(auto tx = my_impl->local_txns.begin(); tx != my_impl->local_txns.end(); ++tx ){
          if(tx->serialized_txn.size() && tx->block_num == 0) {
             bool found = false;
@@ -867,12 +872,25 @@ namespace eosio {
                                  fc_wlog(logger, "Local pending TX erased before queued_write called callback");
                               }
                            });
+               ++count;
             }
          }
+      }
+      if(count!=0){
+          auto conn_str = peer_addr;
+          if(conn_str.empty()) {
+              try {
+                  conn_str = boost::lexical_cast<std::string>(socket->remote_endpoint());
+              } catch (...) {
+
+              }
+          }
+          wlog("send to connection: ${conn} transaction count: ${count}", ("conn",conn_str)("count",count));
       }
    }
 
    void connection::txn_send(const vector<transaction_id_type> &ids) {
+       int count = 0;
       for(auto t : ids) {
          auto tx = my_impl->local_txns.get<by_id>().find(t);
          if( tx != my_impl->local_txns.end() && tx->serialized_txn.size()) {
@@ -888,8 +906,20 @@ namespace eosio {
                               fc_wlog(logger, "Local TX erased before queued_write called callback");
                            }
                         });
+            ++count;
          }
       }
+       if(count!=0){
+           auto conn_str = peer_addr;
+           if(conn_str.empty()) {
+               try {
+                   conn_str = boost::lexical_cast<std::string>(socket->remote_endpoint());
+               } catch (...) {
+
+               }
+           }
+           wlog("send to connection: ${conn} transaction count: ${count}", ("conn",conn_str)("count",count));
+       }
    }
 
    void connection::blk_send_branch() {
@@ -1069,14 +1099,15 @@ namespace eosio {
          my_impl->close(c.lock());
          return;
       }
-      const int OUT_QUEUE_SIZE_LIMIT = 100;
+      const int OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE = 100;
+      const int OUT_QUEUE_SIZE_LIMIT = 200;
       std::vector<boost::asio::const_buffer> bufs;
       while (write_queue.size() > 0) {
          auto& m = write_queue.front();
          bufs.push_back(boost::asio::buffer(*m.buff));
          out_queue.push_back(m);
          write_queue.pop_front();
-         if(out_queue.size() > OUT_QUEUE_SIZE_LIMIT){
+         if(out_queue.size() >= OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE){
              break;
          }
       }
@@ -1117,7 +1148,7 @@ namespace eosio {
        };
 
        //push to out queue
-      while(out_queue.size() <= OUT_QUEUE_SIZE_LIMIT){
+      while(out_queue.size() < OUT_QUEUE_SIZE_LIMIT){
           if(pbft_queue.size()==0) break;
 
           queued_pbft_message pbft = pbft_queue.front();
@@ -2787,8 +2818,6 @@ namespace eosio {
 
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
-        if (sync_master->is_syncing())return;
-
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
             if (conn->pbft_ready()) {
@@ -2824,6 +2853,7 @@ namespace eosio {
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+        ilog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
 
         bcast_pbft_msg(msg);
     }
@@ -2831,6 +2861,7 @@ namespace eosio {
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+        ilog("sending new view at ${n}", ("n", msg.view));
 
         bcast_pbft_msg(msg);
     }
@@ -2864,11 +2895,13 @@ namespace eosio {
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
-        if (chain_id != msg.chain_id) return;
+
+       if (chain_id != msg.chain_id) return;
         if (is_pbft_msg_outdated(msg)) return;
 
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+//        ilog("received prepare at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
         forward_pbft_msg(c, msg);
         pbft_incoming_prepare_channel.publish(msg);
@@ -2876,44 +2909,52 @@ namespace eosio {
     }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
+
        if (chain_id != msg.chain_id) return;
        if (is_pbft_msg_outdated(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
+//       ilog("received commit at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        forward_pbft_msg(c, msg);
        pbft_incoming_commit_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
+
        if (chain_id != msg.chain_id) return;
        if (is_pbft_msg_outdated(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
+       ilog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
 
        forward_pbft_msg(c, msg);
        pbft_incoming_view_change_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
+
        if (chain_id != msg.chain_id) return;
        if (is_pbft_msg_outdated(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
+       ilog("received new view at ${n}, from ${v}", ("n", msg.view)("v", msg.public_key));
 
        forward_pbft_msg(c, msg);
        pbft_incoming_new_view_channel.publish(msg);
    }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
+
         if (chain_id != msg.chain_id) return;
         if (is_pbft_msg_outdated(msg)) return;
 
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+//        ilog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
         forward_pbft_msg(c, msg);
         pbft_incoming_checkpoint_channel.publish(msg);
@@ -2996,7 +3037,7 @@ namespace eosio {
                 ss.str("");
                 ss.clear();
 
-                ss << std::setfill(' ') << std::setw(20) << conn->peer_addr;
+                ss << std::setfill(' ') << std::setw(22) << conn->peer_addr;
                 auto paddr = ss.str();
 
                 ss.str("");
@@ -3017,9 +3058,21 @@ namespace eosio {
                 ss << std::setfill(' ') << std::setw(6) << conn->pbft_queue.size();
                 auto pbft_queue = ss.str();
 
-                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",paddr)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
+                auto conn_str = conn->peer_addr;
+                if(conn_str.empty()) {
+                    try {
+                        conn_str = boost::lexical_cast<std::string>(conn->socket->remote_endpoint());
+                    } catch (...) {
+
+                    }
+                }
+
+                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
             wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            wlog("================================================================================================");
+            auto local_trx_pool_size = local_txns.size();
+            wlog("local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
             wlog("================================================================================================");
         });
     }
