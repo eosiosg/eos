@@ -821,6 +821,7 @@ namespace eosio {
    void connection::flush_queues() {
       write_queue.clear();
       pbft_queue.clear();
+      out_queue.clear();
    }
 
    void connection::close() {
@@ -1146,7 +1147,7 @@ namespace eosio {
        };
 
        //push to out queue
-      while(out_queue.size() <= OUT_QUEUE_SIZE_LIMIT){
+      while(out_queue.size() < OUT_QUEUE_SIZE_LIMIT){
           if(pbft_queue.size()==0) break;
 
           queued_pbft_message pbft = pbft_queue.front();
