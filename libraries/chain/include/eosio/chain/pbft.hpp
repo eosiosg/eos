@@ -89,6 +89,8 @@ namespace eosio {
 
             void set_view_change_timer(const uint32_t &view_change_timer);
 
+            void manually_set_current_view(const uint32_t &current_view);
+
         protected:
             psm_cache cache;
             uint32_t current_view;
@@ -121,6 +123,8 @@ namespace eosio {
 
             virtual void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) = 0;
 
+            virtual void manually_set_view(psm_machine *m, const uint32_t &view) = 0;
+
         };
 
         class psm_prepared_state final: public psm_state {
@@ -142,6 +146,8 @@ namespace eosio {
             void send_view_change(psm_machine *m, pbft_database &pbft_db) override;
 
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
+
+            void manually_set_view(psm_machine *m, const uint32_t &view) override;
 
             bool pending_commit_local;
 
@@ -166,6 +172,8 @@ namespace eosio {
 
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
 
+            void manually_set_view(psm_machine *m, const uint32_t &view) override;
+
             bool pending_commit_local;
         };
 
@@ -184,6 +192,8 @@ namespace eosio {
             void send_view_change(psm_machine *m, pbft_database &pbft_db) override;
 
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
+
+            void manually_set_view(psm_machine *m, const uint32_t &view) override;
         };
 
         struct pbft_config {
@@ -210,7 +220,6 @@ namespace eosio {
             void on_pbft_view_change(pbft_view_change &vc);
             void on_pbft_new_view(pbft_new_view &nv);
             void on_pbft_checkpoint(pbft_checkpoint &cp);
-
 
         private:
             fc::path datadir;
