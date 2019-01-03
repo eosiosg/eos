@@ -29,6 +29,8 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/intrusive/set.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 using namespace eosio::chain::plugin_interface::compat;
 
 namespace fc {
@@ -150,10 +152,12 @@ namespace eosio {
       unique_ptr<boost::asio::steady_timer> connector_check;
       unique_ptr<boost::asio::steady_timer> transaction_check;
       unique_ptr<boost::asio::steady_timer> keepalive_timer;
+      unique_ptr<boost::asio::steady_timer> connection_monitor_timer;
       boost::asio::steady_timer::duration   connector_period;
       boost::asio::steady_timer::duration   txn_exp_period;
       boost::asio::steady_timer::duration   resp_expected_period;
       boost::asio::steady_timer::duration   keepalive_interval{std::chrono::seconds{32}};
+      boost::asio::steady_timer::duration   connection_monitor_tick_interval{std::chrono::seconds{2}};
       int                           max_cleanup_time_ms = 0;
 
       const std::chrono::system_clock::duration peer_authentication_interval{std::chrono::seconds{1}}; ///< Peer clock may be no more than 1 second skewed from our clock, including network latency.
@@ -227,6 +231,8 @@ namespace eosio {
 
       void expire_txns( );
       void connection_monitor(std::weak_ptr<connection> from_connection);
+
+      void connection_monitor_ticker();
       /** \name Peer Timestamps
        *  Time message handling
        *  @{
@@ -2606,6 +2612,71 @@ namespace eosio {
          });
    }
 
+
+    void net_plugin_impl::connection_monitor_ticker() {
+        connection_monitor_timer->expires_from_now (connection_monitor_tick_interval);
+        connection_monitor_timer->async_wait ([this](boost::system::error_code ec) {
+            connection_monitor_ticker ();
+            if (ec) {
+                wlog ("connection monitor ticker error: ${m}", ("m", ec.message()));
+            }
+            int total=0;
+            int current=0;
+            for(auto &conn: connections){
+                if(conn->current()){
+                    ++current;
+                }
+                ++total;
+                auto is_open = conn->socket && conn->socket->is_open();
+//                auto paddr = conn->peer_addr;
+//                paddr.insert(0, 20 - paddr.length(), ' ');
+                std::ostringstream ss;
+
+                auto so = is_open?"1":"0";
+                auto con = conn->connecting ?"1":"0";
+                auto syn = conn->syncing ?"1":"0";
+                auto cur = conn->current() ?"1":"0";
+                ss << so << con << syn << cur ;
+                auto status = ss.str();
+
+                ss.str("");
+                ss.clear();
+
+                ss << std::setfill(' ') << std::setw(22) << conn->peer_addr;
+                auto paddr = ss.str();
+
+                ss.str("");
+                ss.clear();
+
+                ss << std::setfill(' ') << std::setw(6) << conn->write_queue.size();
+                auto write_queue = ss.str();
+
+                ss.str("");
+                ss.clear();
+
+                ss << std::setfill(' ') << std::setw(6) << conn->out_queue.size();
+                auto out_queue = ss.str();
+
+                ss.str("");
+                ss.clear();
+
+
+                auto conn_str = conn->peer_addr;
+                if(conn_str.empty()) {
+                    try {
+                        conn_str = boost::lexical_cast<std::string>(conn->socket->remote_endpoint());
+                    } catch (...) {
+
+                    }
+                }
+
+                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue));
+            }
+            wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            wlog("================================================================================================");
+        });
+    }
+
    void net_plugin_impl::ticker() {
       keepalive_timer->expires_from_now (keepalive_interval);
       keepalive_timer->async_wait ([this](boost::system::error_code ec) {
@@ -2999,6 +3070,8 @@ namespace eosio {
 
          my->keepalive_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->ticker();
+         my->connection_monitor_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
+         my->connection_monitor_ticker();
       } FC_LOG_AND_RETHROW()
    }
 
