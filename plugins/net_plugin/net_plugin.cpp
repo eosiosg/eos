@@ -846,6 +846,7 @@ namespace eosio {
    }
 
    void connection::txn_send_pending(const vector<transaction_id_type> &ids) {
+       int count = 0;
       for(auto tx = my_impl->local_txns.begin(); tx != my_impl->local_txns.end(); ++tx ){
          if(tx->serialized_txn.size() && tx->block_num == 0) {
             bool found = false;
@@ -868,12 +869,25 @@ namespace eosio {
                                  fc_wlog(logger, "Local pending TX erased before queued_write called callback");
                               }
                            });
+               ++count;
             }
          }
+      }
+      if(count!=0){
+          auto conn_str = peer_addr;
+          if(conn_str.empty()) {
+              try {
+                  conn_str = boost::lexical_cast<std::string>(socket->remote_endpoint());
+              } catch (...) {
+
+              }
+          }
+          wlog("send to connection: ${conn} transaction count: ${count}", ("conn",conn_str)("count",count));
       }
    }
 
    void connection::txn_send(const vector<transaction_id_type> &ids) {
+       int count = 0;
       for(auto t : ids) {
          auto tx = my_impl->local_txns.get<by_id>().find(t);
          if( tx != my_impl->local_txns.end() && tx->serialized_txn.size()) {
@@ -889,8 +903,20 @@ namespace eosio {
                               fc_wlog(logger, "Local TX erased before queued_write called callback");
                            }
                         });
+            ++count;
          }
       }
+       if(count!=0){
+           auto conn_str = peer_addr;
+           if(conn_str.empty()) {
+               try {
+                   conn_str = boost::lexical_cast<std::string>(socket->remote_endpoint());
+               } catch (...) {
+
+               }
+           }
+           wlog("send to connection: ${conn} transaction count: ${count}", ("conn",conn_str)("count",count));
+       }
    }
 
    void connection::blk_send_branch() {
@@ -1056,11 +1082,6 @@ namespace eosio {
    void connection::queue_write(std::shared_ptr<vector<char>> buff,
                                 bool trigger_send,
                                 std::function<void(boost::system::error_code, std::size_t)> callback) {
-       if(write_queue.size()>10000){
-           connection_wptr c(shared_from_this());
-           my_impl->close(c.lock());
-           return;
-       }
       write_queue.push_back({buff, callback});
       if(out_queue.empty() && trigger_send)
          do_queue_write();
@@ -3041,6 +3062,9 @@ namespace eosio {
                 wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
             wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            wlog("================================================================================================");
+            auto local_trx_pool_size = local_txns.size();
+            wlog("local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
             wlog("================================================================================================");
         });
     }
