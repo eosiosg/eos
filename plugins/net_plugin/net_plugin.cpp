@@ -808,7 +808,8 @@ namespace eosio {
    }
 
    bool connection::pbft_ready(){
-       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
+       return true;
+//       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
    }
 
    void connection::reset() {
@@ -2847,6 +2848,7 @@ namespace eosio {
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+        ilog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
 
         bcast_pbft_msg(msg);
     }
@@ -2854,6 +2856,7 @@ namespace eosio {
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+        ilog("sending new view at ${n}", ("n", msg.view));
 
         bcast_pbft_msg(msg);
     }

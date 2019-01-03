@@ -145,6 +145,10 @@ namespace eosio {
             current->on_new_view(this, e, pbft_db);
         }
 
+        void psm_machine::manually_set_current_view(const uint32_t &current_view) {
+            current->manually_set_view(this, current_view);
+        }
+
         /**
          * psm_prepared_state
          */
@@ -226,6 +230,12 @@ namespace eosio {
             if (pbft_db.is_valid_new_view(e)) m->transit_to_new_view(e, this);
         }
 
+        void psm_prepared_state::manually_set_view(psm_machine *m, const uint32_t &current_view) {
+            m->set_current_view(current_view);
+            m->set_target_view(current_view+1);
+            m->transit_to_view_change_state(this);
+        }
+
         psm_committed_state::psm_committed_state() {
             pending_commit_local = false;
         }
@@ -296,6 +306,11 @@ namespace eosio {
             if (pbft_db.is_valid_new_view(e)) m->transit_to_new_view(e, this);
         }
 
+        void psm_committed_state::manually_set_view(psm_machine *m, const uint32_t &current_view) {
+            m->set_current_view(current_view);
+            m->set_target_view(current_view+1);
+            m->transit_to_view_change_state(this);
+        }
 
         /**
          * psm_view_change_state
@@ -386,6 +401,12 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (pbft_db.is_valid_new_view(e)) m->transit_to_new_view(e, this);
+        }
+
+        void psm_view_change_state::manually_set_view(psm_machine *m, const uint32_t &current_view) {
+            m->set_current_view(current_view);
+            m->set_target_view(current_view+1);
+            m->transit_to_view_change_state(this);
         }
 
         template<typename T>
