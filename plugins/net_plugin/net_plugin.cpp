@@ -821,6 +821,7 @@ namespace eosio {
    void connection::flush_queues() {
       write_queue.clear();
       pbft_queue.clear();
+      out_queue.clear();
    }
 
    void connection::close() {
