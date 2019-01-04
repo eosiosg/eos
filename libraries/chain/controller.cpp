@@ -115,18 +115,13 @@ struct pending_state {
    }
 };
 
-struct pending_pbft_state {
-    block_id_type    pbft_lib;
-    bool             contains_proposed_schedule = false;
-};
-
 struct controller_impl {
    controller&                    self;
    chainbase::database            db;
    chainbase::database            reversible_blocks; ///< a special database to persist blocks that have successfully been applied but are still reversible
    block_log                      blog;
    optional<pending_state>        pending;
-   optional<pending_pbft_state>   pending_pbft_lib;
+   optional<block_id_type>        pending_pbft_lib;
    optional<block_id_type>        pending_pbft_checkpoint;
    optional<block_num_type>       last_proposed_schedule_block_num;
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
@@ -1289,20 +1284,13 @@ struct controller_impl {
 
    void pbft_commit_local( const block_id_type& id ) {
       pending_pbft_lib.reset();
-      auto contains_proposed_schedule = false;
-      const auto& gpo = db.get<global_property_object>();
-      if (gpo.proposed_schedule_block_num.valid() && fork_db.get_block(id)->block_num == *gpo.proposed_schedule_block_num) {
-         contains_proposed_schedule = true;
-         last_proposed_schedule_block_num.reset();
-         last_proposed_schedule_block_num.emplace(*gpo.proposed_schedule_block_num);
-      }
-      pending_pbft_lib.emplace(pending_pbft_state{id, contains_proposed_schedule});
+      pending_pbft_lib.emplace(id);
    }
 
    void set_pbft_lib() {
 
       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
-         fork_db.set_bft_irreversible(pending_pbft_lib->pbft_lib);
+         fork_db.set_bft_irreversible(*pending_pbft_lib);
          pending_pbft_lib.reset();
          if (read_mode != db_read_mode::IRREVERSIBLE) {
              maybe_switch_forks();
@@ -1319,7 +1307,6 @@ struct controller_impl {
        if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_checkpoint) {
            fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
            pending_pbft_checkpoint.reset();
-
        }
    }
 

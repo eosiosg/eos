@@ -718,6 +718,7 @@ namespace eosio {
       void recv_block(connection_ptr c, const block_id_type &blk_id, uint32_t blk_num);
       void recv_handshake(connection_ptr c, const handshake_message& msg);
       void recv_notice(connection_ptr c, const notice_message& msg);
+      bool is_syncing();
    };
 
    class dispatch_manager {
@@ -808,8 +809,8 @@ namespace eosio {
    }
 
    bool connection::pbft_ready(){
-       return true;
 //       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
+       return current();
    }
 
    void connection::reset() {
@@ -1495,6 +1496,10 @@ namespace eosio {
               chain_plug->chain( ).fork_db_head_block_num( ) < sync_last_requested_num );
    }
 
+   bool sync_manager::is_syncing() {
+       return (state != in_sync);
+   }
+
    void sync_manager::request_next_chunk( connection_ptr conn ) {
       uint32_t head_block = chain_plug->chain().fork_db_head_block_num();
 
@@ -1665,6 +1670,15 @@ namespace eosio {
          }
          return;
       }
+      //TODO: reconstruct.
+      if (lib_num < peer_lib) {
+         fc_dlog(logger, "request checkpoints from peer");
+         checkpoint_request_message crm;
+         crm.start_block = head_checkpoint;
+         crm.end_block = peer_lib;
+         c->enqueue( crm );
+         return;
+      }
       if (lib_num > msg.head_num ) {
          fc_dlog(logger, "sync check state 2");
          if (msg.generation > 1 || c->protocol_version > proto_base) {
@@ -1678,16 +1692,6 @@ namespace eosio {
          c->syncing = true;
          return;
       }
-
-      if (lib_num < peer_lib) {
-          fc_dlog(logger, "request checkpoints from peer");
-          checkpoint_request_message crm;
-          crm.start_block = head_checkpoint;
-          crm.end_block = peer_lib;
-          c->enqueue( crm );
-          return;
-      }
-
       if (head <= msg.head_num ) {
          fc_dlog(logger, "sync check state 3");
          verify_catchup (c, msg.head_num, msg.head_id);
@@ -2678,7 +2682,7 @@ namespace eosio {
 
    void net_plugin_impl::handle_message(  connection_ptr c, const checkpoint_request_message &msg) {
 
-       if ( msg.end_block == 0) return;
+       if ( msg.end_block == 0 || msg.end_block < msg.start_block) return;
 
        fc_ilog(logger, "received checkpoint request message");
        vector<pbft_stable_checkpoint> scp_stack;
@@ -2814,6 +2818,8 @@ namespace eosio {
 
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
+        if (sync_master->is_syncing())return;
+
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
             if (conn->pbft_ready()) {
@@ -2827,7 +2833,7 @@ namespace eosio {
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
             if (conn != c && conn->pbft_ready()) {
-                conn->enqueue_pbft(msg,deadline);
+                conn->enqueue_pbft(msg, deadline);
             }
         }
     }

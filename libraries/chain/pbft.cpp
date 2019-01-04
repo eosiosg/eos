@@ -185,8 +185,10 @@ namespace eosio {
                 pending_commit_local = true;
             }
 
-            if (pending_commit_local && !pbft_db.pending_pbft_lib()) m->transit_to_committed_state(this);
-
+            if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
+                pbft_db.send_pbft_checkpoint();
+                m->transit_to_committed_state(this);
+            }
         }
 
 
@@ -202,7 +204,10 @@ namespace eosio {
                 pending_commit_local = true;
             }
 
-            if (pending_commit_local && !pbft_db.pending_pbft_lib()) m->transit_to_committed_state(this);
+            if (pending_commit_local && !pbft_db.pending_pbft_lib()) {
+                pbft_db.send_pbft_checkpoint();
+                m->transit_to_committed_state(this);
+            }
         }
 
         void psm_prepared_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {
@@ -416,11 +421,11 @@ namespace eosio {
             this->set_target_view(this->get_current_view() + 1);
 
             auto prepares = this->pbft_db.send_and_add_pbft_prepare(vector<pbft_prepare>{}, this->get_current_view());
-
             set_prepares_cache(prepares);
 
-
+            this->set_view_changes_cache(vector<pbft_view_change>{});
             this->set_view_change_timer(0);
+
             this->set_current(new psm_committed_state);
             delete s;
         }
@@ -429,8 +434,9 @@ namespace eosio {
         void psm_machine::transit_to_prepared_state(T const & s) {
 
             auto commits = this->pbft_db.send_and_add_pbft_commit(vector<pbft_commit>{}, this->get_current_view());
-
             set_commits_cache(commits);
+
+            this->set_view_changes_cache(vector<pbft_view_change>{});
 
             this->set_current(new psm_prepared_state);
             delete s;
@@ -458,7 +464,6 @@ namespace eosio {
             this->set_target_view(new_view.view + 1);
 
             this->set_prepares_cache(vector<pbft_prepare>{});
-            this->set_view_changes_cache(vector<pbft_view_change>{});
 
             this->set_view_change_timer(0);
             this->set_target_view_retries(0);

@@ -629,10 +629,10 @@ namespace eosio {
                 if (!valid) return false;
             }
 
-            auto cert_num = certificate.block_num;
-            auto cert_bs = ctrl.fetch_block_state_by_number(cert_num);
+            auto cert_id = certificate.block_id;
+            auto cert_bs = ctrl.fetch_block_state_by_id(cert_id);
             auto producer_schedule = lib_active_producers();
-            if (cert_num > 0 && cert_bs) {
+            if (certificate.block_num > 0 && cert_bs) {
                 producer_schedule = cert_bs->active_schedule;
             }
             auto bp_threshold = producer_schedule.producers.size() * 2 / 3 + 1;
@@ -831,12 +831,14 @@ namespace eosio {
             } else return pbft_stable_checkpoint{};
         }
 
-        block_num_type pbft_database::cal_latest_possible_stable_checkpoint_block_num() const {
+        block_info pbft_database::cal_pending_stable_checkpoint() const {
             auto lscb_num = ctrl.last_stable_checkpoint_block_num();
+            auto lscb_id = ctrl.last_stable_checkpoint_block_id();
+            auto lscb_info = block_info{lscb_id, lscb_num};
 
-            const auto &by_blk_num = checkpoint_index.get<by_stable_and_num>();
+            const auto &by_blk_num = checkpoint_index.get<by_num>();
             auto itr = by_blk_num.lower_bound(lscb_num);
-            if (itr == by_blk_num.end()) return block_num_type{};
+            if (itr == by_blk_num.end()) return lscb_info;
 
             while (itr != by_blk_num.end()) {
                 if ((*itr)->is_stable && ctrl.fetch_block_state_by_id((*itr)->block_id)) {
@@ -855,12 +857,13 @@ namespace eosio {
 
                     if ((*itr)->is_stable
                         && (head_checkpoint_schedule == current_schedule || head_checkpoint_schedule == new_schedule)) {
-                        lscb_num = (*itr)->block_num;
+                        lscb_info.block_id = (*itr)->block_id;
+                        lscb_info.block_num = (*itr)->block_num;
                     }
                 }
                 ++itr;
             }
-            return lscb_num;
+            return lscb_info;
         }
 
         vector<pbft_checkpoint> pbft_database::generate_and_add_pbft_checkpoint() {
@@ -948,7 +951,7 @@ namespace eosio {
 
             auto lscb_num = ctrl.last_stable_checkpoint_block_num();
 
-            auto cp_block_state = ctrl.fetch_block_state_by_number(cp.block_num);
+            auto cp_block_state = ctrl.fetch_block_state_by_id(cp.block_id);
             if (!cp_block_state) return;
             auto active_bps = cp_block_state->active_schedule.producers;
             auto checkpoint_count = count_if(active_bps.begin(), active_bps.end(), [&](const producer_key &p) {
@@ -990,9 +993,10 @@ namespace eosio {
                 }
             }
 
-            auto pending_num = cal_latest_possible_stable_checkpoint_block_num();
+            auto lscb_info = cal_pending_stable_checkpoint();
+            auto pending_num = lscb_info.block_num;
+            auto pending_id = lscb_info.block_id;
             if (pending_num > lscb_num) {
-                auto pending_id = ctrl.get_block_id_for_num(pending_num);
                 ctrl.set_pbft_latest_checkpoint(pending_id);
                 if (ctrl.last_irreversible_block_num() < pending_num) ctrl.pbft_commit_local(pending_id);
                 const auto &by_block_id_index = pbft_state_index.get<by_block_id>();
