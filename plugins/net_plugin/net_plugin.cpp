@@ -528,6 +528,8 @@ namespace eosio {
           std::shared_ptr<net_message> message;
           fc::time_point_sec deadline;
       };
+      const int OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE = 100;
+      const int OUT_QUEUE_SIZE_LIMIT = 200;
       deque<queued_write>     write_queue;
       deque<queued_write>     out_queue;
       deque<queued_pbft_message>     pbft_queue;
@@ -634,6 +636,8 @@ namespace eosio {
                        bool trigger_send,
                        std::function<void(boost::system::error_code, std::size_t)> callback);
       void do_queue_write();
+      void do_queue_write_from_write_queue(std::vector<boost::asio::const_buffer> &bufs);
+      void do_queue_write_from_pbft_queue(std::vector<boost::asio::const_buffer> &bufs);
 
       /** \brief Process the next message from the pending message buffer
        *
@@ -1103,78 +1107,11 @@ namespace eosio {
          my_impl->close(c.lock());
          return;
       }
-      const int OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE = 100;
-      const int OUT_QUEUE_SIZE_LIMIT = 200;
+
       std::vector<boost::asio::const_buffer> bufs;
-      while (write_queue.size() > 0) {
-         auto& m = write_queue.front();
-         bufs.push_back(boost::asio::buffer(*m.buff));
-         out_queue.push_back(m);
-         write_queue.pop_front();
-         if(out_queue.size() >= OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE){
-             break;
-         }
-      }
-      //prepare pbft msg for out queue
 
-      //delete timeout pbft message
-      auto now = time_point::now();
-      int drop_pbft_count = 0;
-      while(pbft_queue.size()>0){
-          if(pbft_queue.front().deadline <= now){
-              pbft_queue.pop_front();
-              ++drop_pbft_count;
-          }else{
-              break;
-          }
-      }
-
-       if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
-           wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
-       }
-
-
-       //drop timeout messages in mem, init send buffer only when actual send happens
-       //copied from function connection::enqueue
-       connection_wptr weak_this = shared_from_this();
-       go_away_reason close_after_send = no_reason;
-       std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
-           connection_ptr conn = weak_this.lock();
-           if (conn) {
-               if (close_after_send != no_reason) {
-                   elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
-                   my_impl->close(conn);
-                   return;
-               }
-           } else {
-               fc_wlog(logger, "connection expired before enqueued net_message called callback!");
-           }
-       };
-
-       //push to out queue
-      while(out_queue.size() < OUT_QUEUE_SIZE_LIMIT){
-          if(pbft_queue.size()==0) break;
-
-          queued_pbft_message pbft = pbft_queue.front();
-          pbft_queue.pop_front();
-          auto m = pbft.message;
-          if(m){
-              uint32_t payload_size = fc::raw::pack_size( *m );
-              char * header = reinterpret_cast<char*>(&payload_size);
-              size_t header_size = sizeof(payload_size);
-
-              size_t buffer_size = header_size + payload_size;
-
-              auto send_buffer = std::make_shared<vector<char>>(buffer_size);
-              fc::datastream<char*> ds( send_buffer->data(), buffer_size);
-              ds.write( header, header_size );
-              fc::raw::pack( ds, *m );
-
-              bufs.push_back(boost::asio::buffer(*send_buffer));
-              out_queue.push_back({send_buffer, callback});
-          }
-      }
-
+      do_queue_write_from_write_queue(bufs);
+      do_queue_write_from_pbft_queue(bufs);
 
       boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
             try {
@@ -1220,6 +1157,78 @@ namespace eosio {
             }
          });
    }
+
+
+    void connection::do_queue_write_from_write_queue(std::vector<boost::asio::const_buffer> &bufs){
+        while (write_queue.size() > 0) {
+            auto& m = write_queue.front();
+            bufs.push_back(boost::asio::buffer(*m.buff));
+            out_queue.push_back(m);
+            write_queue.pop_front();
+            if(out_queue.size() >= OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE){
+                break;
+            }
+        }
+    }
+    void connection::do_queue_write_from_pbft_queue(std::vector<boost::asio::const_buffer> &bufs){
+        //delete timeout pbft message
+        auto now = time_point::now();
+        int drop_pbft_count = 0;
+        while(pbft_queue.size()>0){
+            if(pbft_queue.front().deadline <= now){
+                pbft_queue.pop_front();
+                ++drop_pbft_count;
+            }else{
+                break;
+            }
+        }
+
+        if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
+            wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
+        }
+
+
+        //drop timeout messages in mem, init send buffer only when actual send happens
+        //copied from function connection::enqueue
+        connection_wptr weak_this = shared_from_this();
+        go_away_reason close_after_send = no_reason;
+        std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
+            connection_ptr conn = weak_this.lock();
+            if (conn) {
+                if (close_after_send != no_reason) {
+                    elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
+                    my_impl->close(conn);
+                    return;
+                }
+            } else {
+                fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+            }
+        };
+
+        //push to out queue
+        while(out_queue.size() < OUT_QUEUE_SIZE_LIMIT){
+            if(pbft_queue.size()==0) break;
+
+            queued_pbft_message pbft = pbft_queue.front();
+            pbft_queue.pop_front();
+            auto m = pbft.message;
+            if(m){
+                uint32_t payload_size = fc::raw::pack_size( *m );
+                char * header = reinterpret_cast<char*>(&payload_size);
+                size_t header_size = sizeof(payload_size);
+
+                size_t buffer_size = header_size + payload_size;
+
+                auto send_buffer = std::make_shared<vector<char>>(buffer_size);
+                fc::datastream<char*> ds( send_buffer->data(), buffer_size);
+                ds.write( header, header_size );
+                fc::raw::pack( ds, *m );
+
+                bufs.push_back(boost::asio::buffer(*send_buffer));
+                out_queue.push_back({send_buffer, callback});
+            }
+        }
+    }
 
    void connection::cancel_sync(go_away_reason reason) {
       fc_dlog(logger,"cancel sync reason = ${m}, write queue size ${o} peer ${p}",
