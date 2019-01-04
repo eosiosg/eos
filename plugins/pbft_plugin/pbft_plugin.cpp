@@ -21,7 +21,7 @@ namespace eosio {
         boost::asio::steady_timer::duration prepare_timeout{std::chrono::milliseconds{1000}};
         boost::asio::steady_timer::duration commit_timeout{std::chrono::milliseconds{1000}};
         boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{10}};
-        boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{2}};
+        boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{50}};
 
         void prepare_timer_tick();
 
@@ -32,7 +32,6 @@ namespace eosio {
         void checkpoint_timer_tick();
 
     private:
-        bool is_syncing();
         bool is_replaying();
     };
 
@@ -116,17 +115,6 @@ namespace eosio {
                 if (!is_replaying()) pbft_ctrl.send_pbft_checkpoint();
             }
         });
-    }
-
-    bool pbft_plugin_impl::is_syncing() {
-        // I am syncing if all peers notify me so.
-        return false;
-//        auto connections = app().get_plugin<net_plugin>().connections();
-//        if (connections.empty()) return false;
-//        for (const auto &conn: connections) {
-//            if (!conn.syncing && !conn.connecting) return false;
-//        }
-//        return true;
     }
 
     bool pbft_plugin_impl::is_replaying() {

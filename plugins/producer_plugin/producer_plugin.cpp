@@ -988,7 +988,7 @@ fc::time_point producer_plugin_impl::calculate_pending_block_time() const {
    fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
 
 
-   if((block_time - now) < fc::microseconds(config::block_interval_us/10) ) {     // we must sleep for at least 50ms
+   if((block_time - now) < fc::microseconds(config::block_interval_us/5) ) {     // we must sleep for at least 50ms
       block_time += fc::microseconds(config::block_interval_us);
    }
    return block_time;
