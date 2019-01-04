@@ -537,6 +537,8 @@ namespace eosio {
       int16_t                 sent_handshake_count = 0;
       bool                    connecting = false;
       bool                    syncing = false;
+      int                     connecting_timeout_in_seconds = 10;
+      fc::time_point_sec      connecting_deadline;
       uint16_t                protocol_version  = 0;
       string                  peer_addr;
       unique_ptr<boost::asio::steady_timer> response_expected;
@@ -779,6 +781,7 @@ namespace eosio {
         sent_handshake_count(0),
         connecting(true),
         syncing(false),
+        connecting_deadline(fc::time_point::now()+fc::seconds(connecting_timeout_in_seconds)),
         protocol_version(0),
         peer_addr(),
         response_expected(),
@@ -834,6 +837,7 @@ namespace eosio {
       }
       flush_queues();
       connecting = false;
+      connecting_deadline = fc::time_point::min();
       syncing = false;
       if( last_req ) {
          my_impl->dispatcher->retry_fetch (shared_from_this());
@@ -2148,6 +2152,7 @@ namespace eosio {
       auto current_endpoint = *endpoint_itr;
       ++endpoint_itr;
       c->connecting = true;
+      c->connecting_deadline = fc::time_point::now()+fc::seconds(c->connecting_timeout_in_seconds);
       connection_wptr weak_conn = c;
       c->socket->async_connect( current_endpoint, [weak_conn, endpoint_itr, this] ( const boost::system::error_code& err ) {
             auto c = weak_conn.lock();
@@ -3139,6 +3144,14 @@ namespace eosio {
                it = connections.erase(it);
                continue;
             }
+         }else if((*it)->connecting && (*it)->connecting_deadline < fc::time_point::now()){
+             if( (*it)->peer_addr.length() > 0) {
+                 close(*it);
+             }
+             else {
+                 it = connections.erase(it);
+                 continue;
+             }
          }
          ++it;
       }
