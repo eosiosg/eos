@@ -1376,7 +1376,7 @@ namespace eosio {
    }
 
    void connection::request_sync_checkpoints(uint32_t start, uint32_t end) {
-       wlog("request sync checkpoints");
+       fc_dlog(logger, "request sync checkpoints");
        checkpoint_request_message srm = {start,end};
        enqueue( net_message(srm));
        sync_wait();

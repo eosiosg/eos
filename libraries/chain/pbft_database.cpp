@@ -880,7 +880,7 @@ namespace eosio {
             block_num_type my_latest_checkpoint = 0;
 
             auto checkpoint = [&](const block_num_type &in) {
-                return in % 6 == 1
+                return in % 100 == 1
                        || (in >= ctrl.last_proposed_schedule_block_num() &&
                            in <= ctrl.last_promoted_proposed_schedule_block_num());
             };
