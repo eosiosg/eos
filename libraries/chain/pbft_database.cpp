@@ -1102,6 +1102,9 @@ namespace eosio {
         chain_id_type pbft_database::chain_id() {
             return ctrl.get_chain_id();
         }
+        void pbft_database::set_prepared(const bool &is_prepared) {
+            ctrl.set_pbft_prepared(is_prepared);
+        }
 
         void pbft_database::set(pbft_state_ptr s) {
             auto result = pbft_state_index.insert(s);

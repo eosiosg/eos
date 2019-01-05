@@ -416,6 +416,8 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_committed_state(T const & s) {
+            this->pbft_db.set_prepared(false);
+
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) this->set_current_view(nv);
             this->set_target_view(this->get_current_view() + 1);
@@ -432,7 +434,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_prepared_state(T const & s) {
-
+            this->pbft_db.set_prepared(true);
             auto commits = this->pbft_db.send_and_add_pbft_commit(vector<pbft_commit>{}, this->get_current_view());
             set_commits_cache(commits);
 
@@ -444,6 +446,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_view_change_state(T const &s) {
+            this->pbft_db.set_prepared(false);
 
             this->set_commits_cache(vector<pbft_commit>{});
             this->set_prepares_cache(vector<pbft_prepare>{});

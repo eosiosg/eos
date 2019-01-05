@@ -125,6 +125,7 @@ struct controller_impl {
    optional<block_id_type>        pending_pbft_checkpoint;
    optional<block_num_type>       last_proposed_schedule_block_num;
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
+   bool                           pbft_prepared=false;
    block_state_ptr                head;
    fork_database                  fork_db;
    wasm_interface                 wasmif;
@@ -1262,7 +1263,7 @@ struct controller_impl {
          };
          emit( self.accepted_block_header, new_header_state );
 
-         if ( read_mode != db_read_mode::IRREVERSIBLE ) {
+         if ( read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks( s );
          }
 
@@ -1323,7 +1324,7 @@ struct controller_impl {
             fork_db.set_validity( new_head, false ); // Removes new_head from fork_db index, so no need to mark it as not in the current chain.
             throw;
          }
-      } else if( new_head->id != head->id ) {
+      } else if( new_head->id != head->id && !pbft_prepared) {
          ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
               ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
          auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
@@ -2040,6 +2041,10 @@ bool controller::contracts_console()const {
 
 chain_id_type controller::get_chain_id()const {
    return my->chain_id;
+}
+
+void controller::set_pbft_prepared(const bool status)const {
+    my->pbft_prepared = status;
 }
 
 db_read_mode controller::get_read_mode()const {
