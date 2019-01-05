@@ -1661,6 +1661,10 @@ std::map<chain::public_key_type, signature_provider_type> controller::my_signatu
    return my->conf.my_signature_providers;
 }
 
+void controller::set_my_signature_providers(std::map<chain::public_key_type, signature_provider_type> msp){
+    my->conf.my_signature_providers = msp;
+}
+
 void controller::start_block( block_timestamp_type when, uint16_t confirm_block_count) {
    validate_db_available_size();
    my->start_block(when, confirm_block_count, block_status::incomplete, optional<block_id_type>() );
