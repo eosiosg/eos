@@ -316,22 +316,48 @@ namespace eosio { namespace chain {
        auto& by_id_idx = my->index.get<by_block_id>();
        auto itr = by_id_idx.find( id );
        EOS_ASSERT( itr != by_id_idx.end(), fork_db_block_not_found, "could not find block in fork database" );
+       by_id_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_supported = true; });
 
-       auto curr = vector<block_id_type >{id};
-       auto &pidx = my->index.get<by_prev>();
-       while (!curr.empty()) {
-           vector<block_id_type> next;
-           for (const auto &b: curr) {
-               auto pitr = pidx.lower_bound(b);
-               auto epitr = pidx.upper_bound(b);
-               while (pitr != epitr) {
-                   pidx.modify( pitr, [&]( auto& bsp ) { bsp->pbft_supported = true; });
-                   next.push_back((*pitr)->id);
+       auto update = [&]( const vector<block_id_type>& in ) {
+           vector<block_id_type> updated;
+
+           for( const auto& i : in ) {
+               auto& pidx = my->index.get<by_prev>();
+               auto pitr  = pidx.lower_bound( i );
+               auto epitr = pidx.upper_bound( i );
+               while( pitr != epitr ) {
+                   pidx.modify( pitr, [&]( auto& bsp ) {
+                       bsp->pbft_supported = true;
+                       updated.push_back( bsp->id );
+                   });
                    ++pitr;
                }
            }
-           curr = next;
+           return updated;
+       };
+
+       vector<block_id_type> queue{id};
+       while( queue.size() ) {
+           queue = update( queue );
        }
+
+//       auto curr = vector<block_id_type >{id};
+//       auto &pidx = my->index.get<by_prev>();
+//       while (!curr.empty()) {
+//           vector<block_id_type> next;
+//           for (const auto &b: curr) {
+//               auto pitr = pidx.lower_bound(b);
+//               auto epitr = pidx.upper_bound(b);
+//               while (pitr != epitr) {
+//                   pidx.modify( pitr, [&]( auto& bsp ) { bsp->pbft_supported = true; });
+//                   next.push_back((*pitr)->id);
+//                   ++pitr;
+//               }
+//           }
+//           curr = next;
+//       }
+       my->head = *my->index.get<by_lib_block_num>().begin();
+//       ilog("fork_db: ${f}", ("f", my->index));
    }
 
    void fork_database::remove_pbft_supported_mark() const {

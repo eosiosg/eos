@@ -1313,6 +1313,8 @@ struct controller_impl {
    }
 
    void maybe_switch_forks( controller::block_status s = controller::block_status::complete ) {
+      if (pbft_prepared) fork_db.mark_pbft_supported_fork(*pbft_prepared);
+
       auto new_head = fork_db.head();
 
       if( new_head->header.previous == head->id ) {
@@ -1320,7 +1322,6 @@ struct controller_impl {
             apply_block( new_head->block, s );
             fork_db.mark_in_current_chain( new_head, true );
             fork_db.set_validity( new_head, true );
-            if (pbft_prepared) fork_db.mark_pbft_supported_fork(*pbft_prepared);
             head = new_head;
          } catch ( const fc::exception& e ) {
             fork_db.set_validity( new_head, false ); // Removes new_head from fork_db index, so no need to mark it as not in the current chain.
@@ -2107,6 +2108,9 @@ void controller::set_pbft_prepared(const block_id_type& id) const {
     my->pbft_prepared.reset();
     my->pbft_prepared.emplace(id);
     my->fork_db.mark_pbft_supported_fork(id);
+    wlog("fork_db head ${h}", ("h", fork_db().head()->id));
+    wlog("prepared block id ${b}", ("b", id));
+
 }
 
 db_read_mode controller::get_read_mode()const {
