@@ -69,10 +69,19 @@ namespace eosio { namespace chain {
           * it is removed unless it is the head block.
           */
          signal<void(block_state_ptr)> irreversible;
-       void set_bft_irreversible( block_id_type id );
+         void set_bft_irreversible( block_id_type id );
 
-       void set_latest_checkpoint( block_id_type id);
+         void set_latest_checkpoint( block_id_type id);
 
+         bool is_in_current_chain( const block_id_type& id ) const;
+
+         block_state_ptr get_fork_head( const block_id_type& id ) const;
+
+         void set_head( const block_id_type& id ) const;
+
+         void mark_pbft_supported_fork( const block_id_type& id ) const;
+
+         void remove_pbft_supported_mark() const;
 
    private:
          unique_ptr<fork_database_impl> my;

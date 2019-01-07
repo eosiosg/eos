@@ -272,7 +272,7 @@ namespace eosio { namespace chain {
          producer_schedule_type initial_schedule()const;
          bool is_replaying()const;
 
-         void set_pbft_prepared(const bool status)const;
+         void set_pbft_prepared(const block_id_type& id)const;
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;
