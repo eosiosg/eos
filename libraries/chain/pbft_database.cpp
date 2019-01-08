@@ -160,7 +160,9 @@ namespace eosio {
 
             auto head_block_num = ctrl.head_block_num();
             if (head_block_num <= 1) return vector<pbft_prepare>{};
-
+            auto my_prepare = ctrl.get_pbft_my_prepare();
+            auto my_prepare_bs =  ctrl.fetch_block_state_by_id(my_prepare);
+            vector<pbft_prepare> new_pv;
             if (!pv.empty()) {
                 for (auto p : pv) {
                     //change uuid, sign again, update cache, then emit
@@ -171,9 +173,17 @@ namespace eosio {
                     emit(pbft_outgoing_prepare, p);
                 }
                 return vector<pbft_prepare>{};
+            } else if (my_prepare != block_id_type{} && my_prepare_bs && my_prepare_bs->block_num > ctrl.last_irreversible_block_num()) {
+                for (auto const &sp : ctrl.my_signature_providers()) {
+                    auto uuid = boost::uuids::to_string(uuid_generator());
+                    auto p = pbft_prepare{uuid, current_view, my_prepare_bs->block_num, my_prepare,
+                                          sp.first, chain_id()};
+                    p.producer_signature = sp.second(p.digest());
+                    emit(pbft_outgoing_prepare, p);
+                    new_pv.emplace_back(p);
+                }
+                return new_pv;
             } else {
-                vector<pbft_prepare> new_pv;
-
                 uint32_t high_water_mark_block_num = head_block_num;
                 auto next_proposed_schedule_block_num = ctrl.get_global_properties().proposed_schedule_block_num;
                 auto promoted_proposed_schedule_block_num = ctrl.last_promoted_proposed_schedule_block_num();
@@ -198,6 +208,7 @@ namespace eosio {
                     add_pbft_prepare(p);
                     emit(pbft_outgoing_prepare, p);
                     new_pv.emplace_back(p);
+                    ctrl.set_pbft_my_prepare(high_water_mark_block_id);
                 }
                 return new_pv;
             }
@@ -516,6 +527,7 @@ namespace eosio {
 
         void pbft_database::prune_view_change_index() {
             view_state_index.clear();
+            ctrl.reset_pbft_my_prepare();
         }
 
         pbft_new_view pbft_database::send_pbft_new_view(
@@ -885,8 +897,8 @@ namespace eosio {
 
             auto checkpoint = [&](const block_num_type &in) {
                 return in % 100 == 1
-                       || (in >= ctrl.last_proposed_schedule_block_num() &&
-                           in <= ctrl.last_promoted_proposed_schedule_block_num());
+                       || in == ctrl.last_proposed_schedule_block_num()
+                       || in == ctrl.last_promoted_proposed_schedule_block_num();
             };
 
             for (auto i = psp->block_num;

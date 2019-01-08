@@ -273,6 +273,9 @@ namespace eosio { namespace chain {
          bool is_replaying()const;
 
          void set_pbft_prepared(const block_id_type& id)const;
+         void set_pbft_my_prepare(const block_id_type& id)const;
+         block_id_type get_pbft_my_prepare()const;
+         void reset_pbft_my_prepare()const;
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;

@@ -365,6 +365,7 @@ namespace eosio { namespace chain {
        auto itr = by_num_idx.begin();
        while (itr != by_num_idx.end() && (*itr)->pbft_supported) {
            by_num_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_supported = false; });
+           ++itr;
        }
    }
 
