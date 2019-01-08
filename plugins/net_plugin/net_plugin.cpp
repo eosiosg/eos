@@ -2866,6 +2866,7 @@ namespace eosio {
     void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+        ilog("sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
 
         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
         if (!pcc.pbft_db.is_valid_commit(msg)) return;
@@ -2933,7 +2934,7 @@ namespace eosio {
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-       ilog("received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+       ilog("received prepare at height: ${n}, view: ${v}, from ${k} ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_prepare(msg)) return;
@@ -2950,7 +2951,7 @@ namespace eosio {
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-//       ilog("received commit at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
+       ilog("received commit at height: ${n}, view: ${v}, from ${k} ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_commit(msg)) return;
