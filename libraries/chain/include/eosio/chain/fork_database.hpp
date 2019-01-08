@@ -75,11 +75,9 @@ namespace eosio { namespace chain {
 
          bool is_in_current_chain( const block_id_type& id ) const;
 
-         block_state_ptr get_fork_head( const block_id_type& id ) const;
+         void mark_pbft_prepared_fork(const block_id_type &id) const;
 
-         void set_head( const block_id_type& id ) const;
-
-         void mark_pbft_supported_fork( const block_id_type& id ) const;
+         void mark_pbft_my_prepare_fork(const block_id_type &id) const;
 
          void remove_pbft_supported_mark() const;
 
