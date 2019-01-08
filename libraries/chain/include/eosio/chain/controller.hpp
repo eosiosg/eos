@@ -188,6 +188,7 @@ namespace eosio { namespace chain {
          const fork_database& fork_db()const;
          set<chain::account_name> my_producers()const;
          std::map<chain::public_key_type, signature_provider_type> my_signature_providers()const;
+         void set_my_signature_providers(std::map<chain::public_key_type, signature_provider_type> msp);
 
 
          const account_object&                 get_account( account_name n )const;
@@ -297,6 +298,8 @@ namespace eosio { namespace chain {
          path blocks_dir()const;
          producer_schedule_type initial_schedule()const;
          bool is_replaying()const;
+
+         void set_pbft_prepared(const block_id_type& id)const;
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;

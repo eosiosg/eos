@@ -457,7 +457,7 @@ namespace eosio {
                 pbft_view_state_multi_index_type;
 
         struct by_block_id;
-        struct by_stable_and_num;
+        struct by_num;
         typedef multi_index_container<
                 pbft_checkpoint_state_ptr,
                 indexed_by<
@@ -467,7 +467,7 @@ namespace eosio {
                                 std::hash<block_id_type>
                         >,
                         ordered_non_unique<
-                                tag<by_stable_and_num>,
+                                tag<by_num>,
                                 composite_key<
                                         pbft_checkpoint_state,
 //                                        member<pbft_checkpoint_state, bool, &pbft_checkpoint_state::is_stable>,
@@ -547,7 +547,7 @@ namespace eosio {
 
             pbft_stable_checkpoint get_stable_checkpoint_by_id(const block_id_type &block_id);
 
-            block_num_type cal_latest_possible_stable_checkpoint_block_num() const;
+            block_info cal_pending_stable_checkpoint() const;
 
             bool should_send_pbft_msg();
 

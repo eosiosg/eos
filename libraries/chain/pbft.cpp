@@ -145,6 +145,10 @@ namespace eosio {
             current->on_new_view(this, e, pbft_db);
         }
 
+        void psm_machine::manually_set_current_view(const uint32_t &current_view) {
+            current->manually_set_view(this, current_view);
+        }
+
         /**
          * psm_prepared_state
          */
@@ -185,7 +189,6 @@ namespace eosio {
                 pbft_db.send_pbft_checkpoint();
                 m->transit_to_committed_state(this);
             }
-
         }
 
 
@@ -230,6 +233,12 @@ namespace eosio {
             if (e.view <= m->get_current_view()) return;
 
             if (pbft_db.is_valid_new_view(e)) m->transit_to_new_view(e, this);
+        }
+
+        void psm_prepared_state::manually_set_view(psm_machine *m, const uint32_t &current_view) {
+            m->set_current_view(current_view);
+            m->set_target_view(current_view+1);
+            m->transit_to_view_change_state(this);
         }
 
         psm_committed_state::psm_committed_state() {
@@ -302,6 +311,11 @@ namespace eosio {
             if (pbft_db.is_valid_new_view(e)) m->transit_to_new_view(e, this);
         }
 
+        void psm_committed_state::manually_set_view(psm_machine *m, const uint32_t &current_view) {
+            m->set_current_view(current_view);
+            m->set_target_view(current_view+1);
+            m->transit_to_view_change_state(this);
+        }
 
         /**
          * psm_view_change_state
@@ -394,18 +408,25 @@ namespace eosio {
             if (pbft_db.is_valid_new_view(e)) m->transit_to_new_view(e, this);
         }
 
+        void psm_view_change_state::manually_set_view(psm_machine *m, const uint32_t &current_view) {
+            m->set_current_view(current_view);
+            m->set_target_view(current_view+1);
+            m->transit_to_view_change_state(this);
+        }
+
         template<typename T>
         void psm_machine::transit_to_committed_state(T const & s) {
+
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) this->set_current_view(nv);
             this->set_target_view(this->get_current_view() + 1);
 
             auto prepares = this->pbft_db.send_and_add_pbft_prepare(vector<pbft_prepare>{}, this->get_current_view());
-
             set_prepares_cache(prepares);
 
-
+            this->set_view_changes_cache(vector<pbft_view_change>{});
             this->set_view_change_timer(0);
+
             this->set_current(new psm_committed_state);
             delete s;
         }
@@ -414,8 +435,9 @@ namespace eosio {
         void psm_machine::transit_to_prepared_state(T const & s) {
 
             auto commits = this->pbft_db.send_and_add_pbft_commit(vector<pbft_commit>{}, this->get_current_view());
-
             set_commits_cache(commits);
+
+            this->set_view_changes_cache(vector<pbft_view_change>{});
 
             this->set_current(new psm_prepared_state);
             delete s;
@@ -443,7 +465,6 @@ namespace eosio {
             this->set_target_view(new_view.view + 1);
 
             this->set_prepares_cache(vector<pbft_prepare>{});
-            this->set_view_changes_cache(vector<pbft_view_change>{});
 
             this->set_view_change_timer(0);
             this->set_target_view_retries(0);
