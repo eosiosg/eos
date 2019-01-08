@@ -416,6 +416,7 @@ namespace eosio {
 
         template<typename T>
         void psm_machine::transit_to_committed_state(T const & s) {
+
             auto nv = pbft_db.get_committed_view();
             if (nv > this->get_current_view()) this->set_current_view(nv);
             this->set_target_view(this->get_current_view() + 1);

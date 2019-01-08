@@ -211,7 +211,11 @@ namespace eosio {
 
             pbft_state_ptr psp = *itr;
 
-            return (psp->should_prepared && (psp->block_num > ctrl.last_irreversible_block_num()));
+            if (psp->should_prepared && (psp->block_num > ctrl.last_irreversible_block_num())) {
+                ctrl.set_pbft_prepared((*itr)->block_id);
+                return true;
+            }
+            return false;
         }
 
         bool pbft_database::is_valid_prepare(const pbft_prepare &p) {
