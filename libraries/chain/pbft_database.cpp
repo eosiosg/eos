@@ -161,7 +161,15 @@ namespace eosio {
             auto head_block_num = ctrl.head_block_num();
             if (head_block_num <= 1) return vector<pbft_prepare>{};
             auto my_prepare = ctrl.get_pbft_my_prepare();
-            auto my_prepare_bs =  ctrl.fetch_block_state_by_id(my_prepare);
+
+            auto reserve_prepare = [&](const block_id_type &in) {
+                if (in == block_id_type{} || !ctrl.fetch_block_state_by_id(in)) return false;
+                auto lib = ctrl.last_irreversible_block_id();
+                if (lib == block_id_type{}) return true;
+                auto forks = ctrl.fork_db().fetch_branch_from(in, lib);
+                return !forks.first.empty() && forks.second.empty();
+            };
+
             vector<pbft_prepare> new_pv;
             if (!pv.empty()) {
                 for (auto p : pv) {
@@ -173,11 +181,11 @@ namespace eosio {
                     emit(pbft_outgoing_prepare, p);
                 }
                 return vector<pbft_prepare>{};
-            } else if (my_prepare != block_id_type{} && my_prepare_bs && my_prepare_bs->block_num > ctrl.last_irreversible_block_num()) {
+            } else if (reserve_prepare(my_prepare)) {
                 for (auto const &sp : ctrl.my_signature_providers()) {
                     auto uuid = boost::uuids::to_string(uuid_generator());
-                    auto p = pbft_prepare{uuid, current_view, my_prepare_bs->block_num, my_prepare,
-                                          sp.first, chain_id()};
+                    auto my_prepare_num = ctrl.fetch_block_state_by_id(my_prepare)->block_num;
+                    auto p = pbft_prepare{uuid, current_view, my_prepare_num, my_prepare, sp.first, chain_id()};
                     p.producer_signature = sp.second(p.digest());
                     emit(pbft_outgoing_prepare, p);
                     new_pv.emplace_back(p);
