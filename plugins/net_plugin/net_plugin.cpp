@@ -3122,13 +3122,13 @@ namespace eosio {
                     }
                 }
 
-                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
+                fc_dlog(logger, "connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
-            wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
-            wlog("================================================================================================");
+            fc_dlog(logger, "connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            fc_dlog(logger, "================================================================================================");
             auto local_trx_pool_size = local_txns.size();
-            wlog("local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
-            wlog("================================================================================================");
+            fc_dlog(logger, "local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
+            fc_dlog(logger, "================================================================================================");
         });
     }
 
