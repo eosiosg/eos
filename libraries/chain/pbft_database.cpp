@@ -532,7 +532,8 @@ namespace eosio {
             return sp_itr != sps.end();
         }
 
-        void pbft_database::prune_view_change_index() {
+        void pbft_database::prune_pbft_index() {
+            pbft_state_index.clear();
             view_state_index.clear();
             ctrl.reset_pbft_my_prepare();
         }
@@ -744,6 +745,7 @@ namespace eosio {
 
             if (nv.view_changed.view_changes.size() < schedule_threshold) return false;
             for (auto vc: nv.view_changed.view_changes) {
+                if (!is_valid_view_change(vc)) return false;
                 add_pbft_view_change(vc);
             }
 
