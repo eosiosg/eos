@@ -34,9 +34,11 @@ namespace eosio { namespace chain {
             composite_key< block_header_state,
 //                member<block_header_state,uint32_t,&block_header_state::dpos_irreversible_blocknum>,
                 member<block_header_state,uint32_t,&block_header_state::bft_irreversible_blocknum>,
+                member<block_state,bool,&block_state::pbft_prepared>,
+                member<block_state,bool,&block_state::pbft_my_prepare>,
                 member<block_header_state,uint32_t,&block_header_state::block_num>
             >,
-            composite_key_compare< std::greater<uint32_t>, std::greater<uint32_t> >
+            composite_key_compare< std::greater<uint32_t>, std::greater<bool>, std::greater<bool>, std::greater<uint32_t> >
          >
       >
    > fork_multi_index_type;
@@ -130,13 +132,13 @@ namespace eosio { namespace chain {
 
       my->head = *my->index.get<by_lib_block_num>().begin();
 
-       auto lib    = my->head->bft_irreversible_blocknum;
-       auto checkpoint = my->head->pbft_stable_checkpoint_blocknum;
-       auto oldest = *my->index.get<by_block_num>().begin();
+      auto lib    = my->head->bft_irreversible_blocknum;
+      auto checkpoint = my->head->pbft_stable_checkpoint_blocknum;
+      auto oldest = *my->index.get<by_block_num>().begin();
 
-       if( oldest->block_num < lib && oldest->block_num < checkpoint ) {
-           prune( oldest );
-       }
+      if( oldest->block_num < lib && oldest->block_num < checkpoint ) {
+          prune( oldest );
+      }
 
       return n;
    }
@@ -244,6 +246,13 @@ namespace eosio { namespace chain {
       });
    }
 
+   bool fork_database::is_in_current_chain( const block_id_type& id) const {
+       auto& by_id_idx = my->index.get<by_block_id>();
+       auto itr = by_id_idx.find( id );
+       if (itr == by_id_idx.end()) return false;
+       return (*itr)->in_current_chain;
+   }
+
    void fork_database::prune( const block_state_ptr& h ) {
       auto num = h->block_num;
 
@@ -270,16 +279,88 @@ namespace eosio { namespace chain {
       }
    }
 
-   block_state_ptr   fork_database::get_block(const block_id_type& id)const {
+   block_state_ptr fork_database::get_block(const block_id_type& id) const {
       auto itr = my->index.find( id );
       if( itr != my->index.end() )
          return *itr;
       return block_state_ptr();
    }
 
+   void fork_database::mark_pbft_prepared_fork(const block_id_type &id) const {
+       auto& by_id_idx = my->index.get<by_block_id>();
+       auto itr = by_id_idx.find( id );
+       EOS_ASSERT( itr != by_id_idx.end(), fork_db_block_not_found, "could not find block in fork database" );
+       by_id_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_prepared = true; });
+
+       auto update = [&]( const vector<block_id_type>& in ) {
+           vector<block_id_type> updated;
+
+           for( const auto& i : in ) {
+               auto& pidx = my->index.get<by_prev>();
+               auto pitr  = pidx.lower_bound( i );
+               auto epitr = pidx.upper_bound( i );
+               while( pitr != epitr ) {
+                   pidx.modify( pitr, [&]( auto& bsp ) {
+                       bsp->pbft_prepared = true;
+                       updated.push_back( bsp->id );
+                   });
+                   ++pitr;
+               }
+           }
+           return updated;
+       };
+
+       vector<block_id_type> queue{id};
+       while(!queue.empty()) {
+           queue = update( queue );
+       }
+       my->head = *my->index.get<by_lib_block_num>().begin();
+   }
+
+   void fork_database::mark_pbft_my_prepare_fork(const block_id_type &id) const {
+       auto& by_id_idx = my->index.get<by_block_id>();
+       auto itr = by_id_idx.find( id );
+       EOS_ASSERT( itr != by_id_idx.end(), fork_db_block_not_found, "could not find block in fork database" );
+       by_id_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_my_prepare = true; });
+
+       auto update = [&]( const vector<block_id_type>& in ) {
+           vector<block_id_type> updated;
+
+           for( const auto& i : in ) {
+               auto& pidx = my->index.get<by_prev>();
+               auto pitr  = pidx.lower_bound( i );
+               auto epitr = pidx.upper_bound( i );
+               while( pitr != epitr ) {
+                   pidx.modify( pitr, [&]( auto& bsp ) {
+                       bsp->pbft_my_prepare = true;
+                       updated.push_back( bsp->id );
+                   });
+                   ++pitr;
+               }
+           }
+           return updated;
+       };
+
+       vector<block_id_type> queue{id};
+       while(!queue.empty()) {
+           queue = update( queue );
+       }
+       my->head = *my->index.get<by_lib_block_num>().begin();
+   }
+
+   void fork_database::remove_pbft_supported_mark() const {
+//       auto& by_num_idx = my->index.get<by_lib_block_num>();
+//       auto itr = by_num_idx.begin();
+//       while (itr != by_num_idx.end() && (*itr)->pbft_supported) {
+//           by_num_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_supported = false; });
+//           ++itr;
+//       }
+   }
+
    block_state_ptr   fork_database::get_block_in_current_chain_by_num( uint32_t n )const {
       const auto& numidx = my->index.get<by_block_num>();
       auto nitr = numidx.lower_bound( n );
+
       // following asserts removed so null can be returned
       //FC_ASSERT( nitr != numidx.end() && (*nitr)->block_num == n,
       //           "could not find block in fork database with block number ${block_num}", ("block_num", n) );

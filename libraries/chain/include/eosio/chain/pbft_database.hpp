@@ -535,7 +535,7 @@ namespace eosio {
 
             bool pending_pbft_lib();
 
-            void prune_view_change_index();
+            void prune_pbft_index();
 
             uint32_t get_committed_view();
 

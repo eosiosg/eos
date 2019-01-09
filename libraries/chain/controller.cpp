@@ -125,6 +125,8 @@ struct controller_impl {
    optional<block_id_type>        pending_pbft_checkpoint;
    optional<block_num_type>       last_proposed_schedule_block_num;
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
+   optional<block_id_type>        pbft_prepared;
+   optional<block_id_type>        my_prepare;
    block_state_ptr                head;
    fork_database                  fork_db;
    wasm_interface                 wasmif;
@@ -1114,12 +1116,15 @@ struct controller_impl {
       if ( read_mode == db_read_mode::SPECULATIVE || pending->_block_status != controller::block_status::incomplete ) {
 
          const auto& gpo = db.get<global_property_object>();
+         if (gpo.proposed_schedule_block_num) {
+            last_proposed_schedule_block_num.reset();
+            last_proposed_schedule_block_num.emplace(*gpo.proposed_schedule_block_num);
+         }
          if( gpo.proposed_schedule_block_num.valid() && // if there is a proposed schedule that was proposed in a block ...
 //             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
              pending->_pending_block_state->pending_schedule.producers.size() == 0 && // ... and there is room for a new pending schedule ...
              !was_pending_promoted && // ... and not just because it was promoted to active at the start of this block, then:
-             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + 1 //TODO: to be optimised.
-//             pending->_pending_block_state->block_num  == *gpo.proposed_schedule_block_num + (12*head->active_schedule.producers.size()) //TODO: to be optimised.
+             pending->_pending_block_state->block_num  > *gpo.proposed_schedule_block_num //TODO: to be optimised.
          )
             {
                // Promote proposed schedule to pending schedule.
@@ -1262,7 +1267,7 @@ struct controller_impl {
          };
          emit( self.accepted_block_header, new_header_state );
 
-         if ( read_mode != db_read_mode::IRREVERSIBLE ) {
+         if ( read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks( s );
          }
 
@@ -1292,6 +1297,7 @@ struct controller_impl {
       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
          fork_db.set_bft_irreversible(*pending_pbft_lib);
          pending_pbft_lib.reset();
+
          if (read_mode != db_read_mode::IRREVERSIBLE) {
              maybe_switch_forks();
          }
@@ -1311,6 +1317,10 @@ struct controller_impl {
    }
 
    void maybe_switch_forks( controller::block_status s = controller::block_status::complete ) {
+
+      if (pbft_prepared) fork_db.mark_pbft_prepared_fork(*pbft_prepared);
+      if (my_prepare) fork_db.mark_pbft_prepared_fork(*my_prepare);
+
       auto new_head = fork_db.head();
 
       if( new_head->header.previous == head->id ) {
@@ -1323,28 +1333,87 @@ struct controller_impl {
             fork_db.set_validity( new_head, false ); // Removes new_head from fork_db index, so no need to mark it as not in the current chain.
             throw;
          }
-      } else if( new_head->id != head->id ) {
-         ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
-              ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
-         auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
+      } else if( new_head->id != head->id) {
+          ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
+               ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
+          auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
 
-         for( auto itr = branches.second.begin(); itr != branches.second.end(); ++itr ) {
-            fork_db.mark_in_current_chain( *itr , false );
-            pop_block();
-         }
-         EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
-                    "loss of sync between fork_db and chainbase during fork switch" ); // _should_ never fail
+          for( auto itr = branches.second.begin(); itr != branches.second.end(); ++itr ) {
+              fork_db.mark_in_current_chain( *itr , false );
+              pop_block();
+          }
+          EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
+                      "loss of sync between fork_db and chainbase during fork switch" ); // _should_ never fail
 
-         for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr) {
-            optional<fc::exception> except;
-            try {
+          for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr) {
+              optional<fc::exception> except;
+              try {
+                  apply_block( (*ritr)->block, (*ritr)->validated ? controller::block_status::validated : controller::block_status::complete );
+                  head = *ritr;
+                  fork_db.mark_in_current_chain( *ritr, true );
+                  (*ritr)->validated = true;
+              }
+              catch (const fc::exception& e) { except = e; }
+              if (except) {
+                  elog("exception thrown while switching forks ${e}", ("e",except->to_detail_string()));
+
+                  // ritr currently points to the block that threw
+                  // if we mark it invalid it will automatically remove all forks built off it.
+                  fork_db.set_validity( *ritr, false );
+
+                  // pop all blocks from the bad fork
+                  // ritr base is a forward itr to the last block successfully applied
+                  auto applied_itr = ritr.base();
+                  for( auto itr = applied_itr; itr != branches.first.end(); ++itr ) {
+                      fork_db.mark_in_current_chain( *itr , false );
+                      pop_block();
+                  }
+                  EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
+                              "loss of sync between fork_db and chainbase during fork switch reversal" ); // _should_ never fail
+
+                  // re-apply good blocks
+                  for( auto ritr = branches.second.rbegin(); ritr != branches.second.rend(); ++ritr ) {
+                      apply_block( (*ritr)->block, controller::block_status::validated /* we previously validated these blocks*/ );
+                      head = *ritr;
+                      fork_db.mark_in_current_chain( *ritr, true );
+                  }
+                  throw *except;
+              } // end if exception
+          } /// end for each block in branch
+          ilog("successfully switched fork to new head ${new_head_id}", ("new_head_id", new_head->id));
+      }
+//      } else if( new_head->id != head->id && !pbft_prepared) {
+//          switch_forks(new_head);
+//      } else if (pbft_prepared && !fork_db.is_in_current_chain(*pbft_prepared)) {
+//          auto prepared_head = fork_db.get_fork_head(*pbft_prepared);
+//          EOS_ASSERT (prepared_head, fork_database_exception, "prepared fork head invalid");
+//          switch_forks(prepared_head);
+//          fork_db.mark_pbft_supported_fork(prepared_head->id);
+//      }
+   } /// push_block
+
+   void switch_forks(const block_state_ptr &new_head) {
+       ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
+            ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
+       auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
+
+       for( auto itr = branches.second.begin(); itr != branches.second.end(); ++itr ) {
+           fork_db.mark_in_current_chain( *itr , false );
+           pop_block();
+       }
+       EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
+                   "loss of sync between fork_db and chainbase during fork switch" ); // _should_ never fail
+
+       for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr) {
+           optional<fc::exception> except;
+           try {
                apply_block( (*ritr)->block, (*ritr)->validated ? controller::block_status::validated : controller::block_status::complete );
                head = *ritr;
                fork_db.mark_in_current_chain( *ritr, true );
                (*ritr)->validated = true;
-            }
-            catch (const fc::exception& e) { except = e; }
-            if (except) {
+           }
+           catch (const fc::exception& e) { except = e; }
+           if (except) {
                elog("exception thrown while switching forks ${e}", ("e",except->to_detail_string()));
 
                // ritr currently points to the block that threw
@@ -1355,24 +1424,23 @@ struct controller_impl {
                // ritr base is a forward itr to the last block successfully applied
                auto applied_itr = ritr.base();
                for( auto itr = applied_itr; itr != branches.first.end(); ++itr ) {
-                  fork_db.mark_in_current_chain( *itr , false );
-                  pop_block();
+                   fork_db.mark_in_current_chain( *itr , false );
+                   pop_block();
                }
                EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
-                          "loss of sync between fork_db and chainbase during fork switch reversal" ); // _should_ never fail
+                           "loss of sync between fork_db and chainbase during fork switch reversal" ); // _should_ never fail
 
                // re-apply good blocks
                for( auto ritr = branches.second.rbegin(); ritr != branches.second.rend(); ++ritr ) {
-                  apply_block( (*ritr)->block, controller::block_status::validated /* we previously validated these blocks*/ );
-                  head = *ritr;
-                  fork_db.mark_in_current_chain( *ritr, true );
+                   apply_block( (*ritr)->block, controller::block_status::validated /* we previously validated these blocks*/ );
+                   head = *ritr;
+                   fork_db.mark_in_current_chain( *ritr, true );
                }
                throw *except;
-            } // end if exception
-         } /// end for each block in branch
-         ilog("successfully switched fork to new head ${new_head_id}", ("new_head_id", new_head->id));
-      }
-   } /// push_block
+           } // end if exception
+       } /// end for each block in branch
+       ilog("successfully switched fork to new head ${new_head_id}", ("new_head_id", new_head->id));
+   }
 
    void abort_block() {
       if( pending ) {
@@ -2044,6 +2112,32 @@ bool controller::contracts_console()const {
 
 chain_id_type controller::get_chain_id()const {
    return my->chain_id;
+}
+
+void controller::set_pbft_prepared(const block_id_type& id) const {
+   my->pbft_prepared.reset();
+   my->pbft_prepared.emplace(id);
+   my->fork_db.mark_pbft_prepared_fork(id);
+
+   dlog("fork_db head ${h}", ("h", fork_db().head()->id));
+   dlog("prepared block id ${b}", ("b", id));
+}
+
+void controller::set_pbft_my_prepare(const block_id_type& id) const {
+   my->my_prepare.reset();
+   my->my_prepare.emplace(id);
+   my->fork_db.mark_pbft_my_prepare_fork(id);
+   dlog("fork_db head ${h}", ("h", fork_db().head()->id));
+   dlog("my prepare block id ${b}", ("b", id));
+}
+
+block_id_type controller::get_pbft_my_prepare() const {
+   if (my->my_prepare) return *my->my_prepare;
+   return block_id_type{};
+}
+
+void controller::reset_pbft_my_prepare() const {
+   my->my_prepare.reset();
 }
 
 db_read_mode controller::get_read_mode()const {
