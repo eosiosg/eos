@@ -2111,20 +2111,20 @@ chain_id_type controller::get_chain_id()const {
 }
 
 void controller::set_pbft_prepared(const block_id_type& id) const {
-    my->pbft_prepared.reset();
-    my->pbft_prepared.emplace(id);
-    my->fork_db.mark_pbft_prepared_fork(id);
+   my->pbft_prepared.reset();
+   my->pbft_prepared.emplace(id);
+   my->fork_db.mark_pbft_prepared_fork(id);
 
-    wlog("fork_db head ${h}", ("h", fork_db().head()->id));
-    wlog("prepared block id ${b}", ("b", id));
+   dlog("fork_db head ${h}", ("h", fork_db().head()->id));
+   dlog("prepared block id ${b}", ("b", id));
 }
 
 void controller::set_pbft_my_prepare(const block_id_type& id) const {
    my->my_prepare.reset();
    my->my_prepare.emplace(id);
    my->fork_db.mark_pbft_my_prepare_fork(id);
-   wlog("fork_db head ${h}", ("h", fork_db().head()->id));
-   wlog("my prepare block id ${b}", ("b", id));
+   dlog("fork_db head ${h}", ("h", fork_db().head()->id));
+   dlog("my prepare block id ${b}", ("b", id));
 }
 
 block_id_type controller::get_pbft_my_prepare() const {
