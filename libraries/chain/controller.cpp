@@ -127,6 +127,7 @@ struct controller_impl {
    optional<block_num_type>       last_proposed_schedule_block_num;
    optional<block_num_type>       last_promoted_proposed_schedule_block_num;
    optional<block_id_type>        pbft_prepared;
+   optional<block_id_type>        my_prepare;
    block_state_ptr                head;
    fork_database                  fork_db;
    wasm_interface                 wasmif;
@@ -1199,6 +1200,10 @@ struct controller_impl {
       if ( read_mode == db_read_mode::SPECULATIVE || pending->_block_status != controller::block_status::incomplete ) {
 
          const auto& gpo = db.get<global_property_object>();
+         if (gpo.proposed_schedule_block_num) {
+            last_proposed_schedule_block_num.reset();
+            last_proposed_schedule_block_num.emplace(*gpo.proposed_schedule_block_num);
+         }
          if( gpo.proposed_schedule_block_num.valid() && // if there is a proposed schedule that was proposed in a block ...
 //             ( *gpo.proposed_schedule_block_num <= pending->_pending_block_state->pbft_stable_checkpoint_blocknum ) && // ... that has now become irreversible ...
              pending->_pending_block_state->pending_schedule.producers.size() == 0 && // ... and there is room for a new pending schedule ...
@@ -1378,8 +1383,7 @@ struct controller_impl {
       if ((!pending || pending->_block_status != controller::block_status::incomplete) && pending_pbft_lib ) {
          fork_db.set_bft_irreversible(*pending_pbft_lib);
          pending_pbft_lib.reset();
-//         pbft_prepared.reset();
-//         fork_db.remove_pbft_supported_mark();
+
          if (read_mode != db_read_mode::IRREVERSIBLE) {
              maybe_switch_forks();
          }
@@ -1399,7 +1403,9 @@ struct controller_impl {
    }
 
    void maybe_switch_forks( controller::block_status s = controller::block_status::complete ) {
-      if (pbft_prepared) fork_db.mark_pbft_supported_fork(*pbft_prepared);
+
+      if (pbft_prepared) fork_db.mark_pbft_prepared_fork(*pbft_prepared);
+      if (my_prepare) fork_db.mark_pbft_prepared_fork(*my_prepare);
 
       auto new_head = fork_db.head();
 
@@ -2228,12 +2234,29 @@ chain_id_type controller::get_chain_id()const {
 }
 
 void controller::set_pbft_prepared(const block_id_type& id) const {
-    my->pbft_prepared.reset();
-    my->pbft_prepared.emplace(id);
-    my->fork_db.mark_pbft_supported_fork(id);
-    wlog("fork_db head ${h}", ("h", fork_db().head()->id));
-    wlog("prepared block id ${b}", ("b", id));
+   my->pbft_prepared.reset();
+   my->pbft_prepared.emplace(id);
+   my->fork_db.mark_pbft_prepared_fork(id);
 
+   dlog("fork_db head ${h}", ("h", fork_db().head()->id));
+   dlog("prepared block id ${b}", ("b", id));
+}
+
+void controller::set_pbft_my_prepare(const block_id_type& id) const {
+   my->my_prepare.reset();
+   my->my_prepare.emplace(id);
+   my->fork_db.mark_pbft_my_prepare_fork(id);
+   dlog("fork_db head ${h}", ("h", fork_db().head()->id));
+   dlog("my prepare block id ${b}", ("b", id));
+}
+
+block_id_type controller::get_pbft_my_prepare() const {
+   if (my->my_prepare) return *my->my_prepare;
+   return block_id_type{};
+}
+
+void controller::reset_pbft_my_prepare() const {
+   my->my_prepare.reset();
 }
 
 db_read_mode controller::get_read_mode()const {

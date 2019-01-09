@@ -263,6 +263,8 @@ namespace eosio {
       template<typename M>
       bool is_pbft_msg_outdated(M const & msg);
       template<typename M>
+      bool is_pbft_msg_valid(M const & msg);
+      template<typename M>
       void bcast_pbft_msg(M const & msg);
       template<typename M>
       void forward_pbft_msg(connection_ptr c, M const & msg);
@@ -2950,10 +2952,15 @@ namespace eosio {
     bool net_plugin_impl::is_pbft_msg_outdated(M const & msg) {
         return (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL);
     }
+    template<typename M>
+    bool net_plugin_impl::is_pbft_msg_valid(M const & msg) {
+        // Do some basic validation of an incoming pbft msg, bad msg should be quickly discarded without affecting state.
+        return (chain_id == msg.chain_id && !is_pbft_msg_outdated(msg) && !sync_master->is_syncing());
+    }
 
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
-        if (sync_master->is_syncing())return;
+        if (sync_master->is_syncing()) return;
 
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
@@ -2981,6 +2988,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_prepare(msg)) return;
 
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending prepare at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &msg) {
@@ -2991,28 +2999,29 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
-        ilog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
 
         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
         if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
     }
 
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
-        ilog("sending new view at ${n}", ("n", msg.view));
 
         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
         if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending new view at ${n}", ("n", msg));
     }
 
     void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &msg) {
@@ -3048,82 +3057,82 @@ namespace eosio {
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-//        ilog("received prepare at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_prepare(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+
        pbft_incoming_prepare_channel.publish(msg);
 
     }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-//       ilog("received commit at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+
        pbft_incoming_commit_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-       ilog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
+
        pbft_incoming_view_change_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-       ilog("received new view at ${n}, from ${v}", ("n", msg.view)("v", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
+
        pbft_incoming_new_view_channel.publish(msg);
    }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-//        ilog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
        if (!pcc.pbft_db.is_valid_checkpoint(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
+
        pbft_incoming_checkpoint_channel.publish(msg);
     }
 
@@ -3234,13 +3243,13 @@ namespace eosio {
                     }
                 }
 
-                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
+                fc_dlog(logger, "connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
-            wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
-            wlog("================================================================================================");
+            fc_dlog(logger, "connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            fc_dlog(logger, "================================================================================================");
             auto local_trx_pool_size = local_txns.size();
-            wlog("local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
-            wlog("================================================================================================");
+            fc_dlog(logger, "local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
+            fc_dlog(logger, "================================================================================================");
         });
     }
 
@@ -3782,6 +3791,10 @@ namespace eosio {
          result.push_back( c->get_status() );
       }
       return result;
+   }
+
+    bool net_plugin::is_syncing()const {
+       return my->sync_master->is_syncing();
    }
 
     net_plugin_impl::net_plugin_impl():

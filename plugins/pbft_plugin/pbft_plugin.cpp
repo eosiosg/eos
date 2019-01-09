@@ -33,6 +33,8 @@ namespace eosio {
 
     private:
         bool is_replaying();
+        bool is_syncing();
+        bool pbft_ready();
     };
 
     pbft_plugin::pbft_plugin() : my(new pbft_plugin_impl()) {}
@@ -68,7 +70,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin prepare timer tick error: ${m}", ("m", ec.message()));
             } else {
-                if (!is_replaying()) pbft_ctrl.maybe_pbft_prepare();
+                if (pbft_ready()) pbft_ctrl.maybe_pbft_prepare();
             }
         });
     }
@@ -81,7 +83,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin commit timer tick error: ${m}", ("m", ec.message()));
             } else {
-                if (!is_replaying()) pbft_ctrl.maybe_pbft_commit();
+                if (pbft_ready()) pbft_ctrl.maybe_pbft_commit();
             }
         });
     }
@@ -99,7 +101,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin view change timer tick error: ${m}", ("m", ec.message()));
             } else {
-                if (!is_replaying()) pbft_ctrl.maybe_pbft_view_change();
+                if (pbft_ready()) pbft_ctrl.maybe_pbft_view_change();
             }
         });
     }
@@ -112,12 +114,21 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin checkpoint timer tick error: ${m}", ("m", ec.message()));
             } else {
-                if (!is_replaying()) pbft_ctrl.send_pbft_checkpoint();
+                if (pbft_ready()) pbft_ctrl.send_pbft_checkpoint();
             }
         });
     }
 
     bool pbft_plugin_impl::is_replaying() {
         return app().get_plugin<chain_plugin>().chain().is_replaying();
+    }
+
+    bool pbft_plugin_impl::is_syncing() {
+        return app().get_plugin<net_plugin>().is_syncing();
+    }
+
+    bool pbft_plugin_impl::pbft_ready() {
+        // only trigger pbft related logic if I am in sync and replayed.
+        return (!is_syncing() && !is_replaying());
     }
 }

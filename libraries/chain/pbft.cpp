@@ -469,7 +469,7 @@ namespace eosio {
             this->set_view_change_timer(0);
             this->set_target_view_retries(0);
 
-            this->pbft_db.prune_view_change_index();
+            this->pbft_db.prune_pbft_index();
 
             if (!(new_view.stable_checkpoint == pbft_stable_checkpoint{})) {
                 for (auto cp :new_view.stable_checkpoint.checkpoints) {
@@ -485,13 +485,13 @@ namespace eosio {
                 for (auto p: new_view.prepared.prepares) {
                     try {
                         pbft_db.add_pbft_prepare(p);
-                        if (pbft_db.should_prepared()) {
-                            transit_to_prepared_state(s);
-                            return;
-                        }
                     } catch (...) {
                         wlog("insert prepare failed");
                     }
+                }
+                if (pbft_db.should_prepared()) {
+                    transit_to_prepared_state(s);
+                    return;
                 }
             }
 
