@@ -484,14 +484,15 @@ namespace eosio {
             if (!new_view.prepared.prepares.empty()) {
                 for (auto p: new_view.prepared.prepares) {
                     try {
+                        //TODO: should clean all records before insert?
                         pbft_db.add_pbft_prepare(p);
-                        if (pbft_db.should_prepared()) {
-                            transit_to_prepared_state(s);
-                            return;
-                        }
                     } catch (...) {
                         wlog("insert prepare failed");
                     }
+                }
+                if (pbft_db.should_prepared()) {
+                    transit_to_prepared_state(s);
+                    return;
                 }
             }
 
