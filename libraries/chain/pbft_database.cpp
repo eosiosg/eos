@@ -160,7 +160,17 @@ namespace eosio {
 
             auto head_block_num = ctrl.head_block_num();
             if (head_block_num <= 1) return vector<pbft_prepare>{};
+            auto my_prepare = ctrl.get_pbft_my_prepare();
 
+            auto reserve_prepare = [&](const block_id_type &in) {
+                if (in == block_id_type{} || !ctrl.fetch_block_state_by_id(in)) return false;
+                auto lib = ctrl.last_irreversible_block_id();
+                if (lib == block_id_type{}) return true;
+                auto forks = ctrl.fork_db().fetch_branch_from(in, lib);
+                return !forks.first.empty() && forks.second.empty();
+            };
+
+            vector<pbft_prepare> new_pv;
             if (!pv.empty()) {
                 for (auto p : pv) {
                     //change uuid, sign again, update cache, then emit
@@ -171,9 +181,17 @@ namespace eosio {
                     emit(pbft_outgoing_prepare, p);
                 }
                 return vector<pbft_prepare>{};
+            } else if (reserve_prepare(my_prepare)) {
+                for (auto const &sp : ctrl.my_signature_providers()) {
+                    auto uuid = boost::uuids::to_string(uuid_generator());
+                    auto my_prepare_num = ctrl.fetch_block_state_by_id(my_prepare)->block_num;
+                    auto p = pbft_prepare{uuid, current_view, my_prepare_num, my_prepare, sp.first, chain_id()};
+                    p.producer_signature = sp.second(p.digest());
+                    emit(pbft_outgoing_prepare, p);
+                    new_pv.emplace_back(p);
+                }
+                return new_pv;
             } else {
-                vector<pbft_prepare> new_pv;
-
                 uint32_t high_water_mark_block_num = head_block_num;
                 auto next_proposed_schedule_block_num = ctrl.get_global_properties().proposed_schedule_block_num;
                 auto promoted_proposed_schedule_block_num = ctrl.last_promoted_proposed_schedule_block_num();
@@ -198,6 +216,7 @@ namespace eosio {
                     add_pbft_prepare(p);
                     emit(pbft_outgoing_prepare, p);
                     new_pv.emplace_back(p);
+                    ctrl.set_pbft_my_prepare(high_water_mark_block_id);
                 }
                 return new_pv;
             }
@@ -211,7 +230,11 @@ namespace eosio {
 
             pbft_state_ptr psp = *itr;
 
-            return (psp->should_prepared && (psp->block_num > ctrl.last_irreversible_block_num()));
+            if (psp->should_prepared && (psp->block_num > ctrl.last_irreversible_block_num())) {
+                ctrl.set_pbft_prepared((*itr)->block_id);
+                return true;
+            }
+            return false;
         }
 
         bool pbft_database::is_valid_prepare(const pbft_prepare &p) {
@@ -285,8 +308,7 @@ namespace eosio {
             }
         }
 
-        vector<pbft_commit>
-        pbft_database::send_and_add_pbft_commit(const vector<pbft_commit> &cv, uint32_t current_view) {
+        vector<pbft_commit> pbft_database::send_and_add_pbft_commit(const vector<pbft_commit> &cv, uint32_t current_view) {
             if (!cv.empty()) {
                 for (auto c : cv) {
                     //change uuid, sign again, update cache, then emit
@@ -510,8 +532,10 @@ namespace eosio {
             return sp_itr != sps.end();
         }
 
-        void pbft_database::prune_view_change_index() {
+        void pbft_database::prune_pbft_index() {
+            pbft_state_index.clear();
             view_state_index.clear();
+            ctrl.reset_pbft_my_prepare();
         }
 
         pbft_new_view pbft_database::send_pbft_new_view(
@@ -629,10 +653,10 @@ namespace eosio {
                 if (!valid) return false;
             }
 
-            auto cert_num = certificate.block_num;
-            auto cert_bs = ctrl.fetch_block_state_by_number(cert_num);
+            auto cert_id = certificate.block_id;
+            auto cert_bs = ctrl.fetch_block_state_by_id(cert_id);
             auto producer_schedule = lib_active_producers();
-            if (cert_num > 0 && cert_bs) {
+            if (certificate.block_num > 0 && cert_bs) {
                 producer_schedule = cert_bs->active_schedule;
             }
             auto bp_threshold = producer_schedule.producers.size() * 2 / 3 + 1;
@@ -721,6 +745,7 @@ namespace eosio {
 
             if (nv.view_changed.view_changes.size() < schedule_threshold) return false;
             for (auto vc: nv.view_changed.view_changes) {
+                if (!is_valid_view_change(vc)) return false;
                 add_pbft_view_change(vc);
             }
 
@@ -831,12 +856,14 @@ namespace eosio {
             } else return pbft_stable_checkpoint{};
         }
 
-        block_num_type pbft_database::cal_latest_possible_stable_checkpoint_block_num() const {
+        block_info pbft_database::cal_pending_stable_checkpoint() const {
             auto lscb_num = ctrl.last_stable_checkpoint_block_num();
+            auto lscb_id = ctrl.last_stable_checkpoint_block_id();
+            auto lscb_info = block_info{lscb_id, lscb_num};
 
-            const auto &by_blk_num = checkpoint_index.get<by_stable_and_num>();
+            const auto &by_blk_num = checkpoint_index.get<by_num>();
             auto itr = by_blk_num.lower_bound(lscb_num);
-            if (itr == by_blk_num.end()) return block_num_type{};
+            if (itr == by_blk_num.end()) return lscb_info;
 
             while (itr != by_blk_num.end()) {
                 if ((*itr)->is_stable && ctrl.fetch_block_state_by_id((*itr)->block_id)) {
@@ -855,12 +882,13 @@ namespace eosio {
 
                     if ((*itr)->is_stable
                         && (head_checkpoint_schedule == current_schedule || head_checkpoint_schedule == new_schedule)) {
-                        lscb_num = (*itr)->block_num;
+                        lscb_info.block_id = (*itr)->block_id;
+                        lscb_info.block_num = (*itr)->block_num;
                     }
                 }
                 ++itr;
             }
-            return lscb_num;
+            return lscb_info;
         }
 
         vector<pbft_checkpoint> pbft_database::generate_and_add_pbft_checkpoint() {
@@ -877,9 +905,9 @@ namespace eosio {
             block_num_type my_latest_checkpoint = 0;
 
             auto checkpoint = [&](const block_num_type &in) {
-                return in % 6 == 1
-                       || (in >= ctrl.last_proposed_schedule_block_num() &&
-                           in <= ctrl.last_promoted_proposed_schedule_block_num());
+                return in % 100 == 1
+                       || in == ctrl.last_proposed_schedule_block_num()
+                       || in == ctrl.last_promoted_proposed_schedule_block_num();
             };
 
             for (auto i = psp->block_num;
@@ -948,7 +976,7 @@ namespace eosio {
 
             auto lscb_num = ctrl.last_stable_checkpoint_block_num();
 
-            auto cp_block_state = ctrl.fetch_block_state_by_number(cp.block_num);
+            auto cp_block_state = ctrl.fetch_block_state_by_id(cp.block_id);
             if (!cp_block_state) return;
             auto active_bps = cp_block_state->active_schedule.producers;
             auto checkpoint_count = count_if(active_bps.begin(), active_bps.end(), [&](const producer_key &p) {
@@ -990,9 +1018,10 @@ namespace eosio {
                 }
             }
 
-            auto pending_num = cal_latest_possible_stable_checkpoint_block_num();
+            auto lscb_info = cal_pending_stable_checkpoint();
+            auto pending_num = lscb_info.block_num;
+            auto pending_id = lscb_info.block_id;
             if (pending_num > lscb_num) {
-                auto pending_id = ctrl.get_block_id_for_num(pending_num);
                 ctrl.set_pbft_latest_checkpoint(pending_id);
                 if (ctrl.last_irreversible_block_num() < pending_num) ctrl.pbft_commit_local(pending_id);
                 const auto &by_block_id_index = pbft_state_index.get<by_block_id>();

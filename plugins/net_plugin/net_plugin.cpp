@@ -263,6 +263,8 @@ namespace eosio {
       template<typename M>
       bool is_pbft_msg_outdated(M const & msg);
       template<typename M>
+      bool is_pbft_msg_valid(M const & msg);
+      template<typename M>
       void bcast_pbft_msg(M const & msg);
       template<typename M>
       void forward_pbft_msg(connection_ptr c, M const & msg);
@@ -542,6 +544,8 @@ namespace eosio {
           std::shared_ptr<net_message> message;
           fc::time_point_sec deadline;
       };
+      const int OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE = 100;
+      const int OUT_QUEUE_SIZE_LIMIT = 200;
       deque<queued_write>     write_queue;
       deque<queued_write>     out_queue;
       deque<queued_pbft_message>     pbft_queue;
@@ -551,6 +555,8 @@ namespace eosio {
       int16_t                 sent_handshake_count = 0;
       bool                    connecting = false;
       bool                    syncing = false;
+      int                     connecting_timeout_in_seconds = 10;
+      fc::time_point_sec      connecting_deadline;
       uint16_t                protocol_version  = 0;
       string                  peer_addr;
       unique_ptr<boost::asio::steady_timer> response_expected;
@@ -646,6 +652,8 @@ namespace eosio {
                        bool trigger_send,
                        std::function<void(boost::system::error_code, std::size_t)> callback);
       void do_queue_write();
+      void do_queue_write_from_write_queue(std::vector<boost::asio::const_buffer> &bufs);
+      void do_queue_write_from_pbft_queue(std::vector<boost::asio::const_buffer> &bufs);
 
       void send_p2p_request(bool discoverable);
       void send_p2p_response(bool discoverable,string p2p_peer_list);
@@ -795,6 +803,7 @@ namespace eosio {
         sent_handshake_count(0),
         connecting(true),
         syncing(false),
+        connecting_deadline(fc::time_point::now()+fc::seconds(connecting_timeout_in_seconds)),
         protocol_version(0),
         peer_addr(),
         response_expected(),
@@ -825,8 +834,8 @@ namespace eosio {
    }
 
    bool connection::pbft_ready(){
-       return true;
 //       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
+       return current();
    }
 
    void connection::reset() {
@@ -850,6 +859,7 @@ namespace eosio {
       }
       flush_queues();
       connecting = false;
+      connecting_deadline = fc::time_point::min();
       syncing = false;
       if( last_req ) {
          my_impl->dispatcher->retry_fetch (shared_from_this());
@@ -1138,78 +1148,11 @@ namespace eosio {
          my_impl->close(c.lock());
          return;
       }
-      const int OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE = 100;
-      const int OUT_QUEUE_SIZE_LIMIT = 200;
+
       std::vector<boost::asio::const_buffer> bufs;
-      while (write_queue.size() > 0) {
-         auto& m = write_queue.front();
-         bufs.push_back(boost::asio::buffer(*m.buff));
-         out_queue.push_back(m);
-         write_queue.pop_front();
-         if(out_queue.size() >= OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE){
-             break;
-         }
-      }
-      //prepare pbft msg for out queue
 
-      //delete timeout pbft message
-      auto now = time_point::now();
-      int drop_pbft_count = 0;
-      while(pbft_queue.size()>0){
-          if(pbft_queue.front().deadline <= now){
-              pbft_queue.pop_front();
-              ++drop_pbft_count;
-          }else{
-              break;
-          }
-      }
-
-       if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
-           wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
-       }
-
-
-       //drop timeout messages in mem, init send buffer only when actual send happens
-       //copied from function connection::enqueue
-       connection_wptr weak_this = shared_from_this();
-       go_away_reason close_after_send = no_reason;
-       std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
-           connection_ptr conn = weak_this.lock();
-           if (conn) {
-               if (close_after_send != no_reason) {
-                   elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
-                   my_impl->close(conn);
-                   return;
-               }
-           } else {
-               fc_wlog(logger, "connection expired before enqueued net_message called callback!");
-           }
-       };
-
-       //push to out queue
-      while(out_queue.size() < OUT_QUEUE_SIZE_LIMIT){
-          if(pbft_queue.size()==0) break;
-
-          queued_pbft_message pbft = pbft_queue.front();
-          pbft_queue.pop_front();
-          auto m = pbft.message;
-          if(m){
-              uint32_t payload_size = fc::raw::pack_size( *m );
-              char * header = reinterpret_cast<char*>(&payload_size);
-              size_t header_size = sizeof(payload_size);
-
-              size_t buffer_size = header_size + payload_size;
-
-              auto send_buffer = std::make_shared<vector<char>>(buffer_size);
-              fc::datastream<char*> ds( send_buffer->data(), buffer_size);
-              ds.write( header, header_size );
-              fc::raw::pack( ds, *m );
-
-              bufs.push_back(boost::asio::buffer(*send_buffer));
-              out_queue.push_back({send_buffer, callback});
-          }
-      }
-
+      do_queue_write_from_write_queue(bufs);
+      do_queue_write_from_pbft_queue(bufs);
 
       boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
             try {
@@ -1255,6 +1198,78 @@ namespace eosio {
             }
          });
    }
+
+
+    void connection::do_queue_write_from_write_queue(std::vector<boost::asio::const_buffer> &bufs){
+        while (write_queue.size() > 0) {
+            auto& m = write_queue.front();
+            bufs.push_back(boost::asio::buffer(*m.buff));
+            out_queue.push_back(m);
+            write_queue.pop_front();
+            if(out_queue.size() >= OUT_QUEUE_SIZE_LIMIT_FROM_WRITE_QUEUE){
+                break;
+            }
+        }
+    }
+    void connection::do_queue_write_from_pbft_queue(std::vector<boost::asio::const_buffer> &bufs){
+        //delete timeout pbft message
+        auto now = time_point::now();
+        int drop_pbft_count = 0;
+        while(pbft_queue.size()>0){
+            if(pbft_queue.front().deadline <= now){
+                pbft_queue.pop_front();
+                ++drop_pbft_count;
+            }else{
+                break;
+            }
+        }
+
+        if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
+            wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
+        }
+
+
+        //drop timeout messages in mem, init send buffer only when actual send happens
+        //copied from function connection::enqueue
+        connection_wptr weak_this = shared_from_this();
+        go_away_reason close_after_send = no_reason;
+        std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
+            connection_ptr conn = weak_this.lock();
+            if (conn) {
+                if (close_after_send != no_reason) {
+                    elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
+                    my_impl->close(conn);
+                    return;
+                }
+            } else {
+                fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+            }
+        };
+
+        //push to out queue
+        while(out_queue.size() < OUT_QUEUE_SIZE_LIMIT){
+            if(pbft_queue.size()==0) break;
+
+            queued_pbft_message pbft = pbft_queue.front();
+            pbft_queue.pop_front();
+            auto m = pbft.message;
+            if(m){
+                uint32_t payload_size = fc::raw::pack_size( *m );
+                char * header = reinterpret_cast<char*>(&payload_size);
+                size_t header_size = sizeof(payload_size);
+
+                size_t buffer_size = header_size + payload_size;
+
+                auto send_buffer = std::make_shared<vector<char>>(buffer_size);
+                fc::datastream<char*> ds( send_buffer->data(), buffer_size);
+                ds.write( header, header_size );
+                fc::raw::pack( ds, *m );
+
+                bufs.push_back(boost::asio::buffer(*send_buffer));
+                out_queue.push_back({send_buffer, callback});
+            }
+        }
+    }
 
    void connection::cancel_sync(go_away_reason reason) {
       fc_dlog(logger,"cancel sync reason = ${m}, write queue size ${o} peer ${p}",
@@ -1415,7 +1430,7 @@ namespace eosio {
    }
 
    void connection::request_sync_checkpoints(uint32_t start, uint32_t end) {
-       wlog("request sync checkpoints");
+       fc_dlog(logger, "request sync checkpoints");
        checkpoint_request_message srm = {start,end};
        enqueue( net_message(srm));
        sync_wait();
@@ -1526,9 +1541,6 @@ namespace eosio {
          request_next_chunk();
       }
    }
-   bool sync_manager::is_syncing() {
-       return (state != in_sync);
-   }
 
    bool sync_manager::sync_required( ) {
       fc_dlog(logger, "last req = ${req}, last recv = ${recv} known = ${known} our head = ${head}",
@@ -1536,6 +1548,10 @@ namespace eosio {
 
       return( sync_last_requested_num < sync_known_lib_num ||
               chain_plug->chain( ).fork_db_head_block_num( ) < sync_last_requested_num );
+   }
+
+   bool sync_manager::is_syncing() {
+       return (state != in_sync);
    }
 
    void sync_manager::request_next_chunk( connection_ptr conn ) {
@@ -1708,6 +1724,15 @@ namespace eosio {
          }
          return;
       }
+      //TODO: reconstruct.
+      if (lib_num < peer_lib) {
+         fc_dlog(logger, "request checkpoints from peer");
+         checkpoint_request_message crm;
+         crm.start_block = head_checkpoint;
+         crm.end_block = peer_lib;
+         c->enqueue( crm );
+         return;
+      }
       if (lib_num > msg.head_num ) {
          fc_dlog(logger, "sync check state 2");
          if (msg.generation > 1 || c->protocol_version > proto_base) {
@@ -1721,16 +1746,6 @@ namespace eosio {
          c->syncing = true;
          return;
       }
-
-      if (lib_num < peer_lib) {
-          fc_dlog(logger, "request checkpoints from peer");
-          checkpoint_request_message crm;
-          crm.start_block = head_checkpoint;
-          crm.end_block = peer_lib;
-          c->enqueue( crm );
-          return;
-      }
-
       if (head <= msg.head_num ) {
          fc_dlog(logger, "sync check state 3");
          verify_catchup (c, msg.head_num, msg.head_id);
@@ -2187,6 +2202,7 @@ namespace eosio {
       auto current_endpoint = *endpoint_itr;
       ++endpoint_itr;
       c->connecting = true;
+      c->connecting_deadline = fc::time_point::now()+fc::seconds(c->connecting_timeout_in_seconds);
       connection_wptr weak_conn = c;
       c->socket->async_connect( current_endpoint, [weak_conn, endpoint_itr, this] ( const boost::system::error_code& err ) {
             auto c = weak_conn.lock();
@@ -2803,7 +2819,7 @@ namespace eosio {
 
    void net_plugin_impl::handle_message(  connection_ptr c, const checkpoint_request_message &msg) {
 
-       if ( msg.end_block == 0) return;
+       if ( msg.end_block == 0 || msg.end_block < msg.start_block) return;
 
        fc_ilog(logger, "received checkpoint request message");
        vector<pbft_stable_checkpoint> scp_stack;
@@ -2936,9 +2952,16 @@ namespace eosio {
     bool net_plugin_impl::is_pbft_msg_outdated(M const & msg) {
         return (time_point_sec(time_point::now()) > time_point_sec(msg.timestamp) + pbft_message_TTL);
     }
+    template<typename M>
+    bool net_plugin_impl::is_pbft_msg_valid(M const & msg) {
+        // Do some basic validation of an incoming pbft msg, bad msg should be quickly discarded without affecting state.
+        return (chain_id == msg.chain_id && !is_pbft_msg_outdated(msg) && !sync_master->is_syncing());
+    }
 
     template<typename M>
     void net_plugin_impl::bcast_pbft_msg(M const & msg) {
+        if (sync_master->is_syncing()) return;
+
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
             if (conn->pbft_ready()) {
@@ -2952,7 +2975,7 @@ namespace eosio {
         auto deadline = time_point_sec(time_point::now()) + pbft_message_TTL;
         for (auto &conn: connections) {
             if (conn != c && conn->pbft_ready()) {
-                conn->enqueue_pbft(msg,deadline);
+                conn->enqueue_pbft(msg, deadline);
             }
         }
     }
@@ -2961,35 +2984,52 @@ namespace eosio {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
 
+        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+        if (!pcc.pbft_db.is_valid_prepare(msg)) return;
+
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending prepare at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
 
+        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+        if (!pcc.pbft_db.is_valid_commit(msg)) return;
+
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
-        ilog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
+
+        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+        if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
     }
 
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
-        ilog("sending new view at ${n}", ("n", msg.view));
+
+        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+        if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
         bcast_pbft_msg(msg);
+        fc_dlog(logger, "sending new view at ${n}", ("n", msg));
     }
 
     void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &msg) {
         auto added = maybe_add_pbft_cache(msg.uuid);
         if (!added) return;
+
+        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+        if (!pcc.pbft_db.is_valid_checkpoint(msg)) return;
 
         bcast_pbft_msg(msg);
     }
@@ -3017,79 +3057,94 @@ namespace eosio {
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
 
-       if (chain_id != msg.chain_id) return;
-        if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
-        auto added = maybe_add_pbft_cache(msg.uuid);
-        if (!added) return;
-//        ilog("received prepare at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
+       auto added = maybe_add_pbft_cache(msg.uuid);
+       if (!added) return;
 
-        forward_pbft_msg(c, msg);
-        pbft_incoming_prepare_channel.publish(msg);
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       if (!pcc.pbft_db.is_valid_prepare(msg)) return;
+
+       forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+
+       pbft_incoming_prepare_channel.publish(msg);
 
     }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-//       ilog("received commit at ${n} from ${v}", ("n", msg.block_num)("v", msg.public_key));
+
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+
        pbft_incoming_commit_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-       ilog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
+
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
+
        pbft_incoming_view_change_channel.publish(msg);
    }
 
    void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
 
-       if (chain_id != msg.chain_id) return;
-       if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
        auto added = maybe_add_pbft_cache(msg.uuid);
        if (!added) return;
-       ilog("received new view at ${n}, from ${v}", ("n", msg.view)("v", msg.public_key));
+
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
        forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
+
        pbft_incoming_new_view_channel.publish(msg);
    }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 
-        if (chain_id != msg.chain_id) return;
-        if (is_pbft_msg_outdated(msg)) return;
+       if (!is_pbft_msg_valid(msg)) return;
 
-        auto added = maybe_add_pbft_cache(msg.uuid);
-        if (!added) return;
-//        ilog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
+       auto added = maybe_add_pbft_cache(msg.uuid);
+       if (!added) return;
 
-        forward_pbft_msg(c, msg);
-        pbft_incoming_checkpoint_channel.publish(msg);
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       if (!pcc.pbft_db.is_valid_checkpoint(msg)) return;
+
+       forward_pbft_msg(c, msg);
+       fc_dlog(logger, "received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
+
+       pbft_incoming_checkpoint_channel.publish(msg);
     }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_stable_checkpoint &msg) {
-        if (chain_id != msg.chain_id) return;
+       if (chain_id != msg.chain_id) return;
 
-        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-        if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
-            for (auto cp: msg.checkpoints) {
-                pbft_incoming_checkpoint_channel.publish(cp);
-            }
-        }
+       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
+           for (auto cp: msg.checkpoints) {
+               pbft_incoming_checkpoint_channel.publish(cp);
+           }
+       }
     }
 
    void net_plugin_impl::start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection) {
@@ -3188,13 +3243,13 @@ namespace eosio {
                     }
                 }
 
-                wlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
+                fc_dlog(logger, "connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
-            wlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
-            wlog("================================================================================================");
+            fc_dlog(logger, "connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            fc_dlog(logger, "================================================================================================");
             auto local_trx_pool_size = local_txns.size();
-            wlog("local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
-            wlog("================================================================================================");
+            fc_dlog(logger, "local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
+            fc_dlog(logger, "================================================================================================");
         });
     }
 
@@ -3260,6 +3315,14 @@ namespace eosio {
                it = connections.erase(it);
                continue;
             }
+         }else if((*it)->connecting && (*it)->connecting_deadline < fc::time_point::now()){
+             if( (*it)->peer_addr.length() > 0) {
+                 close(*it);
+             }
+             else {
+                 it = connections.erase(it);
+                 continue;
+             }
          }
          ++it;
       }
@@ -3728,6 +3791,10 @@ namespace eosio {
          result.push_back( c->get_status() );
       }
       return result;
+   }
+
+    bool net_plugin::is_syncing()const {
+       return my->sync_master->is_syncing();
    }
 
     net_plugin_impl::net_plugin_impl():
