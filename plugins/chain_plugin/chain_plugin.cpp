@@ -850,27 +850,22 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
 }
 
 void chain_plugin_impl::on_pbft_incoming_prepare(pbft_prepare p){
-//   ilog("incoming prepare from ${bp} at ${num}", ("bp",p.public_key)("num",p.block_num));
    pbft_ctrl->on_pbft_prepare(p);
 }
 
 void chain_plugin_impl::on_pbft_incoming_commit(pbft_commit c){
-//   ilog("incoming commit from ${bp} at ${num}", ("bp",c.public_key)("num",c.block_num));
    pbft_ctrl->on_pbft_commit(c);
 }
 
 void chain_plugin_impl::on_pbft_incoming_view_change(pbft_view_change vc){
-//   ilog("received incoming pbft_view_change: ${v}, from ${k}, uuid: ${u}", ("v", vc.view)("k", vc.public_key));
    pbft_ctrl->on_pbft_view_change(vc);
 }
 
 void chain_plugin_impl::on_pbft_incoming_new_view(pbft_new_view nv){
-//    ilog("received incoming pbft_new_view: ${v}, from ${k}",("v",nv.view)("k", nv.public_key));
    pbft_ctrl->on_pbft_new_view(nv);
 }
 
 void chain_plugin_impl::on_pbft_incoming_checkpoint(pbft_checkpoint cp){
-//   ilog("received incoming pbft_checkpoint height: ${v}, from ${k}",("v",cp.block_num)("k", cp.public_key));
    pbft_ctrl->on_pbft_checkpoint(cp);
 }
 
@@ -1202,6 +1197,7 @@ read_only::get_info_results read_only::get_info(const read_only::get_info_params
       db.fork_db_head_block_time(),
       db.fork_db_head_block_producer(),
       pbft_ctrl.state_machine.get_current_view(),
+      pbft_ctrl.state_machine.get_target_view(),
       db.last_stable_checkpoint_block_num(),
       rm.get_virtual_block_cpu_limit(),
       rm.get_virtual_block_net_limit(),

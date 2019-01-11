@@ -98,6 +98,7 @@ public:
       fc::time_point          head_block_time;
       account_name            head_block_producer;
       uint32_t                current_view = 0;
+      uint32_t                target_view = 0;
       uint32_t                last_stable_checkpoint_block_num = 0;
       uint64_t                virtual_block_cpu_limit = 0;
       uint64_t                virtual_block_net_limit = 0;
@@ -712,7 +713,7 @@ private:
 FC_REFLECT( eosio::chain_apis::permission, (perm_name)(parent)(required_auth) )
 FC_REFLECT(eosio::chain_apis::empty, )
 FC_REFLECT(eosio::chain_apis::read_only::get_info_results,
-(server_version)(chain_id)(head_block_num)(last_irreversible_block_num)(last_irreversible_block_id)(head_block_id)(head_block_time)(head_block_producer)(current_view)(last_stable_checkpoint_block_num)(virtual_block_cpu_limit)(virtual_block_net_limit)(block_cpu_limit)(block_net_limit)(server_version_string) )
+(server_version)(chain_id)(head_block_num)(last_irreversible_block_num)(last_irreversible_block_id)(head_block_id)(head_block_time)(head_block_producer)(current_view)(target_view)(last_stable_checkpoint_block_num)(virtual_block_cpu_limit)(virtual_block_net_limit)(block_cpu_limit)(block_net_limit)(server_version_string) )
 FC_REFLECT(eosio::chain_apis::read_only::get_block_params, (block_num_or_id))
 FC_REFLECT(eosio::chain_apis::read_only::get_block_header_state_params, (block_num_or_id))
 

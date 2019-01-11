@@ -1,15 +1,8 @@
-//
-// Created by deadlock on 17/10/18.
-//
-
-//#ifndef EOSIO_PBFT_HPP
-//#define EOSIO_PBFT_HPP
 #pragma once
 
 #include <eosio/chain/producer_schedule.hpp>
 #include <eosio/chain/pbft_database.hpp>
 #include <chrono>
-
 
 namespace eosio {
     namespace chain {
@@ -21,9 +14,7 @@ namespace eosio {
             vector<pbft_commit> commits_cache;
             vector<pbft_view_change> view_changes_cache;
             vector<pbft_prepared_certificate> prepared_certificate;
-            vector<pbft_committed_certificate> committed_certificate;
             vector<pbft_view_changed_certificate> view_changed_certificate;
-            vector<pbft_checkpoint> checkpoints_cache;
         };
 
         class psm_machine {
@@ -60,7 +51,7 @@ namespace eosio {
             void transit_to_view_change_state(T const & s);
 
             template<typename T>
-            void transit_to_new_view(const pbft_new_view &new_view, T const & s);
+            void transit_to_new_view(const pbft_new_view &new_view, T const &s);
 
             const vector<pbft_prepare> &get_prepares_cache() const;
 
@@ -82,10 +73,6 @@ namespace eosio {
 
             void set_prepared_certificate(const vector<pbft_prepared_certificate> &prepared_certificate);
 
-            const vector<pbft_committed_certificate> &get_committed_certificate() const;
-
-            void set_committed_certificate(const vector<pbft_committed_certificate> &committed_certificate);
-
             const vector<pbft_view_changed_certificate> &get_view_changed_certificate() const;
 
             void set_view_changed_certificate(const vector<pbft_view_changed_certificate> &view_changed_certificate);
@@ -102,9 +89,7 @@ namespace eosio {
 
             void set_view_change_timer(const uint32_t &view_change_timer);
 
-            const vector<pbft_checkpoint> &get_checkpoints_cache() const;
-
-            void set_checkpoints_cache(const vector<pbft_checkpoint> &checkpoints_cache);
+            void manually_set_current_view(const uint32_t &current_view);
 
         protected:
             psm_cache cache;
@@ -138,6 +123,8 @@ namespace eosio {
 
             virtual void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) = 0;
 
+            virtual void manually_set_view(psm_machine *m, const uint32_t &view) = 0;
+
         };
 
         class psm_prepared_state final: public psm_state {
@@ -160,9 +147,10 @@ namespace eosio {
 
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
 
+            void manually_set_view(psm_machine *m, const uint32_t &view) override;
+
             bool pending_commit_local;
 
-            std::chrono::time_point<std::chrono::system_clock> pending_commit_local_set_time;
         };
 
         class psm_committed_state final: public psm_state {
@@ -184,9 +172,9 @@ namespace eosio {
 
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
 
-            bool pending_commit_local;
+            void manually_set_view(psm_machine *m, const uint32_t &view) override;
 
-            std::chrono::time_point<std::chrono::system_clock> pending_commit_local_set_time;
+            bool pending_commit_local;
         };
 
         class psm_view_change_state final: public psm_state {
@@ -204,10 +192,12 @@ namespace eosio {
             void send_view_change(psm_machine *m, pbft_database &pbft_db) override;
 
             void on_new_view(psm_machine *m, pbft_new_view &e, pbft_database &pbft_db) override;
+
+            void manually_set_view(psm_machine *m, const uint32_t &view) override;
         };
 
         struct pbft_config {
-            uint32_t view_change_timeout;
+            uint32_t view_change_timeout = 6;
             bool     bp_candidate = false;
         };
 
@@ -231,7 +221,6 @@ namespace eosio {
             void on_pbft_new_view(pbft_new_view &nv);
             void on_pbft_checkpoint(pbft_checkpoint &cp);
 
-
         private:
             fc::path datadir;
 
@@ -240,7 +229,4 @@ namespace eosio {
     }
 } /// namespace eosio::chain
 
-
 FC_REFLECT(eosio::chain::pbft_controller, (pbft_db)(state_machine)(config))
-//FC_REFLECT(eosio::chain::psm_machine, (cache)(current_view)(target_view_retries)(target_view)(view_change_timer))
-//#endif //EOSIO_PBFT_HPP

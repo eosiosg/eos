@@ -158,20 +158,18 @@ namespace eosio { namespace chain {
 
          bool pending_pbft_lib();
 
-         void set_pbft_prepared_block_id(optional<block_id_type> bid);
-
-         signed_block_ptr last_irreversible_block()const;
-
-         block_num_type last_proposed_schedule_block_num()const;
-         block_num_type last_promoted_proposed_schedule_block_num()const;
+         uint32_t last_proposed_schedule_block_num()const;
+         uint32_t last_promoted_proposed_schedule_block_num()const;
 
          void set_pbft_latest_checkpoint( const block_id_type& id );
-         uint32_t last_stable_checkpoint_block_num() const;
+         uint32_t last_stable_checkpoint_block_num()const;
+         block_id_type last_stable_checkpoint_block_id()const;
 
 
          const fork_database& fork_db()const;
-         set<chain::account_name> my_producers()const;
+
          std::map<chain::public_key_type, signature_provider_type> my_signature_providers()const;
+         void set_my_signature_providers(std::map<chain::public_key_type, signature_provider_type> msp);
 
 
          const account_object&                 get_account( account_name n )const;
@@ -271,6 +269,12 @@ namespace eosio { namespace chain {
          path state_dir()const;
          path blocks_dir()const;
          producer_schedule_type initial_schedule()const;
+         bool is_replaying()const;
+
+         void set_pbft_prepared(const block_id_type& id)const;
+         void set_pbft_my_prepare(const block_id_type& id)const;
+         block_id_type get_pbft_my_prepare()const;
+         void reset_pbft_my_prepare()const;
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;

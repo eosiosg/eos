@@ -1,12 +1,10 @@
 #include <memory>
 
-#include <memory>
-
-
 #include <eosio/pbft_plugin/pbft_plugin.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <eosio/chain/pbft.hpp>
 #include <eosio/chain_plugin/chain_plugin.hpp>
+#include <eosio/net_plugin/net_plugin.hpp>
 
 namespace eosio {
     static appbase::abstract_plugin &_pbft_plugin = app().register_plugin<pbft_plugin>();
@@ -20,10 +18,10 @@ namespace eosio {
         unique_ptr<boost::asio::steady_timer> view_change_timer;
         unique_ptr<boost::asio::steady_timer> checkpoint_timer;
 
-        boost::asio::steady_timer::duration prepare_timeout{std::chrono::seconds{2}};
-        boost::asio::steady_timer::duration commit_timeout{std::chrono::seconds{2}};
-        boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{2}};
-        boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{2}};
+        boost::asio::steady_timer::duration prepare_timeout{std::chrono::milliseconds{1000}};
+        boost::asio::steady_timer::duration commit_timeout{std::chrono::milliseconds{1000}};
+        boost::asio::steady_timer::duration view_change_timeout{std::chrono::seconds{5}};
+        boost::asio::steady_timer::duration checkpoint_timeout{std::chrono::seconds{50}};
 
         void prepare_timer_tick();
 
@@ -33,6 +31,10 @@ namespace eosio {
 
         void checkpoint_timer_tick();
 
+    private:
+        bool is_replaying();
+        bool is_syncing();
+        bool pbft_ready();
     };
 
     pbft_plugin::pbft_plugin() : my(new pbft_plugin_impl()) {}
@@ -68,7 +70,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin prepare timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.maybe_pbft_prepare();
+                if (pbft_ready()) pbft_ctrl.maybe_pbft_prepare();
             }
         });
     }
@@ -81,7 +83,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin commit timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.maybe_pbft_commit();
+                if (pbft_ready()) pbft_ctrl.maybe_pbft_commit();
             }
         });
     }
@@ -91,7 +93,7 @@ namespace eosio {
         try {
             view_change_timer->cancel();
         } catch (boost::system::system_error &e) {
-            elog("view change timer cancel error: ${e}",("e",e.what()));
+            elog("view change timer cancel error: ${e}", ("e", e.what()));
         }
         view_change_timer->expires_from_now(view_change_timeout);
         view_change_timer->async_wait([&](boost::system::error_code ec) {
@@ -99,7 +101,7 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin view change timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.maybe_pbft_view_change();
+                if (pbft_ready()) pbft_ctrl.maybe_pbft_view_change();
             }
         });
     }
@@ -112,9 +114,21 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin checkpoint timer tick error: ${m}", ("m", ec.message()));
             } else {
-                pbft_ctrl.send_pbft_checkpoint();
+                if (pbft_ready()) pbft_ctrl.send_pbft_checkpoint();
             }
         });
     }
 
+    bool pbft_plugin_impl::is_replaying() {
+        return app().get_plugin<chain_plugin>().chain().is_replaying();
+    }
+
+    bool pbft_plugin_impl::is_syncing() {
+        return app().get_plugin<net_plugin>().is_syncing();
+    }
+
+    bool pbft_plugin_impl::pbft_ready() {
+        // only trigger pbft related logic if I am in sync and replayed.
+        return (!is_syncing() && !is_replaying());
+    }
 }

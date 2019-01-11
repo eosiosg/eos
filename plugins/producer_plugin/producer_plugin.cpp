@@ -923,6 +923,11 @@ producer_plugin::snapshot_information producer_plugin::create_snapshot() const {
    return {head_id, snapshot_path};
 }
 
+void producer_plugin::set_pbft_current_view(const uint32_t view) {
+    pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
+    pbft_ctrl.state_machine.manually_set_current_view(view);
+}
+
 optional<fc::time_point> producer_plugin_impl::calculate_next_block_time(const account_name& producer_name, const block_timestamp_type& current_block_time) const {
    chain::controller& chain = app().get_plugin<chain_plugin>().chain();
    const auto& hbs = chain.head_block_state();
@@ -987,7 +992,7 @@ fc::time_point producer_plugin_impl::calculate_pending_block_time() const {
    fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
 
 
-   if((block_time - now) < fc::microseconds(config::block_interval_us/10) ) {     // we must sleep for at least 50ms
+   if((block_time - now) < fc::microseconds(config::block_interval_us/5) ) {     // we must sleep for at least 50ms
       block_time += fc::microseconds(config::block_interval_us);
    }
    return block_time;
