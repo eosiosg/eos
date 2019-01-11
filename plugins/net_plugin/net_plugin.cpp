@@ -2867,7 +2867,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_prepare(msg)) return;
 
         bcast_pbft_msg(msg);
-        fc_dlog(logger, "sending prepare at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
+        dlog("sending prepare at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &msg) {
@@ -2878,7 +2878,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
         bcast_pbft_msg(msg);
-        fc_dlog(logger, "sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
+        dlog("sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &msg) {
@@ -2889,7 +2889,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
         bcast_pbft_msg(msg);
-        fc_dlog(logger, "sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
+        dlog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
     }
 
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &msg) {
@@ -2900,7 +2900,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
         bcast_pbft_msg(msg);
-        fc_dlog(logger, "sending new view at ${n}", ("n", msg));
+        dlog("sending new view at ${n}", ("n", msg));
     }
 
     void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &msg) {
@@ -2945,7 +2945,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_prepare(msg)) return;
 
        forward_pbft_msg(c, msg);
-       fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+       dlog("received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_incoming_prepare_channel.publish(msg);
 
@@ -2962,7 +2962,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
        forward_pbft_msg(c, msg);
-       fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+       dlog("received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_incoming_commit_channel.publish(msg);
    }
@@ -2978,7 +2978,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
        forward_pbft_msg(c, msg);
-       fc_dlog(logger, "received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
+       dlog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
 
        pbft_incoming_view_change_channel.publish(msg);
    }
@@ -2994,7 +2994,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
        forward_pbft_msg(c, msg);
-       fc_dlog(logger, "received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
+       dlog("received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
 
        pbft_incoming_new_view_channel.publish(msg);
    }
@@ -3010,7 +3010,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_checkpoint(msg)) return;
 
        forward_pbft_msg(c, msg);
-       fc_dlog(logger, "received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
+       dlog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        pbft_incoming_checkpoint_channel.publish(msg);
     }
@@ -3122,10 +3122,10 @@ namespace eosio {
                     }
                 }
 
-                fc_dlog(logger, "connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
+                dlog("connection: ${conn}  \tstatus(socket|connecting|syncing|current): ${status}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("status",status)("conn",conn_str)("write",write_queue)("out",out_queue)("pbft",pbft_queue));
             }
-            fc_dlog(logger, "connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
-            fc_dlog(logger, "================================================================================================");
+            dlog("connections stats:  current : ${current}\t total : ${total} ",("current",current)("total",total));
+            dlog("================================================================================================");
             auto local_trx_pool_size = local_txns.size();
             fc_dlog(logger, "local trx pool size: ${local_trx_pool_size}",("local_trx_pool_size",local_trx_pool_size));
             fc_dlog(logger, "================================================================================================");

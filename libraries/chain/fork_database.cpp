@@ -246,13 +246,6 @@ namespace eosio { namespace chain {
       });
    }
 
-   bool fork_database::is_in_current_chain( const block_id_type& id) const {
-       auto& by_id_idx = my->index.get<by_block_id>();
-       auto itr = by_id_idx.find( id );
-       if (itr == by_id_idx.end()) return false;
-       return (*itr)->in_current_chain;
-   }
-
    void fork_database::prune( const block_state_ptr& h ) {
       auto num = h->block_num;
 
@@ -348,13 +341,35 @@ namespace eosio { namespace chain {
        my->head = *my->index.get<by_lib_block_num>().begin();
    }
 
-   void fork_database::remove_pbft_supported_mark() const {
-//       auto& by_num_idx = my->index.get<by_lib_block_num>();
-//       auto itr = by_num_idx.begin();
-//       while (itr != by_num_idx.end() && (*itr)->pbft_supported) {
-//           by_num_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_supported = false; });
-//           ++itr;
-//       }
+   void fork_database::remove_pbft_my_prepare_fork(const block_id_type &id) const {
+       auto& by_id_idx = my->index.get<by_block_id>();
+       auto itr = by_id_idx.find( id );
+       EOS_ASSERT( itr != by_id_idx.end(), fork_db_block_not_found, "could not find block in fork database" );
+       by_id_idx.modify( itr, [&]( auto& bsp ) { bsp->pbft_my_prepare = false; });
+
+       auto update = [&]( const vector<block_id_type>& in ) {
+           vector<block_id_type> updated;
+
+           for( const auto& i : in ) {
+               auto& pidx = my->index.get<by_prev>();
+               auto pitr  = pidx.lower_bound( i );
+               auto epitr = pidx.upper_bound( i );
+               while( pitr != epitr ) {
+                   pidx.modify( pitr, [&]( auto& bsp ) {
+                       bsp->pbft_my_prepare = false;
+                       updated.push_back( bsp->id );
+                   });
+                   ++pitr;
+               }
+           }
+           return updated;
+       };
+
+       vector<block_id_type> queue{id};
+       while(!queue.empty()) {
+           queue = update( queue );
+       }
+       my->head = *my->index.get<by_lib_block_num>().begin();
    }
 
    block_state_ptr   fork_database::get_block_in_current_chain_by_num( uint32_t n )const {

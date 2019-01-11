@@ -5,9 +5,7 @@
 namespace eosio {
     namespace chain {
 
-        pbft_controller::pbft_controller(controller &ctrl) :
-                pbft_db(ctrl),
-                state_machine(pbft_db) {
+        pbft_controller::pbft_controller(controller &ctrl) : pbft_db(ctrl), state_machine(pbft_db) {
             config.view_change_timeout = 6;
             config.bp_candidate = true;
             datadir = ctrl.state_dir();
@@ -98,8 +96,7 @@ namespace eosio {
         psm_state::~psm_state() = default;
 
 
-        psm_machine::psm_machine(pbft_database &pbft_db) :
-                pbft_db(pbft_db) {
+        psm_machine::psm_machine(pbft_database &pbft_db) : pbft_db(pbft_db) {
             this->set_current(new psm_committed_state);
 
             this->set_prepares_cache(vector<pbft_prepare>{});
@@ -321,19 +318,19 @@ namespace eosio {
          * psm_view_change_state
          */
         void psm_view_change_state::on_prepare(psm_machine *m, pbft_prepare &e, pbft_database &pbft_db) {
-
+            //ignore;
         }
 
         void psm_view_change_state::send_prepare(psm_machine *m, pbft_database &pbft_db) {
-
+            //ignore;
         }
 
         void psm_view_change_state::on_commit(psm_machine *m, pbft_commit &e, pbft_database &pbft_db) {
-
+            //ignore;
         }
 
         void psm_view_change_state::send_commit(psm_machine *m, pbft_database &pbft_db) {
-
+            //ignore;
         }
 
         void psm_view_change_state::on_view_change(psm_machine *m, pbft_view_change &e, pbft_database &pbft_db) {

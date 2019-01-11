@@ -1319,7 +1319,7 @@ struct controller_impl {
    void maybe_switch_forks( controller::block_status s = controller::block_status::complete ) {
 
       if (pbft_prepared) fork_db.mark_pbft_prepared_fork(*pbft_prepared);
-      if (my_prepare) fork_db.mark_pbft_prepared_fork(*my_prepare);
+      if (my_prepare) fork_db.mark_pbft_my_prepare_fork(*my_prepare);
 
       auto new_head = fork_db.head();
 
@@ -1382,65 +1382,7 @@ struct controller_impl {
           } /// end for each block in branch
           ilog("successfully switched fork to new head ${new_head_id}", ("new_head_id", new_head->id));
       }
-//      } else if( new_head->id != head->id && !pbft_prepared) {
-//          switch_forks(new_head);
-//      } else if (pbft_prepared && !fork_db.is_in_current_chain(*pbft_prepared)) {
-//          auto prepared_head = fork_db.get_fork_head(*pbft_prepared);
-//          EOS_ASSERT (prepared_head, fork_database_exception, "prepared fork head invalid");
-//          switch_forks(prepared_head);
-//          fork_db.mark_pbft_supported_fork(prepared_head->id);
-//      }
    } /// push_block
-
-   void switch_forks(const block_state_ptr &new_head) {
-       ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
-            ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
-       auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
-
-       for( auto itr = branches.second.begin(); itr != branches.second.end(); ++itr ) {
-           fork_db.mark_in_current_chain( *itr , false );
-           pop_block();
-       }
-       EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
-                   "loss of sync between fork_db and chainbase during fork switch" ); // _should_ never fail
-
-       for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr) {
-           optional<fc::exception> except;
-           try {
-               apply_block( (*ritr)->block, (*ritr)->validated ? controller::block_status::validated : controller::block_status::complete );
-               head = *ritr;
-               fork_db.mark_in_current_chain( *ritr, true );
-               (*ritr)->validated = true;
-           }
-           catch (const fc::exception& e) { except = e; }
-           if (except) {
-               elog("exception thrown while switching forks ${e}", ("e",except->to_detail_string()));
-
-               // ritr currently points to the block that threw
-               // if we mark it invalid it will automatically remove all forks built off it.
-               fork_db.set_validity( *ritr, false );
-
-               // pop all blocks from the bad fork
-               // ritr base is a forward itr to the last block successfully applied
-               auto applied_itr = ritr.base();
-               for( auto itr = applied_itr; itr != branches.first.end(); ++itr ) {
-                   fork_db.mark_in_current_chain( *itr , false );
-                   pop_block();
-               }
-               EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
-                           "loss of sync between fork_db and chainbase during fork switch reversal" ); // _should_ never fail
-
-               // re-apply good blocks
-               for( auto ritr = branches.second.rbegin(); ritr != branches.second.rend(); ++ritr ) {
-                   apply_block( (*ritr)->block, controller::block_status::validated /* we previously validated these blocks*/ );
-                   head = *ritr;
-                   fork_db.mark_in_current_chain( *ritr, true );
-               }
-               throw *except;
-           } // end if exception
-       } /// end for each block in branch
-       ilog("successfully switched fork to new head ${new_head_id}", ("new_head_id", new_head->id));
-   }
 
    void abort_block() {
       if( pending ) {
@@ -1718,12 +1660,6 @@ const chainbase::database& controller::db()const { return my->db; }
 chainbase::database& controller::mutable_db()const { return my->db; }
 
 const fork_database& controller::fork_db()const { return my->fork_db; }
-
-//pbft_controller& controller::pbft()const { return my->pbft_ctrl; }
-
-set<chain::account_name> controller::my_producers()const{
-   return my->conf.my_producers;
-}
 
 std::map<chain::public_key_type, signature_provider_type> controller::my_signature_providers()const{
    return my->conf.my_signature_providers;
@@ -2137,6 +2073,7 @@ block_id_type controller::get_pbft_my_prepare() const {
 }
 
 void controller::reset_pbft_my_prepare() const {
+   if (my->my_prepare) my->fork_db.remove_pbft_my_prepare_fork(*my->my_prepare);
    my->my_prepare.reset();
 }
 
