@@ -186,7 +186,7 @@ namespace eosio { namespace chain {
 
 
          const fork_database& fork_db()const;
-         set<chain::account_name> my_producers()const;
+
          std::map<chain::public_key_type, signature_provider_type> my_signature_providers()const;
          void set_my_signature_providers(std::map<chain::public_key_type, signature_provider_type> msp);
 

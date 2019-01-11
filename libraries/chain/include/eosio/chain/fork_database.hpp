@@ -73,13 +73,11 @@ namespace eosio { namespace chain {
 
          void set_latest_checkpoint( block_id_type id);
 
-         bool is_in_current_chain( const block_id_type& id ) const;
-
          void mark_pbft_prepared_fork(const block_id_type &id) const;
 
          void mark_pbft_my_prepare_fork(const block_id_type &id) const;
 
-         void remove_pbft_supported_mark() const;
+         void remove_pbft_my_prepare_fork(const block_id_type &id) const;
 
    private:
          unique_ptr<fork_database_impl> my;
