@@ -2988,7 +2988,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_prepare(msg)) return;
 
         bcast_pbft_msg(msg);
-        dlog("sending prepare at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
+//        dlog("sending prepare at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_commit(const pbft_commit &msg) {
@@ -2999,7 +2999,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
         bcast_pbft_msg(msg);
-        dlog("sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
+//        dlog("sending commit at height: ${h}, view: ${v}", ("h", msg.block_num)("v", msg.view));
     }
 
     void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change &msg) {
@@ -3010,7 +3010,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
         bcast_pbft_msg(msg);
-        dlog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
+//        dlog("sending view change {cv: ${cv}, tv: ${tv}}", ("cv", msg.current_view)("tv", msg.target_view));
     }
 
     void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view &msg) {
@@ -3021,7 +3021,7 @@ namespace eosio {
         if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
         bcast_pbft_msg(msg);
-        dlog("sending new view at ${n}", ("n", msg));
+//        dlog("sending new view at ${n}", ("n", msg));
     }
 
     void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint &msg) {
@@ -3066,7 +3066,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_prepare(msg)) return;
 
        forward_pbft_msg(c, msg);
-       dlog("received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+//       dlog("received prepare at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_incoming_prepare_channel.publish(msg);
 
@@ -3083,7 +3083,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_commit(msg)) return;
 
        forward_pbft_msg(c, msg);
-       dlog("received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
+//       dlog("received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_incoming_commit_channel.publish(msg);
    }
@@ -3099,7 +3099,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_view_change(msg)) return;
 
        forward_pbft_msg(c, msg);
-       dlog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
+//       dlog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
 
        pbft_incoming_view_change_channel.publish(msg);
    }
@@ -3115,7 +3115,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_new_view(msg)) return;
 
        forward_pbft_msg(c, msg);
-       dlog("received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
+//       dlog("received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
 
        pbft_incoming_new_view_channel.publish(msg);
    }
@@ -3131,7 +3131,7 @@ namespace eosio {
        if (!pcc.pbft_db.is_valid_checkpoint(msg)) return;
 
        forward_pbft_msg(c, msg);
-       dlog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
+//       dlog("received checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
 
        pbft_incoming_checkpoint_channel.publish(msg);
     }
@@ -3661,7 +3661,7 @@ namespace eosio {
          my->pbft_message_cache_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->connection_monitor_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
          my->pbft_message_cache_ticker();
-         my->connection_monitor_ticker();
+//         my->connection_monitor_ticker();
       } FC_LOG_AND_RETHROW()
    }
 
