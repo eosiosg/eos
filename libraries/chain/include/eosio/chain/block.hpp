@@ -56,8 +56,8 @@ namespace eosio { namespace chain {
     */
    struct signed_block : public signed_block_header {
     private:
-      signed_block( const signed_block& ) = default;
     public:
+      signed_block( const signed_block& ) = default;
       signed_block() = default;
       explicit signed_block( const signed_block_header& h ):signed_block_header(h){}
       signed_block( signed_block&& ) = default;
