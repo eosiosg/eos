@@ -35,6 +35,8 @@ namespace eosio {
       block_id_type              last_irreversible_block_id;
       uint32_t                   head_num = 0;
       block_id_type              head_id;
+      uint32_t                   last_stable_checkpoint_block_num = 0;
+      block_id_type              last_stable_checkpoint_block_id;
       string                     os;
       string                     agent;
       int16_t                    generation;
@@ -166,6 +168,7 @@ FC_REFLECT( eosio::handshake_message,
             (time)(token)(sig)(p2p_address)
             (last_irreversible_block_num)(last_irreversible_block_id)
             (head_num)(head_id)
+            (last_stable_checkpoint_block_num)(last_stable_checkpoint_block_id)
             (os)(agent)(generation) )
 FC_REFLECT( eosio::go_away_message, (reason)(node_id) )
 FC_REFLECT( eosio::time_message, (org)(rec)(xmt)(dst) )

@@ -660,7 +660,8 @@ namespace eosio {
       enum stages {
          lib_catchup,
          head_catchup,
-         in_sync
+         in_sync,
+         checkpoint_catchup
       };
 
       uint32_t       sync_known_lib_num;
@@ -690,6 +691,8 @@ namespace eosio {
       void recv_handshake(const connection_ptr& c, const handshake_message& msg);
       void recv_notice(const connection_ptr& c, const notice_message& msg);
       bool is_syncing();
+      void set_in_sync();
+      void set_checkpoint_catchup();
    };
 
    class dispatch_manager {
@@ -777,7 +780,6 @@ namespace eosio {
    }
 
    bool connection::pbft_ready(){
-//       return current() && !last_handshake_sent.p2p_address.empty() && !last_handshake_recv.p2p_address.empty()  ;
        return current();
    }
 
@@ -1077,9 +1079,9 @@ namespace eosio {
             }
         }
 
-        if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
-            wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
-        }
+//        if(drop_pbft_count>0 || pbft_queue.size()>1000 || write_queue.size()>1000 || out_queue.size()>1000) {
+//            wlog("connection: ${conn}  \tdrop_pbft_count: ${drop_pbft_count}\t|\twrite_queue: ${write}\t|\tout_queue: ${out}\t|\tpbft_queue: ${pbft}", ("drop_pbft_count",drop_pbft_count)("conn",peer_addr)("write",write_queue.size())("out",out_queue.size())("pbft",pbft_queue.size()));
+//        }
 
 
         //drop timeout messages in mem, init send buffer only when actual send happens
@@ -1418,14 +1420,22 @@ namespace eosio {
    }
 
    bool sync_manager::is_syncing() {
-       return (state != in_sync);
+       return state != in_sync;
+   }
+
+   void sync_manager::set_in_sync() {
+       set_state(in_sync);
+   }
+
+   void sync_manager::set_checkpoint_catchup() {
+       set_state(checkpoint_catchup);
    }
 
    void sync_manager::request_next_chunk( const connection_ptr& conn ) {
       uint32_t head_block = chain_plug->chain().fork_db_head_block_num();
 
       if (head_block < sync_last_requested_num && source && source->current()) {
-         fc_ilog(logger, "ignoring request, head is ${h} last req = ${r} source is ${p}",
+         ilog ( "ignoring request, head is ${h} last req = ${r} source is ${p}",
                   ("h",head_block)("r",sync_last_requested_num)("p",source->peer_name()));
          return;
       }
@@ -1566,7 +1576,7 @@ namespace eosio {
       // 3  my head block num <= peer head block num - update sync state and send a catchup request
       // 4  my head block num > peer block num send a notice catchup if this is not the first generation
       //
-      // 5. my checkpoint height < peer lib - start request checkpoints
+      // 5. checkpoint sync
       //
       //-----------------------------
 
@@ -1583,6 +1593,9 @@ namespace eosio {
          c->enqueue( note );
          return;
       }
+
+
+
       if (head < peer_lib) {
          fc_dlog(logger, "sync check state 1");
          // wait for receipt of a notice message before initiating sync
@@ -1591,7 +1604,8 @@ namespace eosio {
          }
          return;
       }
-      //TODO: reconstruct.
+
+//      //TODO: reconstruct.
       if (lib_num < peer_lib) {
          fc_dlog(logger, "request checkpoints from peer");
          checkpoint_request_message crm;
@@ -1600,6 +1614,7 @@ namespace eosio {
          c->enqueue( crm );
          return;
       }
+
       if (lib_num > msg.head_num ) {
          fc_dlog(logger, "sync check state 2");
          if (msg.generation > 1 || c->protocol_version > proto_base) {
@@ -2539,27 +2554,24 @@ namespace eosio {
 
        if ( msg.end_block == 0 || msg.end_block < msg.start_block) return;
 
-       fc_ilog(logger, "received checkpoint request message");
+       fc_dlog(logger, "received checkpoint request message");
        vector<pbft_stable_checkpoint> scp_stack;
        controller &cc = my_impl->chain_plug->chain();
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
 
-       for (auto i = msg.start_block; i <= msg.end_block; ++i) {
-           if (i > 0) {
-               auto bid = cc.get_block_id_for_num(i);
-               auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(bid);
-               if (!(scp == pbft_stable_checkpoint{})) {
-                   scp_stack.push_back(scp);
-               }
+       for (auto i = msg.end_block; i >= msg.start_block && i>0; --i) {
+           auto bid = cc.get_block_id_for_num(i);
+           auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(bid);
+           if (!(scp == pbft_stable_checkpoint{})) {
+               scp_stack.push_back(scp);
            }
        }
+       fc_dlog(logger, "Sent ${n} stable checkpoints on my node",("n",scp_stack.size()));
 
        while (scp_stack.size()) {
            c->enqueue(scp_stack.back());
            scp_stack.pop_back();
        }
-
-       fc_ilog(logger, "Sent ${n} stable checkpoints on my node",("n",scp_stack.size()));
    }
 
    void net_plugin_impl::handle_message(const connection_ptr& c, const packed_transaction_ptr& trx) {
@@ -2860,10 +2872,15 @@ namespace eosio {
        if (chain_id != msg.chain_id) return;
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+       controller &cc = my_impl->chain_plug->chain();
+       uint32_t head = cc.fork_db_head_block_num( );
+       uint32_t head_checkpoint = cc.last_stable_checkpoint_block_num();
        if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
+           ilog("received stable checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
            for (auto cp: msg.checkpoints) {
                pbft_incoming_checkpoint_channel.publish(cp);
            }
+           my_impl->chain_plug->chain().set_lib();
        }
     }
 
@@ -3197,6 +3214,8 @@ namespace eosio {
       hello.last_irreversible_block_id = fc::sha256();
       hello.head_num = cc.fork_db_head_block_num();
       hello.last_irreversible_block_num = cc.last_irreversible_block_num();
+      hello.last_stable_checkpoint_block_id = fc::sha256();
+      hello.last_stable_checkpoint_block_num = cc.last_stable_checkpoint_block_num();
       if( hello.last_irreversible_block_num ) {
          try {
             hello.last_irreversible_block_id = cc.get_block_id_for_num(hello.last_irreversible_block_num);
@@ -3212,6 +3231,15 @@ namespace eosio {
          }
          catch( const unknown_block_exception &ex) {
            hello.head_num = 0;
+         }
+      }
+      if( hello.last_stable_checkpoint_block_num ) {
+         try {
+           hello.last_stable_checkpoint_block_id = cc.get_block_id_for_num(hello.last_stable_checkpoint_block_num);
+         }
+         catch( const unknown_block_exception &ex) {
+           ilog("caught unknown_block");
+           hello.last_stable_checkpoint_block_num = 0;
          }
       }
    }
@@ -3490,13 +3518,21 @@ namespace eosio {
        return my->sync_master->is_syncing();
    }
 
-    net_plugin_impl::net_plugin_impl():
-    pbft_incoming_prepare_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::prepare_channel>()),
-    pbft_incoming_commit_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::commit_channel>()),
-    pbft_incoming_view_change_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::view_change_channel>()),
-    pbft_incoming_new_view_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::new_view_channel>()),
-    pbft_incoming_checkpoint_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::checkpoint_channel>())
-    {}
+   void net_plugin::request_checkpoints(uint32_t start, uint32_t end) {
+       auto conns = my->connections;
+       my->sync_master->set_checkpoint_catchup();
+       for (const auto c: conns) {
+           c->request_sync_checkpoints(start, end);
+       }
+   }
+
+   net_plugin_impl::net_plugin_impl():
+   pbft_incoming_prepare_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::prepare_channel>()),
+   pbft_incoming_commit_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::commit_channel>()),
+   pbft_incoming_view_change_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::view_change_channel>()),
+   pbft_incoming_new_view_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::new_view_channel>()),
+   pbft_incoming_checkpoint_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::checkpoint_channel>())
+   {}
 
    connection_ptr net_plugin_impl::find_connection(const string& host )const {
       for( const auto& c : connections )

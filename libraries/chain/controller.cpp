@@ -1352,7 +1352,6 @@ struct controller_impl {
          emit( self.accepted_block_header, new_header_state );
 
          if ( read_mode != db_read_mode::IRREVERSIBLE) {
-            ilog("attempt to switch forks");
             maybe_switch_forks( s );
          }
 
@@ -1368,7 +1367,6 @@ struct controller_impl {
       fork_db.add( c );
       emit( self.accepted_confirmation, c );
       if ( read_mode != db_read_mode::IRREVERSIBLE ) {
-         ilog("attempt to switch forks");
          maybe_switch_forks();
       }
    }
@@ -2005,7 +2003,6 @@ uint32_t controller::last_stable_checkpoint_block_num() const {
 
 block_id_type controller::last_stable_checkpoint_block_id() const {
     auto lscb_num = last_stable_checkpoint_block_num();
-    if (lscb_num == 0) return block_id_type{};
     const auto& tapos_block_summary = db().get<block_summary_object>((uint16_t)lscb_num);
 
     if( block_header::num_from_id(tapos_block_summary.block_id) == lscb_num )
@@ -2400,6 +2397,12 @@ bool controller::is_resource_greylisted(const account_name &name) const {
 
 const flat_set<account_name> &controller::get_resource_greylist() const {
    return  my->conf.resource_greylist;
+}
+
+
+void controller::set_lib() const {
+   my->set_pbft_lib();
+   my->set_pbft_lscb();
 }
 
 } } /// eosio::chain

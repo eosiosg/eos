@@ -38,6 +38,7 @@ namespace eosio {
         optional<connection_status>  status( const string& endpoint )const;
         vector<connection_status>    connections()const;
         bool is_syncing()const;
+        void request_checkpoints(uint32_t start, uint32_t end);
 
         size_t num_peers() const;
       private:
