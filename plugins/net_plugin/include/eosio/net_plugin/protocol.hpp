@@ -140,6 +140,11 @@ namespace eosio {
        uint32_t end_block;
    };
 
+   struct notice_checkpoint_message {
+       uint32_t start_block;
+       uint32_t end_block;
+   };
+
    using net_message = static_variant<handshake_message,
                                       chain_size_message,
                                       go_away_message,
@@ -148,14 +153,15 @@ namespace eosio {
                                       request_message,
                                       sync_request_message,
                                       signed_block,         // which = 7
-                                      packed_transaction,
+                                      packed_transaction,   // which = 8
                                       pbft_prepare,
                                       pbft_commit,
                                       pbft_view_change,
                                       pbft_new_view,
                                       pbft_checkpoint,
                                       pbft_stable_checkpoint,
-                                      checkpoint_request_message>;  // which = 8
+                                      checkpoint_request_message,
+                                      notice_checkpoint_message>;
 
 } // namespace eosio
 
@@ -176,6 +182,7 @@ FC_REFLECT( eosio::notice_message, (known_trx)(known_blocks) )
 FC_REFLECT( eosio::request_message, (req_trx)(req_blocks) )
 FC_REFLECT( eosio::sync_request_message, (start_block)(end_block) )
 FC_REFLECT( eosio::checkpoint_request_message, (start_block)(end_block) )
+FC_REFLECT( eosio::notice_checkpoint_message, (start_block)(end_block) )
 
 
 /**

@@ -245,6 +245,7 @@ namespace eosio {
       void handle_message( connection_ptr c, const pbft_checkpoint &msg);
       void handle_message( connection_ptr c, const pbft_stable_checkpoint &msg);
       void handle_message( connection_ptr c, const checkpoint_request_message &msg);
+      void handle_message( connection_ptr c, const notice_checkpoint_message &msg);
 
       void start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection);
       void start_txn_timer();
@@ -670,7 +671,7 @@ namespace eosio {
       uint32_t       sync_req_span;
       connection_ptr source;
       stages         state;
-
+      uint32_t       sync_known_lscb_num;
       chain_plugin* chain_plug = nullptr;
 
       constexpr auto stage_str(stages s );
@@ -692,7 +693,8 @@ namespace eosio {
       void recv_notice(const connection_ptr& c, const notice_message& msg);
       bool is_syncing();
       void set_in_sync();
-      void set_checkpoint_catchup();
+      void set_checkpoint_catchup(uint32_t known_lscb_num);
+      bool is_checkpoint_sync();
    };
 
    class dispatch_manager {
@@ -1427,8 +1429,17 @@ namespace eosio {
        set_state(in_sync);
    }
 
-   void sync_manager::set_checkpoint_catchup() {
-       set_state(checkpoint_catchup);
+   void sync_manager::set_checkpoint_catchup(uint32_t known_lscb_num) {
+       auto verify_checkpoint_catchup = true;
+
+       if (verify_checkpoint_catchup) {
+           sync_known_lscb_num = known_lscb_num;
+           set_state(checkpoint_catchup);
+       }
+   }
+
+   bool sync_manager::is_checkpoint_sync() {
+       return chain_plug->chain().fork_db_head_block_num() >= sync_known_lscb_num;
    }
 
    void sync_manager::request_next_chunk( const connection_ptr& conn ) {
@@ -1576,13 +1587,14 @@ namespace eosio {
       // 3  my head block num <= peer head block num - update sync state and send a catchup request
       // 4  my head block num > peer block num send a notice catchup if this is not the first generation
       //
-      // 5. checkpoint sync
+      // 5. my lscb > peer lscb - send an checkpoint notice
+      // 6. my head < peer lscb - send a stable checkpoint catchup request (from lscb to head)
       //
       //-----------------------------
 
       uint32_t head = cc.fork_db_head_block_num();
       block_id_type head_id = cc.fork_db_head_block_id();
-      uint32_t head_checkpoint = cc.last_stable_checkpoint_block_num();
+      uint32_t lscb_num = cc.last_stable_checkpoint_block_num();
       if (head_id == msg.head_id) {
          fc_dlog(logger, "sync check state 0");
          // notify peer of our pending transactions
@@ -1594,7 +1606,20 @@ namespace eosio {
          return;
       }
 
+      if (lscb_num > msg.last_stable_checkpoint_block_num) {
+         fc_dlog(logger, "sync check state 5");
+         notice_checkpoint_message note;
+         note.start_block = msg.last_stable_checkpoint_block_num;
+         note.end_block = msg.head_num;
+         c->enqueue( note );
+         return;
+      }
 
+      if (head < msg.last_stable_checkpoint_block_num) {
+         fc_dlog(logger, "sync check state 6");
+         c->request_sync_checkpoints(lscb_num, head);
+         return;
+      }
 
       if (head < peer_lib) {
          fc_dlog(logger, "sync check state 1");
@@ -1609,7 +1634,7 @@ namespace eosio {
       if (lib_num < peer_lib) {
          fc_dlog(logger, "request checkpoints from peer");
          checkpoint_request_message crm;
-         crm.start_block = head_checkpoint;
+         crm.start_block = lscb_num;
          crm.end_block = peer_lib;
          c->enqueue( crm );
          return;
@@ -2774,8 +2799,9 @@ namespace eosio {
            return true;
        }
        return false;
-   }
-   void net_plugin_impl::clean_expired_pbft_cache(){
+    }
+
+    void net_plugin_impl::clean_expired_pbft_cache(){
        auto itr = pbft_message_cache.begin();
        auto now = time_point::now();
 
@@ -2785,9 +2811,9 @@ namespace eosio {
            } else
                itr++;
        }
-   }
+    }
 
-   void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_prepare &msg) {
 
        if (!is_pbft_msg_valid(msg)) return;
 
@@ -2804,7 +2830,7 @@ namespace eosio {
 
     }
 
-   void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_commit &msg) {
 
        if (!is_pbft_msg_valid(msg)) return;
 
@@ -2818,9 +2844,9 @@ namespace eosio {
 //       dlog("received commit at height: ${n}, view: ${v}, from ${k}, ", ("n", msg.block_num)("v", msg.view)("k", msg.public_key));
 
        pbft_incoming_commit_channel.publish(msg);
-   }
+    }
 
-   void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_view_change &msg) {
 
        if (!is_pbft_msg_valid(msg)) return;
 
@@ -2834,9 +2860,9 @@ namespace eosio {
 //       dlog("received view change {cv: ${cv}, tv: ${tv}} from ${v}", ("cv", msg.current_view)("tv", msg.target_view)("v", msg.public_key));
 
        pbft_incoming_view_change_channel.publish(msg);
-   }
+    }
 
-   void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
+    void net_plugin_impl::handle_message( connection_ptr c, const pbft_new_view &msg) {
 
        if (!is_pbft_msg_valid(msg)) return;
 
@@ -2850,7 +2876,7 @@ namespace eosio {
 //       dlog("received new view at ${n}, from ${v}", ("n", msg)("v", msg.public_key));
 
        pbft_incoming_new_view_channel.publish(msg);
-   }
+    }
 
     void net_plugin_impl::handle_message( connection_ptr c, const pbft_checkpoint &msg) {
 
@@ -2872,15 +2898,33 @@ namespace eosio {
        if (chain_id != msg.chain_id) return;
 
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-       controller &cc = my_impl->chain_plug->chain();
-       uint32_t head = cc.fork_db_head_block_num( );
-       uint32_t head_checkpoint = cc.last_stable_checkpoint_block_num();
+
        if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
-           ilog("received stable checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
+           fc_dlog(logger, "received stable checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", msg.public_key));
            for (auto cp: msg.checkpoints) {
                pbft_incoming_checkpoint_channel.publish(cp);
            }
            my_impl->chain_plug->chain().set_lib();
+       }
+
+       if (sync_master->is_syncing() && sync_master->is_checkpoint_sync()) {
+           sync_master->set_in_sync();
+           c->send_handshake();
+       }
+
+    }
+
+    void net_plugin_impl::handle_message( connection_ptr c, const notice_checkpoint_message &msg) {
+
+       if (sync_master->is_syncing()) return;
+
+       controller &cc = my_impl->chain_plug->chain();
+       auto head = cc.fork_db_head_block_num( );
+       auto head_checkpoint = cc.last_stable_checkpoint_block_num();
+       auto end = msg.end_block;
+
+       if (end > head_checkpoint && end <= head) {
+           sync_master->set_checkpoint_catchup(end);
        }
     }
 
@@ -3520,7 +3564,7 @@ namespace eosio {
 
    void net_plugin::request_checkpoints(uint32_t start, uint32_t end) {
        auto conns = my->connections;
-       my->sync_master->set_checkpoint_catchup();
+       my->sync_master->set_checkpoint_catchup(end);
        for (const auto c: conns) {
            c->request_sync_checkpoints(start, end);
        }
