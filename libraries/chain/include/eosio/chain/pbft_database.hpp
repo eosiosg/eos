@@ -166,15 +166,12 @@ namespace eosio {
             block_num_type block_num = 0;
             block_id_type block_id;
             vector<pbft_checkpoint> checkpoints;
-            public_key_type public_key;
             chain_id_type chain_id;
-            signature_type producer_signature;
 
             bool operator==(const pbft_stable_checkpoint &rhs) const {
                 return block_id == rhs.block_id
                        && block_num == rhs.block_num
                        && checkpoints == rhs.checkpoints
-                       && public_key == rhs.public_key
                        && chain_id == rhs.chain_id;
             }
 
@@ -187,18 +184,8 @@ namespace eosio {
                 fc::raw::pack(enc, block_num);
                 fc::raw::pack(enc, block_id);
                 fc::raw::pack(enc, checkpoints);
-                fc::raw::pack(enc, public_key);
                 fc::raw::pack(enc, chain_id);
                 return enc.result();
-            }
-
-            bool is_signature_valid() const {
-                try {
-                    auto pk = crypto::public_key(producer_signature, digest(), true);
-                    return public_key == pk;
-                } catch (fc::exception & /*e*/) {
-                    return false;
-                }
             }
         };
 
@@ -628,6 +615,5 @@ FC_REFLECT(eosio::chain::pbft_prepared_certificate, (block_id)(block_num)(prepar
 FC_REFLECT(eosio::chain::pbft_view_changed_certificate, (view)(view_changes)(public_key)(producer_signature))
 FC_REFLECT(eosio::chain::pbft_checkpoint,
            (uuid)(block_num)(block_id)(public_key)(chain_id)(producer_signature)(timestamp))
-FC_REFLECT(eosio::chain::pbft_stable_checkpoint,
-           (block_num)(block_id)(checkpoints)(public_key)(chain_id)(producer_signature))
+FC_REFLECT(eosio::chain::pbft_stable_checkpoint, (block_num)(block_id)(checkpoints)(chain_id))
 FC_REFLECT(eosio::chain::pbft_checkpoint_state, (block_id)(block_num)(checkpoints)(is_stable))

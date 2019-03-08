@@ -1359,6 +1359,13 @@ struct controller_impl {
          if( s == controller::block_status::irreversible )
             emit( self.irreversible_block, new_header_state );
 
+         // apply stable checkpoint when there is a valid one
+         // TODO:// verify required one more time?
+         if (b->block_extensions.back().first == 0) {
+            pbft_commit_local(b->id());
+            set_pbft_latest_checkpoint(b->id());
+         }
+
       } FC_LOG_AND_RETHROW( )
    }
 

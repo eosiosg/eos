@@ -1,7 +1,7 @@
 #pragma once
 
-#include <eosio/chain/producer_schedule.hpp>
 #include <eosio/chain/pbft_database.hpp>
+#include <eosio/chain/producer_schedule.hpp>
 #include <chrono>
 
 namespace eosio {
