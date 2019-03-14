@@ -700,6 +700,9 @@ struct controller_impl {
             pending->_pending_block_state->validated = true;
             auto new_bsp = fork_db.add(pending->_pending_block_state, true);
             emit(self.accepted_block_header, pending->_pending_block_state);
+            fork_db.mark_pbft_prepared_fork(head->id);
+            fork_db.mark_pbft_my_prepare_fork(head->id);
+
             if (pbft_prepared) fork_db.mark_pbft_prepared_fork(*pbft_prepared);
             if (my_prepare) fork_db.mark_pbft_my_prepare_fork(*my_prepare);
             head = fork_db.head();
@@ -1210,7 +1213,7 @@ struct controller_impl {
 
    void apply_block( const signed_block_ptr& b, controller::block_status s ) { try {
       try {
-         EOS_ASSERT( b->block_extensions.size() == 0, block_validate_exception, "no supported extensions" );
+//         EOS_ASSERT( b->block_extensions.size() == 0, block_validate_exception, "no supported extensions" );
          auto producer_block_id = b->id();
          start_block( b->timestamp, b->confirmed, s , producer_block_id);
 
@@ -1317,20 +1320,23 @@ struct controller_impl {
          auto& b = new_header_state->block;
          emit( self.pre_accepted_block, b );
 
+
+         auto current_head = b->id();
+
+         fork_db.add( new_header_state, false );
+         if (conf.trusted_producers.count(b->producer)) {
+             trusted_producer_light_validation = true;
+         };
+         emit( self.accepted_block_header, new_header_state );
+
          set_pbft_lib();
          set_pbft_lscb();
+         fork_db.mark_pbft_my_prepare_fork(current_head);
+         fork_db.mark_pbft_prepared_fork(current_head);
 
-          fork_db.add( new_header_state, false );
-
-          if (conf.trusted_producers.count(b->producer)) {
-              trusted_producer_light_validation = true;
-          };
-          emit( self.accepted_block_header, new_header_state );
-
-          if ( read_mode != db_read_mode::IRREVERSIBLE ) {
-              ilog("attempt to switch forks");
-              maybe_switch_forks( s );
-          }
+         if ( read_mode != db_read_mode::IRREVERSIBLE ) {
+             maybe_switch_forks( s );
+         }
 
       } FC_LOG_AND_RETHROW( )
    }
@@ -1355,16 +1361,18 @@ struct controller_impl {
             maybe_switch_forks( s );
          }
 
+//         // apply stable checkpoint when there is a valid one
+//         // TODO:// verify required one more time?
+         if (b->block_extensions.size() >0 && b->block_extensions.back().first == 0) {
+            pbft_commit_local(b->id());
+            set_pbft_lib();
+            set_pbft_latest_checkpoint(b->id());
+            set_pbft_lscb();
+         }
+
          // on replay irreversible is not emitted by fork database, so emit it explicitly here
          if( s == controller::block_status::irreversible )
             emit( self.irreversible_block, new_header_state );
-
-         // apply stable checkpoint when there is a valid one
-         // TODO:// verify required one more time?
-         if (b->block_extensions.back().first == 0) {
-            pbft_commit_local(b->id());
-            set_pbft_latest_checkpoint(b->id());
-         }
 
       } FC_LOG_AND_RETHROW( )
    }
