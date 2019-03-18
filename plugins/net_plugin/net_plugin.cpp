@@ -879,7 +879,7 @@ namespace eosio {
       }
 
       vector<signed_block_ptr> bstack;
-      vector<pbft_stable_checkpoint> scp_stack;
+//      vector<pbft_stable_checkpoint> scp_stack;
       block_id_type null_id;
       for (auto bid = head_id; bid != null_id && bid != lib_id; ) {
          try {
@@ -894,10 +894,12 @@ namespace eosio {
             if ( b ) {
                bid = b->previous;
                bstack.push_back(b);
-               auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(b->id());
-               if ( !(scp == pbft_stable_checkpoint{})) {
-                   scp_stack.push_back(scp);
-               }
+//               if (b->block_num() > 0) {
+//                   auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(b->id());
+//                   if ( !(scp == pbft_stable_checkpoint{})) {
+//                       scp_stack.push_back(scp);
+//                   }
+//               }
             }
             else {
                break;
@@ -912,6 +914,13 @@ namespace eosio {
             count = bstack.size();
             while (bstack.size()) {
                enqueue_block( bstack.back() );
+//               auto cp_itr = find_if(scp_stack.begin(), scp_stack.end(), [&](const pbft_stable_checkpoint &psc) {
+//                   return psc.block_id == (*bstack.back()).id();
+//               });
+//               if (cp_itr != scp_stack.end()) {
+//                   enqueue(*cp_itr);
+                     //pop?
+//               }
                bstack.pop_back();
             }
          }
@@ -1569,14 +1578,11 @@ namespace eosio {
       // 3  my head block num <= peer head block num - update sync state and send a catchup request
       // 4  my head block num > peer block num send a notice catchup if this is not the first generation
       //
-      // 5. my lscb > peer lscb - ignore
-      // 6. my head < peer lscb - send a stable checkpoint catchup request (from lscb to head)
-      //
       //-----------------------------
 
       uint32_t head = cc.fork_db_head_block_num();
       block_id_type head_id = cc.fork_db_head_block_id();
-      uint32_t lscb_num = cc.last_stable_checkpoint_block_num();
+
       if (head_id == msg.head_id) {
          fc_dlog(logger, "sync check state 0");
          // notify peer of our pending transactions
@@ -1588,33 +1594,12 @@ namespace eosio {
          return;
       }
 
-//      if (lscb_num > msg.last_stable_checkpoint_block_num) {
-//         fc_dlog(logger, "sync check state 5");
-//         return;
-//      }
-
-      if (head < msg.last_stable_checkpoint_block_num) {
-         fc_dlog(logger, "sync check state 6");
-         c->request_sync_checkpoints(lscb_num, head);
-         return;
-      }
-
       if (head < peer_lib) {
          fc_dlog(logger, "sync check state 1");
          // wait for receipt of a notice message before initiating sync
          if (c->protocol_version < proto_explicit_sync) {
             start_sync( c, peer_lib);
          }
-         return;
-      }
-
-//      //TODO: reconstruct.
-      if (lib_num < peer_lib) {
-         fc_dlog(logger, "request checkpoints from peer");
-         checkpoint_request_message crm;
-         crm.start_block = lscb_num;
-         crm.end_block = peer_lib;
-         c->enqueue( crm );
          return;
       }
 
@@ -2643,6 +2628,16 @@ namespace eosio {
       try {
          chain_plug->accept_block(msg); //, sync_master->is_active(c));
          reason = no_reason;
+         auto blk = msg;
+         auto ext = blk->block_extensions;
+         if (!ext.empty() && ext.back().first == 0) {
+             auto scp_v = ext.back().second;
+             fc::datastream<char*> ds_decode( scp_v.data(), scp_v.size());
+
+             pbft_stable_checkpoint scp_decode;
+             fc::raw::unpack(ds_decode, scp_decode);
+             handle_message(c, scp_decode);
+         }
       } catch( const unlinkable_block_exception &ex) {
          peer_elog(c, "bad signed_block : ${m}", ("m",ex.what()));
          reason = unlinkable;
@@ -2875,11 +2870,10 @@ namespace eosio {
        pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
 
        if (pcc.pbft_db.is_valid_stable_checkpoint(msg)) {
-           fc_dlog(logger, "received stable checkpoint at ${n}, from ${v}", ("n", msg.block_num));
+           fc_dlog(logger, "received stable checkpoint at ${n}, from ${v}", ("n", msg.block_num)("v", c->peer_name()));
            for (auto cp: msg.checkpoints) {
                pbft_incoming_checkpoint_channel.publish(cp);
            }
-           my_impl->chain_plug->chain().set_lib();
        }
     }
 
@@ -3213,8 +3207,6 @@ namespace eosio {
       hello.last_irreversible_block_id = fc::sha256();
       hello.head_num = cc.fork_db_head_block_num();
       hello.last_irreversible_block_num = cc.last_irreversible_block_num();
-      hello.last_stable_checkpoint_block_id = fc::sha256();
-      hello.last_stable_checkpoint_block_num = cc.last_stable_checkpoint_block_num();
       if( hello.last_irreversible_block_num ) {
          try {
             hello.last_irreversible_block_id = cc.get_block_id_for_num(hello.last_irreversible_block_num);
@@ -3230,15 +3222,6 @@ namespace eosio {
          }
          catch( const unknown_block_exception &ex) {
            hello.head_num = 0;
-         }
-      }
-      if( hello.last_stable_checkpoint_block_num ) {
-         try {
-           hello.last_stable_checkpoint_block_id = cc.get_block_id_for_num(hello.last_stable_checkpoint_block_num);
-         }
-         catch( const unknown_block_exception &ex) {
-           ilog("caught unknown_block");
-           hello.last_stable_checkpoint_block_num = 0;
          }
       }
    }
