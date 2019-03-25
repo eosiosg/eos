@@ -846,7 +846,7 @@ namespace eosio {
                 auto &ext = b->block_extensions;
 
                 for (auto it = ext.begin(); it != ext.end();) {
-                    if (it->first == static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint))
+                    if (it->first == static_cast<uint16_t>(0))
                     {
                         auto scp_v = it->second;
                         fc::datastream<char *> ds_decode(scp_v.data(), scp_v.size());
@@ -1049,7 +1049,7 @@ namespace eosio {
                     auto id = csp->block_id;
                     auto blk = ctrl.fetch_block_by_id(id);
 
-                    if (blk && (blk->block_extensions.empty() || blk->block_extensions.back().first != static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint))) {
+                    if (blk && (blk->block_extensions.empty() || blk->block_extensions.back().first != static_cast<uint16_t>(0))) {
                         auto scp = get_stable_checkpoint_by_id(id);
                         auto scp_size = fc::raw::pack_size(scp);
 
@@ -1059,7 +1059,7 @@ namespace eosio {
 
                         blk->block_extensions.emplace_back();
                         auto &extension = blk->block_extensions.back();
-                        extension.first = static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint );
+                        extension.first = static_cast<uint16_t>( 0 );
                         extension.second.resize(scp_size);
                         std::copy(buffer->begin(),buffer->end(), extension.second.data());
                     }

@@ -1368,7 +1368,7 @@ struct controller_impl {
 //         // apply stable checkpoint when there is a valid one
 //         // TODO:// verify required one more time?
          for (const auto &extn: b->block_extensions) {
-            if (extn.first == static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint)) {
+            if (extn.first == static_cast<uint16_t>(0)) {
                pbft_commit_local(b->id());
                set_pbft_lib();
                set_pbft_latest_checkpoint(b->id());
