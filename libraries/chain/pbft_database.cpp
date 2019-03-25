@@ -841,27 +841,42 @@ namespace eosio {
             return result;
         }
 
+        pbft_stable_checkpoint pbft_database::fetch_stable_checkpoint_from_blk_extn(const signed_block_ptr &b) {
+            try {
+                auto &ext = b->block_extensions;
+
+                for (auto it = ext.begin(); it != ext.end();) {
+                    if (it->first == static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint))
+                    {
+                        auto scp_v = it->second;
+                        fc::datastream<char *> ds_decode(scp_v.data(), scp_v.size());
+
+                        pbft_stable_checkpoint scp_decode;
+                        fc::raw::unpack(ds_decode, scp_decode);
+
+                        if (is_valid_stable_checkpoint(scp_decode)) {
+                            return scp_decode;
+                        } else {
+                            it = ext.erase(it);
+                        }
+                    } else {
+                        it++;
+                    }
+                }
+            } catch(...) {
+                wlog("no stable checkpoints found in the block extension");
+            }
+            return pbft_stable_checkpoint{};
+        }
+
         pbft_stable_checkpoint pbft_database::get_stable_checkpoint_by_id(const block_id_type &block_id) {
             const auto &by_block = checkpoint_index.get<by_block_id>();
             auto itr = by_block.find(block_id);
             if (itr == by_block.end()) {
-                try {
-                    auto blk = ctrl.fetch_block_by_id(block_id);
-                    auto ext = blk->block_extensions;
-                    if (!ext.empty() && ext.back().first == 0) {
-                        auto scp_v = ext.back().second;
-                        fc::datastream<char*> ds_decode( scp_v.data(), scp_v.size());
-
-                        pbft_stable_checkpoint scp_decode;
-                        fc::raw::unpack(ds_decode, scp_decode);
-                        return scp_decode;
-                    }
-
-                } catch(...) {
-                    wlog("no stable checkpoints found in the block extension");
-                }
-                return pbft_stable_checkpoint{};
+                auto blk = ctrl.fetch_block_by_id(block_id);
+                return fetch_stable_checkpoint_from_blk_extn(blk);
             }
+
             auto cpp = *itr;
 
             if (cpp->is_stable) {
@@ -1034,7 +1049,7 @@ namespace eosio {
                     auto id = csp->block_id;
                     auto blk = ctrl.fetch_block_by_id(id);
 
-                    if (blk && (blk->block_extensions.empty() || blk->block_extensions.back().first != 0 )) {
+                    if (blk && (blk->block_extensions.empty() || blk->block_extensions.back().first != static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint))) {
                         auto scp = get_stable_checkpoint_by_id(id);
                         auto scp_size = fc::raw::pack_size(scp);
 
@@ -1044,21 +1059,10 @@ namespace eosio {
 
                         blk->block_extensions.emplace_back();
                         auto &extension = blk->block_extensions.back();
-                        extension.first = static_cast<uint16_t>(0);
+                        extension.first = static_cast<uint16_t>(block_extension_type::pbft_stable_checkpoint );
                         extension.second.resize(scp_size);
                         std::copy(buffer->begin(),buffer->end(), extension.second.data());
                     }
-
-//                    wlog("block extensions: ${ext}", ("ext", blk->block_extensions));
-//                    auto decode = blk->block_extensions.back().second;
-//                    fc::datastream<char*> ds_decode( decode.data(), decode.size());
-//
-//                    pbft_stable_checkpoint scp_decode;
-//                    fc::raw::unpack(ds_decode, scp_decode);
-//
-//
-//                    wlog("decode scp: ${scp}", ("scp", scp_decode));
-
                 }
             }
 
