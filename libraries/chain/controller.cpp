@@ -834,6 +834,18 @@ struct controller_impl {
    }
    // "bos end"
 
+   bool is_new_version() {
+       try {
+           const auto& upo = db.get<upgrade_property_object>().upgrade_target_block_num;
+//           dlog("upgrade target block num: ${n}", ("n", upo));
+           return  head->dpos_irreversible_blocknum >= upo && upo > 0;
+       } catch( const boost::exception& e) {
+           wlog("no upo found, regenerating...");
+           db.create<upgrade_property_object>([](auto&){});
+           return false;
+       }
+   }
+
    /**
     * @post regardless of the success of commit block there is no active pending block
     */
@@ -2633,19 +2645,11 @@ void controller::set_subjective_cpu_leeway(fc::microseconds leeway) {
 
 void controller::add_resource_greylist(const account_name &name) {
    my->conf.resource_greylist.insert(name);
-
-   // *bos begin*
-   my->sync_name_list(list_type::resource_greylist_type);
-   // *bos end*
 }
 
 void controller::remove_resource_greylist(const account_name &name) {
    my->check_msig_blacklist(list_type::resource_greylist_type, name);///bos
    my->conf.resource_greylist.erase(name);
-
-   // *bos begin*
-   my->sync_name_list(list_type::resource_greylist_type);
-   // *bos end*
 }
 
 bool controller::is_resource_greylisted(const account_name &name) const {

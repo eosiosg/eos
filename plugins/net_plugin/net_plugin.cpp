@@ -235,8 +235,8 @@ namespace eosio {
       void handle_message(const connection_ptr& c, const signed_block_ptr& msg);
       void handle_message(const connection_ptr& c, const packed_transaction& msg) = delete; // packed_transaction_ptr overload used instead
       void handle_message(const connection_ptr& c, const packed_transaction_ptr& msg);
-      void handle_message( connection_ptr c, const request_p2p_message &msg);
-      void handle_message( connection_ptr c, const response_p2p_message &msg);
+      void handle_message(const connection_ptr& c, const request_p2p_message &msg);
+      void handle_message(const connection_ptr& c, const response_p2p_message &msg);
 
       //pbft messages
       bool maybe_add_pbft_cache(const string &uuid);
@@ -2438,7 +2438,7 @@ namespace eosio {
    }
 
 
-   void net_plugin_impl::handle_message( connection_ptr c, const request_p2p_message &msg){
+   void net_plugin_impl::handle_message(const connection_ptr& c, const request_p2p_message &msg){
       peer_ilog(c, "received request_p2p_message");
       string rspm;
       for(auto sd :p2p_peer_records){
