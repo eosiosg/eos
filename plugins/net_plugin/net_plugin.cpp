@@ -2451,7 +2451,8 @@ namespace eosio {
       }
    }
 
-   void net_plugin_impl::handle_message( connection_ptr c, const response_p2p_message &msg){
+
+   void net_plugin_impl::handle_message(const connection_ptr& c, const response_p2p_message &msg){
       peer_ilog(c, "received response_p2p_message");
       auto peer_record=p2p_peer_records.find(c->peer_addr);
       if(peer_record!=p2p_peer_records.end()){

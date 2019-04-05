@@ -222,7 +222,7 @@ class privileged_api : public context_aware_api {
 
          context.control.set_name_list(list, action, name_list);
 
-       
+
       }
 
       void set_guaranteed_minimum_resources(int64_t ram_byte, int64_t cpu_us, int64_t net_byte)
