@@ -596,6 +596,8 @@ namespace eosio {
             bool is_valid_new_view(const pbft_new_view &nv);
 
             bool should_stop_view_change(const pbft_view_change &vc);
+            
+            pbft_state_ptr get_pbft_state_by_id(const block_id_type& id)const;
 
         private:
             controller &ctrl;

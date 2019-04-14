@@ -1177,6 +1177,19 @@ namespace eosio {
             return ctrl.get_chain_id();
         }
 
+        pbft_state_ptr pbft_database::get_pbft_state_by_id(const block_id_type& id) const {
+
+            auto &by_block_id_index = pbft_state_index.get<by_block_id>();
+
+            auto itr = by_block_id_index.find(id);
+
+            if (itr != by_block_id_index.end()) {
+                return (*itr);
+            }
+
+            return pbft_state_ptr{};
+        }
+
         void pbft_database::set(pbft_state_ptr s) {
             auto result = pbft_state_index.insert(s);
 
