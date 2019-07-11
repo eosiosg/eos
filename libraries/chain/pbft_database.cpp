@@ -633,6 +633,13 @@ namespace eosio {
                 pbft_new_view nv;
                 nv.new_view = target_view;
                 nv.prepared_cert = generate_prepared_certificate();
+                for (auto i = ctrl.last_stable_checkpoint_block_num(); i <= ctrl.head_block_num(); ++i) {
+                    try {
+                        nv.prepared_cert.pre_prepares.emplace(ctrl.get_block_id_for_num(i));
+                    } catch (...) {
+                        continue;
+                    }
+                }
                 nv.committed_certs = generate_committed_certificate();
                 nv.stable_checkpoint = get_stable_checkpoint_by_id(ctrl.last_stable_checkpoint_block_id());
                 nv.view_changed_cert = pbft_view_changed_certificate();
