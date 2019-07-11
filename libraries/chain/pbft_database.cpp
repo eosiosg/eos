@@ -615,6 +615,33 @@ namespace eosio {
             }
         }
 
+        void pbft_database::fake_pbft_new_view(const pbft_view_type &cv) {
+            auto my_sps = ctrl.my_signature_providers();
+            auto active_bps = lscb_active_producers().producers;
+            auto target_view = cv;
+            public_key_type nv_key;
+
+            for (auto i = cv+1; i < cv+22; ++i) {
+                for (auto &sp: my_sps) {
+                    if (active_bps[i % active_bps.size()].block_signing_key == sp.first) {
+                        target_view = i;
+                        nv_key = sp.first;
+                    }
+                }
+            }
+            if (my_sps.find(nv_key) != my_sps.end()) {
+                pbft_new_view nv;
+                nv.new_view = target_view;
+                nv.prepared_cert = generate_prepared_certificate();
+                nv.committed_certs = generate_committed_certificate();
+                nv.stable_checkpoint = get_stable_checkpoint_by_id(ctrl.last_stable_checkpoint_block_id());
+                nv.view_changed_cert = pbft_view_changed_certificate();
+                nv.view_changed_cert.target_view = target_view;
+                nv.sender_signature = my_sps.find(nv_key)->second(nv.digest(chain_id));
+                emit(pbft_outgoing_new_view, std::make_shared<pbft_new_view>(nv));
+            }
+        }
+
         pbft_prepared_certificate pbft_database::generate_prepared_certificate() {
 
             auto const &by_prepare_and_num_index = pbft_state_index.get<by_prepare_and_num>();

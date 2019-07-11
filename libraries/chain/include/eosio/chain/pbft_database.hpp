@@ -488,6 +488,7 @@ namespace eosio {
             vector<block_num_type> get_pbft_watermarks() const;
             flat_map<public_key_type, uint32_t> get_pbft_fork_schedules() const;
 
+            void fake_pbft_new_view(const pbft_view_type &cv);
 
             signal<void(const pbft_prepare_ptr &)> pbft_outgoing_prepare;
             signal<void(const pbft_commit_ptr &)> pbft_outgoing_commit;
