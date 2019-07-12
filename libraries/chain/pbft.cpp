@@ -41,7 +41,7 @@ namespace eosio {
         }
 
         void pbft_controller::maybe_pbft_prepare() {
-            for (auto i = 0; i < 10; ++i) {
+            for (auto i = 0; i < 20; ++i) {
                 pbft_db.fake_pbft_new_view(state_machine->get_current_view());
             }
             if (!pbft_db.should_send_pbft_msg()) return;
