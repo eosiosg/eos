@@ -132,6 +132,7 @@ namespace eosio {
         protected:
             psm_machine&    m;
             pbft_database&  pbft_db;
+			std::mutex	pbft_states_mtx_;
         };
 
         class psm_prepared_state final: public psm_state {
