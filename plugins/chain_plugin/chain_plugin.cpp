@@ -21,6 +21,7 @@
 #include <boost/signals2/connection.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/asio/post.hpp>
 
 #include <fc/io/json.hpp>
 #include <fc/variant.hpp>
@@ -177,6 +178,7 @@ public:
    fc::optional<vm_type>            wasm_runtime;
    fc::microseconds                 abi_serializer_max_time_ms;
    fc::optional<bfs::path>          snapshot_path;
+   boost::thread_group              chain_thread_pool;
 
    void on_pbft_incoming_prepare(const pbft_metadata_ptr<pbft_prepare>& p);
    void on_pbft_incoming_commit(const pbft_metadata_ptr<pbft_commit>& c);
@@ -806,11 +808,17 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
 
       //pbft
       my->pbft_incoming_prepare_subscription = my->pbft_incoming_prepare_channel.subscribe( [this]( const pbft_metadata_ptr<pbft_prepare>& p ){
-          my->on_pbft_incoming_prepare(p);
+//      	boost::thread(boost::bind(&chain_plugin_impl::on_pbft_incoming_prepare, &(*my), p)).join();
+      	my->chain_thread_pool.create_thread(boost::bind(&chain_plugin_impl::on_pbft_incoming_prepare, &(*my), p));
+//          my->on_pbft_incoming_prepare(p);
+		my->chain_thread_pool.join_all();
       });
 
       my->pbft_incoming_commit_subscription = my->pbft_incoming_commit_channel.subscribe( [this]( const pbft_metadata_ptr<pbft_commit>& c ){
-          my->on_pbft_incoming_commit(c);
+//		  boost::thread(boost::bind(&chain_plugin_impl::on_pbft_incoming_commit, &(*my), c)).join();
+		  my->chain_thread_pool.create_thread(boost::bind(&chain_plugin_impl::on_pbft_incoming_commit, &(*my), c));
+//		  my->on_pbft_incoming_commit(c);
+		  my->chain_thread_pool.join_all();
       });
 
       my->pbft_incoming_view_change_subscription = my->pbft_incoming_view_change_channel.subscribe( [this]( const pbft_metadata_ptr<pbft_view_change>& vc ){
@@ -857,10 +865,17 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
 }
 
 void chain_plugin_impl::on_pbft_incoming_prepare(const pbft_metadata_ptr<pbft_prepare>& p){
+    std::stringstream ss;
+    ss << std::this_thread::get_id();
+	ilog("on pbft incoming prepare thread num: ${thread}", ("thread", ss.str()));
    pbft_ctrl->on_pbft_prepare(p);
 }
 
 void chain_plugin_impl::on_pbft_incoming_commit(const pbft_metadata_ptr<pbft_commit>& c){
+	std::stringstream ss;
+	ss << std::this_thread::get_id();
+	ilog("on pbft incoming commit thread num: ${thread}", ("thread", ss.str()));
+//	cout <<"on pbft incoming commit thread num: " << boost::this_thread::get_id() << endl;
    pbft_ctrl->on_pbft_commit(c);
 }
 
@@ -916,6 +931,7 @@ void chain_plugin::plugin_shutdown() {
    my->accepted_confirmation_connection.reset();
    my->chain->get_thread_pool().stop();
    my->chain->get_thread_pool().join();
+   my->chain_thread_pool.join_all();
    my->chain.reset();
 }
 
