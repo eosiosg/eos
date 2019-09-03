@@ -74,9 +74,9 @@ namespace eosio {
 
    struct sha256_less {
       bool operator()( const sha256& lhs, const sha256& rhs ) const {
-       return
-             std::tie(lhs._hash[0], lhs._hash[1], lhs._hash[2], lhs._hash[3]) <
-             std::tie(rhs._hash[0], rhs._hash[1], rhs._hash[2], rhs._hash[3]);
+         return
+            std::tie(lhs._hash[0], lhs._hash[1], lhs._hash[2], lhs._hash[3]) <
+               std::tie(rhs._hash[0], rhs._hash[1], rhs._hash[2], rhs._hash[3]);
       }
    };
 
@@ -86,30 +86,30 @@ namespace eosio {
          ordered_unique<
             tag< by_id >,
             member < node_transaction_state,
-                     transaction_id_type,
-                     &node_transaction_state::id >,
+               transaction_id_type,
+               &node_transaction_state::id >,
             sha256_less >,
          ordered_non_unique<
             tag< by_expiry >,
             member< node_transaction_state,
-                    fc::time_point_sec,
-                    &node_transaction_state::expires >
-            >,
+               fc::time_point_sec,
+               &node_transaction_state::expires >
+         >,
          ordered_non_unique<
             tag<by_block_num>,
             member< node_transaction_state,
-                    uint32_t,
-                    &node_transaction_state::block_num > >
-         >
+               uint32_t,
+               &node_transaction_state::block_num > >
       >
-   node_transaction_index;
+   >
+      node_transaction_index;
 
    struct p2p_peer_record{
-        string peer_address;
-        time_point_sec expiry;
-        bool is_config;
-        bool discoverable;
-        bool connected;
+      string peer_address;
+      time_point_sec expiry;
+      bool is_config;
+      bool discoverable;
+      bool connected;
    };
    class net_plugin_impl {
    private:
@@ -132,14 +132,14 @@ namespace eosio {
       bool request_p2p_flag=true;
       vector<chain::public_key_type>   allowed_peers; ///< peer keys allowed to connect
       std::map<chain::public_key_type,
-               chain::private_key_type> private_keys; ///< overlapping with producer keys, also authenticating non-producing nodes
+         chain::private_key_type> private_keys; ///< overlapping with producer keys, also authenticating non-producing nodes
 
       enum possible_connections : char {
          None = 0,
-            Producers = 1 << 0,
-            Specified = 1 << 1,
-            Any = 1 << 2
-            };
+         Producers = 1 << 0,
+         Specified = 1 << 1,
+         Any = 1 << 2
+      };
       possible_connections             allowed_connections{None};
 
       connection_ptr find_connection(const string& host)const;
@@ -405,11 +405,11 @@ namespace eosio {
          ordered_non_unique<
             tag<by_block_num>,
             member< transaction_state,
-                    uint32_t,
-                    &transaction_state::block_num > >
-         >
+               uint32_t,
+               &transaction_state::block_num > >
+      >
 
-      > transaction_state_index;
+   > transaction_state_index;
 
    /**
     *
@@ -433,8 +433,8 @@ namespace eosio {
       indexed_by<
          ordered_unique< tag<by_id>, member<eosio::peer_block_state, block_id_type, &eosio::peer_block_state::id >, sha256_less >,
          ordered_unique< tag<by_block_num>, member<eosio::peer_block_state, uint32_t, &eosio::peer_block_state::block_num > >
-         >
-      > peer_block_state_index;
+      >
+   > peer_block_state_index;
 
 
    struct update_known_by_peer {
@@ -502,8 +502,8 @@ namespace eosio {
       }
 
       bool add_write_queue( const std::shared_ptr<vector<char>>& buff,
-                            std::function<void( boost::system::error_code, std::size_t )> callback,
-                            bool to_sync_queue ) {
+         std::function<void( boost::system::error_code, std::size_t )> callback,
+         bool to_sync_queue ) {
          if( to_sync_queue ) {
             _sync_write_queue.push_back( {buff, callback} );
          } else {
@@ -534,7 +534,7 @@ namespace eosio {
    private:
       struct queued_write;
       void fill_out_buffer( std::vector<boost::asio::const_buffer>& bufs,
-                            deque<queued_write>& w_queue ) {
+         deque<queued_write>& w_queue ) {
          while ( w_queue.size() > 0 ) {
             auto& m = w_queue.front();
             bufs.push_back( boost::asio::buffer( *m.buff ));
@@ -556,10 +556,10 @@ namespace eosio {
       deque<queued_write> _out_queue;
 
    public:
-       //used for pbft msgs sending only
-       void push_to_out_queue( const queued_write& m) {
-           _out_queue.emplace_back( m );
-       }
+      //used for pbft msgs sending only
+      void push_to_out_queue( const queued_write& m) {
+         _out_queue.emplace_back( m );
+      }
 
    }; // queued_buffer
 
@@ -582,8 +582,8 @@ namespace eosio {
 
 
       struct queued_pbft_message {
-          std::shared_ptr<vector<char>> message;
-          fc::time_point_sec deadline;
+         std::shared_ptr<vector<char>> message;
+         fc::time_point_sec deadline;
       };
       const int OUT_QUEUE_SIZE_LIMIT = 200;
 
@@ -675,8 +675,8 @@ namespace eosio {
       void enqueue( const net_message &msg, bool trigger_send = true );
       void enqueue_block( const signed_block_ptr& sb, bool trigger_send = true, bool to_sync_queue = false );
       void enqueue_buffer( const std::shared_ptr<std::vector<char>>& send_buffer,
-                           bool trigger_send, go_away_reason close_after_send,
-                           bool to_sync_queue = false);
+         bool trigger_send, go_away_reason close_after_send,
+         bool to_sync_queue = false);
       void enqueue_pbft( const std::shared_ptr<std::vector<char>>& m, const time_point_sec deadline);
 
       bool pbft_read_to_send();
@@ -693,9 +693,9 @@ namespace eosio {
       void fetch_timeout(boost::system::error_code ec);
 
       void queue_write(const std::shared_ptr<vector<char>>& buff,
-                       bool trigger_send,
-                       std::function<void(boost::system::error_code, std::size_t)> callback,
-                       bool to_sync_queue = false);
+         bool trigger_send,
+         std::function<void(boost::system::error_code, std::size_t)> callback,
+         bool to_sync_queue = false);
       void do_queue_write();
       void fill_out_buffer_with_pbft_queue(std::vector<boost::asio::const_buffer>& bufs);
 
@@ -900,7 +900,7 @@ namespace eosio {
    }
 
    bool connection::pbft_ready(){
-       return current();
+      return current();
    }
 
    void connection::reset() {
@@ -981,8 +981,8 @@ namespace eosio {
 
       if( !peer_requested ) {
          peer_requested = sync_state( block_header::num_from_id(lib_id)+1,
-                                      block_header::num_from_id(head_id),
-                                      block_header::num_from_id(lib_id) );
+            block_header::num_from_id(head_id),
+            block_header::num_from_id(lib_id) );
       } else {
          uint32_t start = std::min( peer_requested->last + 1, block_header::num_from_id(lib_id)+1 );
          uint32_t end   = std::max( peer_requested->end_block, block_header::num_from_id(head_id) );
@@ -1005,40 +1005,40 @@ namespace eosio {
             enqueue_block( b );
          } else {
             ilog("fetch block by id returned null, id ${id} for ${p}",
-                  ("id",blkid)("p",peer_name()));
+               ("id",blkid)("p",peer_name()));
          }
       }
       catch (const assert_exception &ex) {
          elog( "caught assert on fetch_block_by_id, ${ex}, id ${id} for ${p}",
-               ("ex",ex.to_string())("id",blkid)("p",peer_name()));
+            ("ex",ex.to_string())("id",blkid)("p",peer_name()));
       }
       catch (...) {
          elog( "caught other exception fetching block id ${id} for ${p}",
-               ("id",blkid)("p",peer_name()));
+            ("id",blkid)("p",peer_name()));
       }
    }
 
    void connection::send_p2p_request(bool discoverable)
    {
-         try
-         {
-               enqueue(net_message(request_p2p_message{discoverable}));
-         }
-         catch (...)
-         {
-               elog("send request_p2p_message message error");
-         }
+      try
+      {
+         enqueue(net_message(request_p2p_message{discoverable}));
+      }
+      catch (...)
+      {
+         elog("send request_p2p_message message error");
+      }
    }
    void connection::send_p2p_response(bool discoverable, string p2p_list)
    {
-         try
-         {
-               enqueue(net_message(response_p2p_message{discoverable, p2p_list}));
-         }
-         catch (...)
-         {
-               elog("send response_p2p_message message error");
-         }
+      try
+      {
+         enqueue(net_message(response_p2p_message{discoverable, p2p_list}));
+      }
+      catch (...)
+      {
+         elog("send response_p2p_message message error");
+      }
    }
 
    void connection::stop_send() {
@@ -1049,7 +1049,7 @@ namespace eosio {
       handshake_initializer::populate(last_handshake_sent);
       last_handshake_sent.generation = ++sent_handshake_count;
       fc_dlog(logger, "Sending handshake generation ${g} to ${ep}",
-              ("g",last_handshake_sent.generation)("ep", peer_name()));
+         ("g",last_handshake_sent.generation)("ep", peer_name()));
       enqueue(last_handshake_sent);
    }
 
@@ -1071,12 +1071,12 @@ namespace eosio {
    }
 
    void connection::queue_write(const std::shared_ptr<vector<char>>& buff,
-                                bool trigger_send,
-                                std::function<void(boost::system::error_code, std::size_t)> callback,
-                                bool to_sync_queue) {
+      bool trigger_send,
+      std::function<void(boost::system::error_code, std::size_t)> callback,
+      bool to_sync_queue) {
       if( !buffer_queue.add_write_queue( buff, callback, to_sync_queue )) {
          fc_wlog( logger, "write_queue full ${s} bytes, giving up on connection ${p}",
-                  ("s", buffer_queue.write_queue_size())("p", peer_name()) );
+            ("s", buffer_queue.write_queue_size())("p", peer_name()) );
          my_impl->close( shared_from_this() );
          return;
       }
@@ -1086,12 +1086,12 @@ namespace eosio {
    }
 
    bool connection::pbft_read_to_send() {
-       return !pbft_queue.empty() && buffer_queue.is_out_queue_empty();
+      return !pbft_queue.empty() && buffer_queue.is_out_queue_empty();
    }
 
    void connection::do_queue_write() {
       if( !(buffer_queue.ready_to_send() || pbft_read_to_send()) )
-          return;
+         return;
 
       connection_wptr c(shared_from_this());
       if(!socket->is_open()) {
@@ -1105,92 +1105,92 @@ namespace eosio {
       fill_out_buffer_with_pbft_queue( bufs );
 
       boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
-            try {
-               auto conn = c.lock();
-               if(!conn)
-                  return;
+         try {
+            auto conn = c.lock();
+            if(!conn)
+               return;
 
-               conn->buffer_queue.out_callback( ec, w );
+            conn->buffer_queue.out_callback( ec, w );
 
-               if(ec) {
-                  string pname = conn ? conn->peer_name() : "no connection name";
-                  if( ec.value() != boost::asio::error::eof) {
-                     elog("Error sending to peer ${p}: ${i}", ("p",pname)("i", ec.message()));
-                  }
-                  else {
-                     ilog("connection closure detected on write to ${p}",("p",pname));
-                  }
-                  my_impl->close(conn);
-                  return;
+            if(ec) {
+               string pname = conn ? conn->peer_name() : "no connection name";
+               if( ec.value() != boost::asio::error::eof) {
+                  elog("Error sending to peer ${p}: ${i}", ("p",pname)("i", ec.message()));
                }
-               conn->buffer_queue.clear_out_queue();
-               conn->enqueue_sync_block();
-               conn->do_queue_write();
+               else {
+                  ilog("connection closure detected on write to ${p}",("p",pname));
+               }
+               my_impl->close(conn);
+               return;
             }
-            catch(const std::exception &ex) {
-               auto conn = c.lock();
-               string pname = conn ? conn->peer_name() : "no connection name";
-               elog("Exception in do_queue_write to ${p} ${s}", ("p",pname)("s",ex.what()));
-            }
-            catch(const fc::exception &ex) {
-               auto conn = c.lock();
-               string pname = conn ? conn->peer_name() : "no connection name";
-               elog("Exception in do_queue_write to ${p} ${s}", ("p",pname)("s",ex.to_string()));
-            }
-            catch(...) {
-               auto conn = c.lock();
-               string pname = conn ? conn->peer_name() : "no connection name";
-               elog("Exception in do_queue_write to ${p}", ("p",pname) );
-            }
-         });
+            conn->buffer_queue.clear_out_queue();
+            conn->enqueue_sync_block();
+            conn->do_queue_write();
+         }
+         catch(const std::exception &ex) {
+            auto conn = c.lock();
+            string pname = conn ? conn->peer_name() : "no connection name";
+            elog("Exception in do_queue_write to ${p} ${s}", ("p",pname)("s",ex.what()));
+         }
+         catch(const fc::exception &ex) {
+            auto conn = c.lock();
+            string pname = conn ? conn->peer_name() : "no connection name";
+            elog("Exception in do_queue_write to ${p} ${s}", ("p",pname)("s",ex.to_string()));
+         }
+         catch(...) {
+            auto conn = c.lock();
+            string pname = conn ? conn->peer_name() : "no connection name";
+            elog("Exception in do_queue_write to ${p}", ("p",pname) );
+         }
+      });
    }
 
-    void connection::fill_out_buffer_with_pbft_queue(std::vector<boost::asio::const_buffer>& bufs){
-        //delete timeout pbft message
-        auto now = time_point::now();
-        auto itr = pbft_queue.begin();
-        while (itr != pbft_queue.end()) {
-            if (itr->deadline <= now) {
-                itr = pbft_queue.erase(itr);
-            } else {
-                ++itr;
-            }
-        }
+   void connection::fill_out_buffer_with_pbft_queue(std::vector<boost::asio::const_buffer>& bufs){
+      //delete timeout pbft message
+      auto now = time_point::now();
+      auto itr = pbft_queue.begin();
+      while (itr != pbft_queue.end()) {
+         if (itr->deadline <= now) {
+            itr = pbft_queue.erase(itr);
+         } else {
+            ++itr;
+         }
+      }
 
-        //drop timeout messages in mem, init send buffer only when actual send happens
-        //copied from a previous version of  connection::enqueue
-        connection_wptr weak_this = shared_from_this();
-        go_away_reason close_after_send = no_reason;
-        std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
-            connection_ptr conn = weak_this.lock();
-            if (conn) {
-                if (close_after_send != no_reason) {
-                    elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
-                    my_impl->close(conn);
-                    return;
-                }
-            } else {
-                fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+      //drop timeout messages in mem, init send buffer only when actual send happens
+      //copied from a previous version of  connection::enqueue
+      connection_wptr weak_this = shared_from_this();
+      go_away_reason close_after_send = no_reason;
+      std::function<void(boost::system::error_code, std::size_t)> callback = [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
+         connection_ptr conn = weak_this.lock();
+         if (conn) {
+            if (close_after_send != no_reason) {
+               elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
+               my_impl->close(conn);
+               return;
             }
-        };
+         } else {
+            fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+         }
+      };
 
-        //push to out queue
-        while (buffer_queue.out_queue_size() < OUT_QUEUE_SIZE_LIMIT) {
-            if (pbft_queue.empty()) break;
+      //push to out queue
+      while (buffer_queue.out_queue_size() < OUT_QUEUE_SIZE_LIMIT) {
+         if (pbft_queue.empty()) break;
 
-            queued_pbft_message pbft = pbft_queue.front();
-            pbft_queue.pop_front();
-            auto m = pbft.message;
-            if (m) {
-                bufs.push_back(boost::asio::buffer(*m));
-                buffer_queue.push_to_out_queue( {m, callback} );
-            }
-        }
-    }
+         queued_pbft_message pbft = pbft_queue.front();
+         pbft_queue.pop_front();
+         auto m = pbft.message;
+         if (m) {
+            bufs.push_back(boost::asio::buffer(*m));
+            buffer_queue.push_to_out_queue( {m, callback} );
+         }
+      }
+   }
 
    void connection::cancel_sync(go_away_reason reason) {
       fc_dlog(logger,"cancel sync reason = ${m}, write queue size ${o} bytes peer ${p}",
-              ("m",reason_str(reason)) ("o", buffer_queue.write_queue_size())("p", peer_name()));
+         ("m",reason_str(reason)) ("o", buffer_queue.write_queue_size())("p", peer_name()));
       cancel_wait();
       flush_queues();
       switch (reason) {
@@ -1268,32 +1268,32 @@ namespace eosio {
    }
 
    void connection::enqueue_buffer( const std::shared_ptr<std::vector<char>>& send_buffer, bool trigger_send,
-                                    go_away_reason close_after_send,
-                                    bool to_sync_queue )
+      go_away_reason close_after_send,
+      bool to_sync_queue )
    {
       connection_wptr weak_this = shared_from_this();
       queue_write(send_buffer,trigger_send,
-                  [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
-                     connection_ptr conn = weak_this.lock();
-                     if (conn) {
-                        if (close_after_send != no_reason) {
-                           elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
-                           my_impl->close(conn);
-                           return;
-                        }
-                     } else {
-                        fc_wlog(logger, "connection expired before enqueued net_message called callback!");
-                     }
-                  },
-                  to_sync_queue);
+         [weak_this, close_after_send](boost::system::error_code ec, std::size_t ) {
+            connection_ptr conn = weak_this.lock();
+            if (conn) {
+               if (close_after_send != no_reason) {
+                  elog ("sent a go away message: ${r}, closing connection to ${p}",("r", reason_str(close_after_send))("p", conn->peer_name()));
+                  my_impl->close(conn);
+                  return;
+               }
+            } else {
+               fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+            }
+         },
+         to_sync_queue);
    }
 
    void connection::enqueue_pbft(const std::shared_ptr<std::vector<char>>& m, const time_point_sec deadline)
    {
-       pbft_queue.push_back(queued_pbft_message{m, deadline });
-       if (buffer_queue.is_out_queue_empty()) {
-           do_queue_write();
-       }
+      pbft_queue.push_back(queued_pbft_message{m, deadline });
+      if (buffer_queue.is_out_queue_empty()) {
+         do_queue_write();
+      }
    }
 
    void connection::cancel_wait() {
@@ -1305,28 +1305,28 @@ namespace eosio {
       response_expected->expires_from_now( my_impl->resp_expected_period);
       connection_wptr c(shared_from_this());
       response_expected->async_wait( [c]( boost::system::error_code ec){
-            connection_ptr conn = c.lock();
-            if (!conn) {
-               // connection was destroyed before this lambda was delivered
-               return;
-            }
+         connection_ptr conn = c.lock();
+         if (!conn) {
+            // connection was destroyed before this lambda was delivered
+            return;
+         }
 
-            conn->sync_timeout(ec);
-         } );
+         conn->sync_timeout(ec);
+      } );
    }
 
    void connection::fetch_wait() {
       response_expected->expires_from_now( my_impl->resp_expected_period);
       connection_wptr c(shared_from_this());
       response_expected->async_wait( [c]( boost::system::error_code ec){
-            connection_ptr conn = c.lock();
-            if (!conn) {
-               // connection was destroyed before this lambda was delivered
-               return;
-            }
+         connection_ptr conn = c.lock();
+         if (!conn) {
+            // connection was destroyed before this lambda was delivered
+            return;
+         }
 
-            conn->fetch_timeout(ec);
-         } );
+         conn->fetch_timeout(ec);
+      } );
    }
 
    void connection::sync_timeout( boost::system::error_code ec ) {
@@ -1413,7 +1413,7 @@ namespace eosio {
 
    //-----------------------------------------------------------
 
-    sync_manager::sync_manager( uint32_t req_span )
+   sync_manager::sync_manager( uint32_t req_span )
       :sync_known_lib_num( 0 )
       ,sync_last_requested_num( 0 )
       ,sync_next_expected_num( 1 )
@@ -1426,13 +1426,13 @@ namespace eosio {
    }
 
    constexpr auto sync_manager::stage_str(stages s) {
-    switch (s) {
-    case in_sync : return "in sync";
-    case lib_catchup: return "lib catchup";
-    case head_catchup : return "head catchup";
-    default : return "unkown";
-    }
-  }
+      switch (s) {
+      case in_sync : return "in sync";
+      case lib_catchup: return "lib catchup";
+      case head_catchup : return "head catchup";
+      default : return "unkown";
+      }
+   }
 
    void sync_manager::set_state(stages newstate) {
       if (state == newstate) {
@@ -1446,8 +1446,8 @@ namespace eosio {
       if (state == head_catchup && c) {
          bool fhset = c->fork_head != block_id_type();
          fc_dlog(logger, "fork_head_num = ${fn} fork_head set = ${s}",
-                 ("fn", c->fork_head_num)("s", fhset));
-            return c->fork_head != block_id_type() && c->fork_head_num < chain_plug->chain().fork_db_head_block_num();
+            ("fn", c->fork_head_num)("s", fhset));
+         return c->fork_head != block_id_type() && c->fork_head_num < chain_plug->chain().fork_db_head_block_num();
       }
       return state != in_sync;
    }
@@ -1468,14 +1468,14 @@ namespace eosio {
 
    bool sync_manager::sync_required() {
       fc_dlog(logger, "last req = ${req}, last recv = ${recv} known = ${known} our head = ${head}",
-              ("req",sync_last_requested_num)("recv",sync_next_expected_num)("known",sync_known_lib_num)("head",chain_plug->chain().fork_db_head_block_num()));
+         ("req",sync_last_requested_num)("recv",sync_next_expected_num)("known",sync_known_lib_num)("head",chain_plug->chain().fork_db_head_block_num()));
 
       return( sync_last_requested_num < sync_known_lib_num ||
-              chain_plug->chain().fork_db_head_block_num() < sync_last_requested_num );
+         chain_plug->chain().fork_db_head_block_num() < sync_last_requested_num );
    }
 
    bool sync_manager::is_syncing() {
-       return state != in_sync;
+      return state != in_sync;
    }
 
    void sync_manager::request_next_chunk( const connection_ptr& conn ) {
@@ -1483,7 +1483,7 @@ namespace eosio {
 
       if (head_block < sync_last_requested_num && source && source->current()) {
          fc_ilog(logger, "ignoring request, head is ${h} last req = ${r} source is ${p}",
-                  ("h",head_block)("r",sync_last_requested_num)("p",source->peer_name()));
+            ("h",head_block)("r",sync_last_requested_num)("p",source->peer_name()));
          return;
       }
 
@@ -1532,7 +1532,7 @@ namespace eosio {
                   break;
                }
                if(++cptr == my_impl->connections.end())
-                     cptr = my_impl->connections.begin();
+                  cptr = my_impl->connections.begin();
             } while(cptr != cstart_it);
             // no need to check the result, either source advanced or the whole list was checked and the old source is reused.
          }
@@ -1554,7 +1554,7 @@ namespace eosio {
             end = sync_known_lib_num;
          if( end > 0 && end >= start ) {
             fc_ilog(logger, "requesting range ${s} to ${e}, from ${n}",
-                    ("n",source->peer_name())("s",start)("e",end));
+               ("n",source->peer_name())("s",start)("e",end));
             source->request_sync_blocks(start, end);
             sync_last_requested_num = end;
          }
@@ -1579,7 +1579,7 @@ namespace eosio {
          uint32_t bnum = chain_plug->chain().last_irreversible_block_num();
          uint32_t hnum = chain_plug->chain().fork_db_head_block_num();
          fc_dlog( logger, "We are already caught up, my irr = ${b}, head = ${h}, target = ${t}",
-                  ("b",bnum)("h",hnum)("t",target));
+            ("b",bnum)("h",hnum)("t",target));
          return;
       }
 
@@ -1589,35 +1589,35 @@ namespace eosio {
       }
 
       fc_ilog(logger, "Catching up with chain, our last req is ${cc}, theirs is ${t} peer ${p}",
-              ( "cc",sync_last_requested_num)("t",target)("p",c->peer_name()));
+         ( "cc",sync_last_requested_num)("t",target)("p",c->peer_name()));
 
       request_next_chunk(c);
    }
 
    void sync_manager::sync_stable_checkpoints(const connection_ptr& c, uint32_t target) {
-       controller& cc = chain_plug->chain();
-       uint32_t lscb_num = cc.last_stable_checkpoint_block_num();
-       auto head_num = cc.head_block_num();
-       if (last_req_scp_num < lscb_num
-          || last_req_scp_num == 0
-          || last_req_scp_num > target) last_req_scp_num = lscb_num;
+      controller& cc = chain_plug->chain();
+      uint32_t lscb_num = cc.last_stable_checkpoint_block_num();
+      auto head_num = cc.head_block_num();
+      if (last_req_scp_num < lscb_num
+         || last_req_scp_num == 0
+         || last_req_scp_num > target) last_req_scp_num = lscb_num;
 
-       auto pbft_checkpoint_granularity = chain_plug->pbft_ctrl().pbft_db.get_checkpoint_interval();
-       auto end = target;
-       auto max_target_scp_num = last_req_scp_num + pbft_checkpoint_granularity * 10;
-       if (target > max_target_scp_num) end = std::min(max_target_scp_num, head_num);
+      auto pbft_checkpoint_granularity = chain_plug->pbft_ctrl().pbft_db.get_checkpoint_interval();
+      auto end = target;
+      auto max_target_scp_num = last_req_scp_num + pbft_checkpoint_granularity * 10;
+      if (target > max_target_scp_num) end = std::min(max_target_scp_num, head_num);
 
-       if (end - last_req_scp_num < pbft_checkpoint_granularity) return;
-       checkpoint_request_message crm = {last_req_scp_num+1,end};
-       c->enqueue( net_message(crm));
-       fc_dlog(logger, "request sync stable checkpoints from ${s} to ${e}",
-               ("s", last_req_scp_num+1)("e", end));
-       last_req_scp_num = end;
+      if (end - last_req_scp_num < pbft_checkpoint_granularity) return;
+      checkpoint_request_message crm = {last_req_scp_num+1,end};
+      c->enqueue( net_message(crm));
+      fc_dlog(logger, "request sync stable checkpoints from ${s} to ${e}",
+         ("s", last_req_scp_num+1)("e", end));
+      last_req_scp_num = end;
    }
 
    void sync_manager::reassign_fetch(const connection_ptr& c, go_away_reason reason) {
       fc_ilog(logger, "reassign_fetch, our last req is ${cc}, next expected is ${ne} peer ${p}",
-              ( "cc",sync_last_requested_num)("ne",sync_next_expected_num)("p",c->peer_name()));
+         ( "cc",sync_last_requested_num)("ne",sync_next_expected_num)("p",c->peer_name()));
 
       if (c == source) {
          c->cancel_sync(reason);
@@ -1705,7 +1705,7 @@ namespace eosio {
       req.req_blocks.mode = catch_up;
       for (const auto& cc : my_impl->connections) {
          if (cc->fork_head == id ||
-             cc->fork_head_num > num) {
+            cc->fork_head_num > num) {
             req.req_blocks.mode = none;
             break;
          }
@@ -1714,7 +1714,7 @@ namespace eosio {
          c->fork_head = id;
          c->fork_head_num = num;
          ilog("got a catch_up notice while in ${s}, fork head num = ${fhn} target LIB = ${lib} next_expected = ${ne}",
-               ("s",stage_str(state))("fhn",num)("lib",sync_known_lib_num)("ne", sync_next_expected_num));
+            ("s",stage_str(state))("fhn",num)("lib",sync_known_lib_num)("ne", sync_next_expected_num));
          if (state == lib_catchup)
             return;
          set_state(head_catchup);
@@ -1835,10 +1835,10 @@ namespace eosio {
    void dispatch_manager::recv_block(const connection_ptr& c, const block_id_type& id, uint32_t bnum) {
       received_blocks.insert(std::make_pair(id, c));
       if (c &&
-          c->last_req &&
-          c->last_req->req_blocks.mode != none &&
-          !c->last_req->req_blocks.ids.empty() &&
-          c->last_req->req_blocks.ids.back() == id) {
+         c->last_req &&
+         c->last_req->req_blocks.mode != none &&
+         !c->last_req->req_blocks.ids.empty() &&
+         c->last_req->req_blocks.ids.back() == id) {
          c->last_req.reset();
       }
       c->add_peer_block({id, bnum, false,true,time_point()});
@@ -1905,14 +1905,14 @@ namespace eosio {
       my_impl->send_all( buff, [&id, &skips, trx_expiration](const connection_ptr& c) -> bool {
          if( skips.find(c) != skips.end() || c->syncing ) {
             return false;
-          }
-          const auto& bs = c->trx_state.find(id);
-          bool unknown = bs == c->trx_state.end();
-          if( unknown ) {
-             c->trx_state.insert(transaction_state({id,0,trx_expiration}));
-             fc_dlog(logger, "sending trx to ${n}", ("n",c->peer_name() ) );
-          }
-          return unknown;
+         }
+         const auto& bs = c->trx_state.find(id);
+         bool unknown = bs == c->trx_state.end();
+         if( unknown ) {
+            c->trx_state.insert(transaction_state({id,0,trx_expiration}));
+            fc_dlog(logger, "sending trx to ${n}", ("n",c->peer_name() ) );
+         }
+         return unknown;
       });
 
    }
@@ -1920,10 +1920,10 @@ namespace eosio {
    void dispatch_manager::recv_transaction(const connection_ptr& c, const transaction_id_type& id) {
       received_transactions.insert(std::make_pair(id, c));
       if (c &&
-          c->last_req &&
-          c->last_req->req_trx.mode != none &&
-          !c->last_req->req_trx.ids.empty() &&
-          c->last_req->req_trx.ids.back() == id) {
+         c->last_req &&
+         c->last_req->req_trx.mode != none &&
+         !c->last_req->req_trx.ids.empty() &&
+         c->last_req->req_trx.ids.back() == id) {
          c->last_req.reset();
       }
 
@@ -2006,7 +2006,7 @@ namespace eosio {
       }
       else {
          fc_wlog( logger,"no retry, block mpde = ${b} trx mode = ${t}",
-                  ("b",modes_str(c->last_req->req_blocks.mode))("t",modes_str(c->last_req->req_trx.mode)));
+            ("b",modes_str(c->last_req->req_blocks.mode))("t",modes_str(c->last_req->req_trx.mode)));
          return;
       }
       for (auto& conn : my_impl->connections) {
@@ -2085,33 +2085,33 @@ namespace eosio {
 
    std::shared_ptr<std::vector<char>> net_plugin_impl::encode_pbft_message(const net_message &msg, bool compress) const {
 
-       uint32_t payload_size = fc::raw::pack_size( msg );
+      uint32_t payload_size = fc::raw::pack_size( msg );
 
-       char* header = reinterpret_cast<char*>(&payload_size);
-       size_t header_size = sizeof(payload_size);
-       size_t buffer_size = header_size + payload_size;
+      char* header = reinterpret_cast<char*>(&payload_size);
+      size_t header_size = sizeof(payload_size);
+      size_t buffer_size = header_size + payload_size;
 
-       auto send_buffer = std::make_shared<vector<char>>(buffer_size);
-       fc::datastream<char*> ds( send_buffer->data(), buffer_size);
-       ds.write( header, header_size );
-       fc::raw::pack( ds, msg );
-       auto out_buffer = send_buffer;
+      auto send_buffer = std::make_shared<vector<char>>(buffer_size);
+      fc::datastream<char*> ds( send_buffer->data(), buffer_size);
+      ds.write( header, header_size );
+      fc::raw::pack( ds, msg );
+      auto out_buffer = send_buffer;
 
-       if (compress) {
-           auto cpnv = compressed_pbft_message{ compress_pbft(send_buffer) };
-           payload_size = fc::raw::pack_size( cpnv );
+      if (compress) {
+         auto cpnv = compressed_pbft_message{ compress_pbft(send_buffer) };
+         payload_size = fc::raw::pack_size( cpnv );
 
-           header = reinterpret_cast<char*>(&payload_size);
-           header_size = sizeof(payload_size);
-           buffer_size = header_size + payload_size;
+         header = reinterpret_cast<char*>(&payload_size);
+         header_size = sizeof(payload_size);
+         buffer_size = header_size + payload_size;
 
-           auto compressed_buffer = std::make_shared<vector<char>>(buffer_size);
-           fc::datastream<char*> ds( compressed_buffer->data(), buffer_size);
-           ds.write( header, header_size );
-           fc::raw::pack( ds, &cpnv );
-           out_buffer = compressed_buffer;
-       }
-       return out_buffer;
+         auto compressed_buffer = std::make_shared<vector<char>>(buffer_size);
+         fc::datastream<char*> ds( compressed_buffer->data(), buffer_size);
+         ds.write( header, header_size );
+         fc::raw::pack( ds, &cpnv );
+         out_buffer = compressed_buffer;
+      }
+      return out_buffer;
    }
 
    void net_plugin_impl::connect(const connection_ptr& c) {
@@ -2143,17 +2143,17 @@ namespace eosio {
       // Note: need to add support for IPv6 too
 
       resolver->async_resolve( query,
-                               [weak_conn, this]( const boost::system::error_code& err,
-                                          tcp::resolver::iterator endpoint_itr ){
-                                  auto c = weak_conn.lock();
-                                  if (!c) return;
-                                  if( !err ) {
-                                     connect( c, endpoint_itr );
-                                  } else {
-                                     elog( "Unable to resolve ${peer_addr}: ${error}",
-                                           (  "peer_addr", c->peer_name() )("error", err.message() ) );
-                                  }
-                               });
+         [weak_conn, this]( const boost::system::error_code& err,
+            tcp::resolver::iterator endpoint_itr ){
+            auto c = weak_conn.lock();
+            if (!c) return;
+            if( !err ) {
+               connect( c, endpoint_itr );
+            } else {
+               elog( "Unable to resolve ${peer_addr}: ${error}",
+                  (  "peer_addr", c->peer_name() )("error", err.message() ) );
+            }
+         });
    }
 
    void net_plugin_impl::connect(const connection_ptr& c, tcp::resolver::iterator endpoint_itr) {
@@ -2168,58 +2168,58 @@ namespace eosio {
       c->connecting_deadline = fc::time_point::now()+fc::seconds(c->connecting_timeout_in_seconds);
       connection_wptr weak_conn = c;
       c->socket->async_connect( current_endpoint, [weak_conn, endpoint_itr, this] ( const boost::system::error_code& err ) {
-            auto c = weak_conn.lock();
-            if (!c) return;
-            if( !err && c->socket->is_open() ) {
-               if (start_session( c )) {
-                  c->send_handshake();
-                  send_p2p_request(c);
-                  }
-            } else {
-               if( endpoint_itr != tcp::resolver::iterator() ) {
-                  close(c);
-                  connect( c, endpoint_itr );
-               }
-               else {
-                  elog( "connection failed to ${peer}: ${error}",
-                        ( "peer", c->peer_name())("error",err.message()));
-                  c->connecting = false;
-                  my_impl->close(c);
-               }
+         auto c = weak_conn.lock();
+         if (!c) return;
+         if( !err && c->socket->is_open() ) {
+            if (start_session( c )) {
+               c->send_handshake();
+               send_p2p_request(c);
             }
-         } );
+         } else {
+            if( endpoint_itr != tcp::resolver::iterator() ) {
+               close(c);
+               connect( c, endpoint_itr );
+            }
+            else {
+               elog( "connection failed to ${peer}: ${error}",
+                  ( "peer", c->peer_name())("error",err.message()));
+               c->connecting = false;
+               my_impl->close(c);
+            }
+         }
+      } );
    }
 
    void net_plugin_impl::send_p2p_request(connection_ptr c)
    {
-         if (p2p_discoverable && request_p2p_flag)
+      if (p2p_discoverable && request_p2p_flag)
+      {
+         auto peer_record = p2p_peer_records.find(c->peer_addr);
+         if (peer_record != p2p_peer_records.end())
          {
-               auto peer_record = p2p_peer_records.find(c->peer_addr);
-               if (peer_record != p2p_peer_records.end())
+            if (peer_record->second.is_config && !peer_record->second.connected)
+            {
+               c->send_p2p_request(p2p_discoverable);
+               peer_record->second.connected = true;
+            }
+            else
+            {
+               bool stop_flag = true;
+               for (auto record : p2p_peer_records)
                {
-                     if (peer_record->second.is_config && !peer_record->second.connected)
-                     {
-                           c->send_p2p_request(p2p_discoverable);
-                           peer_record->second.connected = true;
-                     }
-                     else
-                     {
-                           bool stop_flag = true;
-                           for (auto record : p2p_peer_records)
-                           {
-                                 if (record.second.is_config && !( record.second.connected||record.second.expiry < time_point::now()))
-                                 {
-                                       stop_flag = false;
-                                       break;
-                                 }
-                           }
-                           if (stop_flag)
-                           {
-                                 request_p2p_flag = false;
-                           }
-                     }
+                  if (record.second.is_config && !( record.second.connected||record.second.expiry < time_point::now()))
+                  {
+                     stop_flag = false;
+                     break;
+                  }
                }
+               if (stop_flag)
+               {
+                  request_p2p_flag = false;
+               }
+            }
          }
+      }
    }
 
    bool net_plugin_impl::start_session(const connection_ptr& con) {
@@ -2229,7 +2229,7 @@ namespace eosio {
       con->socket->set_option( nodelay, ec );
       if (ec) {
          elog( "connection failed to ${peer}: ${error}",
-               ( "peer", con->peer_name())("error",ec.message()));
+            ( "peer", con->peer_name())("error",ec.message()));
          con->connecting = false;
          close(con);
          return false;
@@ -2248,65 +2248,65 @@ namespace eosio {
    void net_plugin_impl::start_listen_loop() {
       auto socket = std::make_shared<tcp::socket>( std::ref( app().get_io_service() ) );
       acceptor->async_accept( *socket, [socket,this]( boost::system::error_code ec ) {
-            if( !ec ) {
-               uint32_t visitors = 0;
-               uint32_t from_addr = 0;
-               auto paddr = socket->remote_endpoint(ec).address();
-               if (ec) {
-                  fc_elog(logger,"Error getting remote endpoint: ${m}",("m", ec.message()));
-               }
-               else {
-                  for (auto &conn : connections) {
-                     if(conn->socket->is_open()) {
-                        if (conn->peer_addr.empty()) {
-                           visitors++;
-                           boost::system::error_code ec;
-                           if (paddr == conn->socket->remote_endpoint(ec).address()) {
-                              from_addr++;
-                           }
+         if( !ec ) {
+            uint32_t visitors = 0;
+            uint32_t from_addr = 0;
+            auto paddr = socket->remote_endpoint(ec).address();
+            if (ec) {
+               fc_elog(logger,"Error getting remote endpoint: ${m}",("m", ec.message()));
+            }
+            else {
+               for (auto &conn : connections) {
+                  if(conn->socket->is_open()) {
+                     if (conn->peer_addr.empty()) {
+                        visitors++;
+                        boost::system::error_code ec;
+                        if (paddr == conn->socket->remote_endpoint(ec).address()) {
+                           from_addr++;
                         }
                      }
                   }
-                  if (num_clients != visitors) {
-                     ilog("checking max client, visitors = ${v} num clients ${n}",("v",visitors)("n",num_clients));
-                     num_clients = visitors;
-                  }
-                  if( from_addr < max_nodes_per_host && (max_client_count == 0 || num_clients < max_client_count )) {
-                     ++num_clients;
-                     connection_ptr c = std::make_shared<connection>( socket );
-                     connections.insert( c );
-                     start_session( c );
+               }
+               if (num_clients != visitors) {
+                  ilog("checking max client, visitors = ${v} num clients ${n}",("v",visitors)("n",num_clients));
+                  num_clients = visitors;
+               }
+               if( from_addr < max_nodes_per_host && (max_client_count == 0 || num_clients < max_client_count )) {
+                  ++num_clients;
+                  connection_ptr c = std::make_shared<connection>( socket );
+                  connections.insert( c );
+                  start_session( c );
 
+               }
+               else {
+                  if (from_addr >= max_nodes_per_host) {
+                     fc_elog(logger, "Number of connections (${n}) from ${ra} exceeds limit",
+                        ("n", from_addr+1)("ra",paddr.to_string()));
                   }
                   else {
-                     if (from_addr >= max_nodes_per_host) {
-                        fc_elog(logger, "Number of connections (${n}) from ${ra} exceeds limit",
-                                ("n", from_addr+1)("ra",paddr.to_string()));
-                     }
-                     else {
-                        fc_elog(logger, "Error max_client_count ${m} exceeded",
-                                ( "m", max_client_count) );
-                     }
-                     socket->close();
+                     fc_elog(logger, "Error max_client_count ${m} exceeded",
+                        ( "m", max_client_count) );
                   }
-               }
-            } else {
-               elog( "Error accepting connection: ${m}",( "m", ec.message() ) );
-               // For the listed error codes below, recall start_listen_loop()
-               switch (ec.value()) {
-                  case ECONNABORTED:
-                  case EMFILE:
-                  case ENFILE:
-                  case ENOBUFS:
-                  case ENOMEM:
-                  case EPROTO:
-                     break;
-                  default:
-                     return;
+                  socket->close();
                }
             }
-            start_listen_loop();
-         });
+         } else {
+            elog( "Error accepting connection: ${m}",( "m", ec.message() ) );
+            // For the listed error codes below, recall start_listen_loop()
+            switch (ec.value()) {
+            case ECONNABORTED:
+            case EMFILE:
+            case ENFILE:
+            case ENOBUFS:
+            case ENOMEM:
+            case EPROTO:
+               break;
+            default:
+               return;
+            }
+         }
+         start_listen_loop();
+      });
    }
 
    void net_plugin_impl::start_read_message(const connection_ptr& conn) {
@@ -2335,8 +2335,8 @@ namespace eosio {
          };
 
          if( conn->buffer_queue.write_queue_size() > def_max_write_queue_size ||
-             conn->reads_in_flight > def_max_reads_in_flight   ||
-             conn->trx_in_progress_size > def_max_trx_in_progress_size )
+            conn->reads_in_flight > def_max_reads_in_flight   ||
+            conn->trx_in_progress_size > def_max_trx_in_progress_size )
          {
             // too much queued up, reschedule
             if( conn->buffer_queue.write_queue_size() > def_max_write_queue_size ) {
@@ -2347,8 +2347,8 @@ namespace eosio {
                peer_wlog( conn, "max trx in progress ${s} bytes", ("s", conn->trx_in_progress_size) );
             }
             if( conn->buffer_queue.write_queue_size() > 2*def_max_write_queue_size ||
-                conn->reads_in_flight > 2*def_max_reads_in_flight   ||
-                conn->trx_in_progress_size > 2*def_max_trx_in_progress_size )
+               conn->reads_in_flight > 2*def_max_reads_in_flight   ||
+               conn->trx_in_progress_size > 2*def_max_trx_in_progress_size )
             {
                fc_wlog( logger, "queues over full, giving up on connection ${p}", ("p", conn->peer_name()) );
                my_impl->close( conn );
@@ -2381,7 +2381,7 @@ namespace eosio {
                   if( !ec ) {
                      if (bytes_transferred > conn->pending_message_buffer.bytes_to_write()) {
                         elog("async_read_some callback: bytes_transfered = ${bt}, buffer.bytes_to_write = ${btw}",
-                             ("bt",bytes_transferred)("btw",conn->pending_message_buffer.bytes_to_write()));
+                           ("bt",bytes_transferred)("btw",conn->pending_message_buffer.bytes_to_write()));
                      }
                      EOS_ASSERT(bytes_transferred <= conn->pending_message_buffer.bytes_to_write(), plugin_exception, "");
                      conn->pending_message_buffer.advance_write_ptr(bytes_transferred);
@@ -2398,7 +2398,7 @@ namespace eosio {
                            if(message_length > def_send_buffer_size*2 || message_length == 0) {
                               boost::system::error_code ec;
                               elog("incoming message length unexpected (${i}), from ${p}",
-                                    ("i", message_length)("p",boost::lexical_cast<std::string>(conn->socket->remote_endpoint(ec))));
+                                 ("i", message_length)("p",boost::lexical_cast<std::string>(conn->socket->remote_endpoint(ec))));
                               close(conn);
                               return;
                            }
@@ -2483,7 +2483,7 @@ namespace eosio {
       bool valid = true;
       if (msg.last_irreversible_block_num > msg.head_num) {
          wlog("Handshake message validation: last irreversible block (${i}) is greater than head block (${h})",
-              ("i", msg.last_irreversible_block_num)("h", msg.head_num));
+            ("i", msg.last_irreversible_block_num)("h", msg.head_num));
          valid = false;
       }
       if (msg.p2p_address.empty()) {
@@ -2510,12 +2510,12 @@ namespace eosio {
       peer_ilog(c, "received request_p2p_message");
       string rspm;
       for(auto sd :p2p_peer_records){
-            if(sd.second.discoverable){
-                  rspm.append(sd.second.peer_address+"#");
-            }
+         if(sd.second.discoverable){
+            rspm.append(sd.second.peer_address+"#");
+         }
       }
       if(p2p_discoverable||rspm.size()>0){
-            c->send_p2p_response(p2p_discoverable,rspm);
+         c->send_p2p_response(p2p_discoverable,rspm);
       }
    }
 
@@ -2523,8 +2523,8 @@ namespace eosio {
       peer_ilog(c, "received response_p2p_message");
       auto peer_record=p2p_peer_records.find(c->peer_addr);
       if(peer_record!=p2p_peer_records.end()){
-      peer_record->second.discoverable=msg.discoverable;
-      if (peer_record->second.is_config&&msg.p2p_peer_list.length()>0){
+         peer_record->second.discoverable=msg.discoverable;
+         if (peer_record->second.is_config&&msg.p2p_peer_list.length()>0){
 
             vector<string> p2p_peer_list;
             int start = 0;
@@ -2533,27 +2533,27 @@ namespace eosio {
             string peer_list;
             while( idx != std::string::npos )
             {
-                  if(max_nodes_per_host<=connections.size()||max_nodes_per_host<=p2p_peer_records.size()){
-                        return;
-                  }
-                  peer_list=msg.p2p_peer_list.substr(start, idx-start);
-                  if(peer_list.size()<3){
-                        break;
-                  }
-                  start = idx+delim.size();
-                  idx = msg.p2p_peer_list.find(delim, start);
-                  if( find_connection( peer_list ))
+               if(max_nodes_per_host<=connections.size()||max_nodes_per_host<=p2p_peer_records.size()){
+                  return;
+               }
+               peer_list=msg.p2p_peer_list.substr(start, idx-start);
+               if(peer_list.size()<3){
+                  break;
+               }
+               start = idx+delim.size();
+               idx = msg.p2p_peer_list.find(delim, start);
+               if( find_connection( peer_list ))
                   continue;
-                  p2p_peer_record p2prcd;
-                  p2prcd.peer_address=peer_list;
-                  p2prcd.discoverable=false;
-                  p2prcd.is_config=true;
-                  p2prcd.connected=false;
-                  p2p_peer_records.insert(pair<string,p2p_peer_record>(peer_list,p2prcd));
-                  connection_ptr c = std::make_shared<connection>(peer_list);
-                  fc_dlog(logger,"adding new connection to the list");
-                  connections.insert( c );
-              }}}
+               p2p_peer_record p2prcd;
+               p2prcd.peer_address=peer_list;
+               p2prcd.discoverable=false;
+               p2prcd.is_config=true;
+               p2prcd.connected=false;
+               p2p_peer_records.insert(pair<string,p2p_peer_record>(peer_list,p2prcd));
+               connection_ptr c = std::make_shared<connection>(peer_list);
+               fc_dlog(logger,"adding new connection to the list");
+               connections.insert( c );
+            }}}
    }
 
 
@@ -2613,12 +2613,12 @@ namespace eosio {
          if(c->protocol_version != net_version) {
             if (network_version_match) {
                elog("Peer network version does not match expected ${nv} but got ${mnv}",
-                    ("nv", net_version)("mnv", c->protocol_version));
+                  ("nv", net_version)("mnv", c->protocol_version));
                c->enqueue(go_away_message(wrong_version));
                return;
             } else {
                ilog("Local network version: ${nv} Remote version: ${mnv}",
-                    ("nv", net_version)("mnv", c->protocol_version));
+                  ("nv", net_version)("mnv", c->protocol_version));
             }
          }
 
@@ -2669,7 +2669,7 @@ namespace eosio {
       string rsn = reason_str( msg.reason );
       peer_ilog(c, "received go_away_message");
       ilog( "received a go away message from ${p}, reason = ${r}",
-            ("p", c->peer_name())("r",rsn));
+         ("p", c->peer_name())("r",rsn));
       c->no_retry = msg.reason;
       if(msg.reason == duplicate ) {
          c->node_id = msg.node_id;
@@ -2697,10 +2697,10 @@ namespace eosio {
       c->dst = msg.dst;
 
       if(msg.org == 0)
-         {
-            c->send_time(msg);
-            return;  // We don't have enough data to perform the calculation yet.
-         }
+      {
+         c->send_time(msg);
+         return;  // We don't have enough data to perform the calculation yet.
+      }
 
       c->offset = (double(c->rec - c->org) + double(msg.xmt - c->dst)) / 2;
       double NsecPerUsec{1000};
@@ -2781,7 +2781,7 @@ namespace eosio {
          if( !msg.req_blocks.ids.empty() ) {
             fc_dlog( logger, "received request_message, sending ${num} blocks from my node", ("num", msg.req_blocks.ids.size()));
             for (auto const &bid: msg.req_blocks.ids) {
-                c->blk_send(bid);
+               c->blk_send(bid);
             }
          }
          break;
@@ -2821,45 +2821,45 @@ namespace eosio {
    size_t calc_trx_size( const packed_transaction_ptr& trx ) {
       // transaction is stored packed and unpacked, double packed_size and size of signed as an approximation of use
       return (trx->get_packed_transaction().size() * 2 + sizeof(trx->get_signed_transaction())) * 2 +
-             trx->get_packed_context_free_data().size() * 4 +
-             trx->get_signatures().size() * sizeof(signature_type);
+         trx->get_packed_context_free_data().size() * 4 +
+         trx->get_signatures().size() * sizeof(signature_type);
    }
 
    void net_plugin_impl::handle_message( const connection_ptr& c, const checkpoint_request_message &msg) {
 
-       if ( msg.end_block == 0 || msg.end_block < msg.start_block) return;
+      if ( msg.end_block == 0 || msg.end_block < msg.start_block) return;
 
-       fc_dlog(logger, "received checkpoint request message ${m}, from ${p}", ("m", msg)("p", c->peer_name()));
+      fc_dlog(logger, "received checkpoint request message ${m}, from ${p}", ("m", msg)("p", c->peer_name()));
 
-       if ( msg.end_block - msg.start_block > chain_plug->pbft_ctrl().pbft_db.get_checkpoint_interval() * 100) {
-           fc_dlog(logger, "request range too large");
-           return;
-       }
+      if ( msg.end_block - msg.start_block > chain_plug->pbft_ctrl().pbft_db.get_checkpoint_interval() * 100) {
+         fc_dlog(logger, "request range too large");
+         return;
+      }
 
-       vector<pbft_stable_checkpoint> scp_stack;
-       controller& cc = my_impl->chain_plug->chain();
-       pbft_controller& pcc = my_impl->chain_plug->pbft_ctrl();
+      vector<pbft_stable_checkpoint> scp_stack;
+      controller& cc = my_impl->chain_plug->chain();
+      pbft_controller& pcc = my_impl->chain_plug->pbft_ctrl();
 
-       auto end_block = std::min(msg.end_block, cc.last_stable_checkpoint_block_num());
+      auto end_block = std::min(msg.end_block, cc.last_stable_checkpoint_block_num());
 
-       for (auto i = end_block; i >= msg.start_block && i > 0; --i) {
-           try {
-               auto bid = cc.get_block_id_for_num(i);
-               auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(bid);
-               if (!scp.empty()) {
-                   scp_stack.push_back(scp);
-               }
-           } catch (...) {
-               break;
-           }
-       }
+      for (auto i = end_block; i >= msg.start_block && i > 0; --i) {
+         try {
+            auto bid = cc.get_block_id_for_num(i);
+            auto scp = pcc.pbft_db.get_stable_checkpoint_by_id(bid);
+            if (!scp.empty()) {
+               scp_stack.push_back(scp);
+            }
+         } catch (...) {
+            break;
+         }
+      }
 
-       if (!scp_stack.empty()) fc_dlog(logger, "sending ${n} stable checkpoints on my node",("n",scp_stack.size()));
+      if (!scp_stack.empty()) fc_dlog(logger, "sending ${n} stable checkpoints on my node",("n",scp_stack.size()));
 
-       while (scp_stack.size()) {
-           c->enqueue(scp_stack.back());
-           scp_stack.pop_back();
-       }
+      while (scp_stack.size()) {
+         c->enqueue(scp_stack.back());
+         scp_stack.pop_back();
+      }
    }
 
    void net_plugin_impl::handle_message(const connection_ptr& c, const packed_transaction_ptr& trx) {
@@ -2912,16 +2912,16 @@ namespace eosio {
       c->cancel_wait();
 
       auto accept_pbft_stable_checkpoint = [&]() {
-          auto &pcc = chain_plug->pbft_ctrl();
-          auto scp = pcc.pbft_db.fetch_stable_checkpoint_from_blk_extn(msg);
+         auto &pcc = chain_plug->pbft_ctrl();
+         auto scp = pcc.pbft_db.fetch_stable_checkpoint_from_blk_extn(msg);
 
-          if (!scp.empty() && scp.block_info.block_num() > cc.last_stable_checkpoint_block_num()) {
-              if (pcc.pbft_db.get_stable_checkpoint_by_id(msg->id(), false).empty()) {
-                  handle_message(c, scp);
-              } else {
-                  pcc.pbft_db.checkpoint_local();
-              }
-          }
+         if (!scp.empty() && scp.block_info.block_num() > cc.last_stable_checkpoint_block_num()) {
+            if (pcc.pbft_db.get_stable_checkpoint_by_id(msg->id(), false).empty()) {
+               handle_message(c, scp);
+            } else {
+               pcc.pbft_db.checkpoint_local();
+            }
+         }
       };
 
       try {
@@ -2938,7 +2938,7 @@ namespace eosio {
       dispatcher->recv_block(c, blk_id, blk_num);
       fc::microseconds age( fc::time_point::now() - msg->timestamp);
       peer_ilog(c, "received signed_block : #${n} block age in secs = ${age}",
-              ("n",blk_num)("age",age.to_seconds()));
+         ("n",blk_num)("age",age.to_seconds()));
 
       go_away_reason reason = fatal_other;
       try {
@@ -2986,247 +2986,247 @@ namespace eosio {
    }
 
 
-    template<typename M>
-    bool net_plugin_impl::is_pbft_msg_outdated(M const & msg) {
-        if (time_point_sec(time_point::now()) > time_point_sec(msg.common.timestamp) + pbft_message_TTL) {
-            fc_dlog( logger, "received an outdated pbft message ${m}", ("m", msg));
-            return true;
-        }
-        return false;
-    }
+   template<typename M>
+   bool net_plugin_impl::is_pbft_msg_outdated(M const & msg) {
+      if (time_point_sec(time_point::now()) > time_point_sec(msg.common.timestamp) + pbft_message_TTL) {
+         fc_dlog( logger, "received an outdated pbft message ${m}", ("m", msg));
+         return true;
+      }
+      return false;
+   }
 
-    template<typename M>
-    bool net_plugin_impl::is_pbft_msg_valid(M const & msg) {
-        // Do some basic validations of an incoming pbft msg, bad msgs should be quickly discarded without affecting state.
-        return  !is_pbft_msg_outdated(msg)
-                && !sync_master->is_syncing();
-    }
+   template<typename M>
+   bool net_plugin_impl::is_pbft_msg_valid(M const & msg) {
+      // Do some basic validations of an incoming pbft msg, bad msgs should be quickly discarded without affecting state.
+      return  !is_pbft_msg_outdated(msg)
+         && !sync_master->is_syncing();
+   }
 
-    void net_plugin_impl::bcast_pbft_msg(const net_message &msg, int ttl, const connection_ptr& c) {
+   void net_plugin_impl::bcast_pbft_msg(const net_message &msg, int ttl, const connection_ptr& c) {
 //        if (sync_master->is_syncing()) return;
 
-        auto deadline = time_point_sec(time_point::now()) + ttl;
+      auto deadline = time_point_sec(time_point::now()) + ttl;
 
-        for (auto &conn: connections) {
-            if (conn != c && conn->pbft_ready()) {
-                conn->enqueue_pbft(encode_pbft_message(msg), deadline);
+      for (auto &conn: connections) {
+         if (conn != c && conn->pbft_ready()) {
+            conn->enqueue_pbft(encode_pbft_message(msg), deadline);
+         }
+      }
+   }
+
+   void net_plugin_impl::pbft_outgoing_prepare(const pbft_prepare_ptr& msg) {
+      if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
+         bcast_pbft_msg(*msg, pbft_message_TTL);
+         fc_dlog(logger, "sent prepare at height: ${n}, view: ${v} ",
+            ("n", msg->block_info.block_num())("v", msg->view));
+      }
+   }
+
+   void net_plugin_impl::pbft_outgoing_commit(const pbft_commit_ptr& msg) {
+      if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
+         bcast_pbft_msg(*msg, pbft_message_TTL);
+         fc_dlog(logger, "sent commit at height: ${n}, view: ${v} ",
+            ("n", msg->block_info.block_num())("v", msg->view));
+      }
+   }
+
+   void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change_ptr& msg) {
+      if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
+         bcast_pbft_msg(*msg, pbft_message_TTL);
+         fc_dlog(logger, "sent view change {cv: ${cv}, tv: ${tv}}",
+            ("cv", msg->current_view)("tv", msg->target_view));
+      }
+   }
+
+   void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view_ptr& msg) {
+      if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
+         bcast_pbft_msg(*msg, 60 * pbft_message_TTL);
+         fc_dlog( logger, "sent new view at view: ${v} ", ("v", msg->new_view));
+      }
+
+   }
+
+   void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint_ptr& msg) {
+      if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
+         bcast_pbft_msg(*msg, pbft_message_TTL);
+         fc_dlog(logger, "sent checkpoint at height: ${n} ", ("n", msg->block_info.block_num()));
+      }
+   }
+
+   bool net_plugin_impl::maybe_add_to_pbft_cache(const string &key){
+      auto itr = pbft_message_cache.find(key);
+      if (itr == pbft_message_cache.end()) {
+         //add to cache
+         pbft_message_cache[key] = time_point_sec(time_point::now()) + pbft_message_cache_TTL;
+         return true;
+      }
+      return false;
+   }
+
+   void net_plugin_impl::clean_expired_pbft_messages(){
+      pbft_message_cache_ticker();
+
+      auto itr = pbft_message_cache.begin();
+      auto now = time_point::now();
+
+      while (itr != pbft_message_cache.end()) {
+         if (itr->second <= now) {
+            itr = pbft_message_cache.erase(itr);
+         } else
+            itr++;
+      }
+   }
+
+   void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_prepare &msg) {
+      if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
+         auto pmm = pbft_message_metadata<pbft_prepare>(msg, chain_id);
+
+         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+         if (!pcc.pbft_db.is_valid_prepare(pmm.msg, pmm.sender_key)) return;
+
+         bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
+         fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ",
+            ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", pmm.sender_key));
+
+         pbft_incoming_prepare_channel.publish(std::make_shared<pbft_message_metadata<pbft_prepare>>(std::move(pmm)));
+      }
+
+   }
+
+   void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_commit &msg) {
+      if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
+         auto pmm = pbft_message_metadata<pbft_commit>(msg, chain_id);
+
+         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+         if (!pcc.pbft_db.is_valid_commit(pmm.msg, pmm.sender_key)) return;
+
+         bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
+         fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ",
+            ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", pmm.sender_key));
+
+         pbft_incoming_commit_channel.publish(std::make_shared<pbft_message_metadata<pbft_commit>>(std::move(pmm)));
+      }
+   }
+
+   void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_view_change &msg) {
+      if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
+         auto pmm = pbft_message_metadata<pbft_view_change>(msg, chain_id);
+
+         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+         controller &ctrl = my_impl->chain_plug->chain();
+         if (!pcc.pbft_db.is_valid_view_change(pmm.msg, pmm.sender_key)) return;
+
+         auto missing_blocks = set<block_id_type>{};
+         for (auto const &b: pmm.msg.prepared_cert.pre_prepares) {
+            if (!ctrl.fetch_block_by_id(b)) missing_blocks.emplace(b);
+         }
+
+         if (!missing_blocks.empty()) {
+            fc_dlog(logger, "requesting ${num} missing blocks from view change", ("num", missing_blocks.size()));
+            request_message req;
+            for (auto const &b: missing_blocks) {
+               req.req_blocks.ids.push_back(b);
             }
-        }
-    }
+            req.req_trx.mode = normal;
+            req.req_blocks.mode = normal;
+            c->enqueue(req);
+         }
 
-    void net_plugin_impl::pbft_outgoing_prepare(const pbft_prepare_ptr& msg) {
-        if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
-            bcast_pbft_msg(*msg, pbft_message_TTL);
-            fc_dlog(logger, "sent prepare at height: ${n}, view: ${v} ",
-                    ("n", msg->block_info.block_num())("v", msg->view));
-        }
-    }
+         bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
+         fc_dlog(logger, "received view change {cv: ${cv}, tv: ${tv}} from ${v}",
+            ("cv", pmm.msg.current_view)("tv", pmm.msg.target_view)("v", pmm.sender_key));
 
-    void net_plugin_impl::pbft_outgoing_commit(const pbft_commit_ptr& msg) {
-        if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
-            bcast_pbft_msg(*msg, pbft_message_TTL);
-            fc_dlog(logger, "sent commit at height: ${n}, view: ${v} ",
-                    ("n", msg->block_info.block_num())("v", msg->view));
-        }
-    }
+         pbft_incoming_view_change_channel.publish(std::make_shared<pbft_message_metadata<pbft_view_change>>(std::move(pmm)));
+      }
+   }
 
-    void net_plugin_impl::pbft_outgoing_view_change(const pbft_view_change_ptr& msg) {
-        if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
-            bcast_pbft_msg(*msg, pbft_message_TTL);
-            fc_dlog(logger, "sent view change {cv: ${cv}, tv: ${tv}}",
-                    ("cv", msg->current_view)("tv", msg->target_view));
-        }
-    }
+   void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_new_view &msg) {
 
-    void net_plugin_impl::pbft_outgoing_new_view(const pbft_new_view_ptr& msg) {
-        if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
-            bcast_pbft_msg(*msg, 60 * pbft_message_TTL);
-            fc_dlog( logger, "sent new view at view: ${v} ", ("v", msg->new_view));
-        }
+      if (maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
 
-    }
+         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
 
-    void net_plugin_impl::pbft_outgoing_checkpoint(const pbft_checkpoint_ptr& msg) {
-        if (maybe_add_to_pbft_cache(std::string(msg->sender_signature))) {
-            bcast_pbft_msg(*msg, pbft_message_TTL);
-            fc_dlog(logger, "sent checkpoint at height: ${n} ", ("n", msg->block_info.block_num()));
-        }
-    }
+         if (time_point_sec(time_point::now()) > time_point_sec(msg.common.timestamp) + 60 * pbft_message_TTL
+            || msg.new_view <= pcc.state_machine.get_current_view()) {
+            //skip new view messages that are too old or whose target views are lower than mine.
+            return;
+         }
 
-    bool net_plugin_impl::maybe_add_to_pbft_cache(const string &key){
-       auto itr = pbft_message_cache.find(key);
-       if (itr == pbft_message_cache.end()) {
-           //add to cache
-           pbft_message_cache[key] = time_point_sec(time_point::now()) + pbft_message_cache_TTL;
-           return true;
-       }
-       return false;
-    }
+         auto pmm = pbft_message_metadata<pbft_new_view>(msg, chain_id);
 
-    void net_plugin_impl::clean_expired_pbft_messages(){
-       pbft_message_cache_ticker();
+         if (pmm.sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
 
-       auto itr = pbft_message_cache.begin();
-       auto now = time_point::now();
+         bcast_pbft_msg(pmm.msg, 60 * pbft_message_TTL, c);
+         fc_dlog(logger, "received new view: ${n}, from ${v}", ("n", pmm.msg)("v", pmm.sender_key));
 
-       while (itr != pbft_message_cache.end()) {
-           if (itr->second <= now) {
-               itr = pbft_message_cache.erase(itr);
-           } else
-               itr++;
-       }
-    }
+         pbft_incoming_new_view_channel.publish(std::make_shared<pbft_message_metadata<pbft_new_view>>(std::move(pmm)));
+      }
+   }
 
-    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_prepare &msg) {
-       if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
-           auto pmm = pbft_message_metadata<pbft_prepare>(msg, chain_id);
+   void net_plugin_impl::handle_message( const connection_ptr& c, const compressed_pbft_message &msg) {
 
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           if (!pcc.pbft_db.is_valid_prepare(pmm.msg, pmm.sender_key)) return;
+      auto decompressed_msg = decompress_pbft(msg.content);
 
-           bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
-           fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ",
-                   ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", pmm.sender_key));
+      net_message message;
+      fc::datastream<const char *> ds(decompressed_msg.data(), decompressed_msg.size());
+      fc::raw::unpack(ds, message);
 
-           pbft_incoming_prepare_channel.publish(std::make_shared<pbft_message_metadata<pbft_prepare>>(std::move(pmm)));
-       }
+      try {
+         msg_handler m(*this, c);
+         message.visit( m );
+      } catch(  const fc::exception& e ) {
+         edump((e.to_detail_string() ));
+      }
+   }
 
-    }
+   void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_checkpoint &msg) {
+      if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
+         auto pmm = pbft_message_metadata<pbft_checkpoint>(msg, chain_id);
 
-    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_commit &msg) {
-       if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
-           auto pmm = pbft_message_metadata<pbft_commit>(msg, chain_id);
+         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+         if (!pcc.pbft_db.is_valid_checkpoint(pmm.msg, pmm.sender_key)) return;
 
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           if (!pcc.pbft_db.is_valid_commit(pmm.msg, pmm.sender_key)) return;
+         bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
+         fc_dlog(logger, "received checkpoint at ${n}, from ${v}",
+            ("n", pmm.msg.block_info.block_num())("v", pmm.sender_key));
 
-           bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
-           fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ",
-                   ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", pmm.sender_key));
+         pbft_incoming_checkpoint_channel.publish(std::make_shared<pbft_message_metadata<pbft_checkpoint>>(std::move(pmm)));
+      }
+   }
 
-           pbft_incoming_commit_channel.publish(std::make_shared<pbft_message_metadata<pbft_commit>>(std::move(pmm)));
-       }
-    }
+   void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_stable_checkpoint &msg) {
 
-    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_view_change &msg) {
-       if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
-           auto pmm = pbft_message_metadata<pbft_view_change>(msg, chain_id);
+      pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
 
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           controller &ctrl = my_impl->chain_plug->chain();
-           if (!pcc.pbft_db.is_valid_view_change(pmm.msg, pmm.sender_key)) return;
-
-           auto missing_blocks = set<block_id_type>{};
-           for (auto const &b: pmm.msg.prepared_cert.pre_prepares) {
-               if (!ctrl.fetch_block_by_id(b)) missing_blocks.emplace(b);
-           }
-
-           if (!missing_blocks.empty()) {
-               fc_dlog(logger, "requesting ${num} missing blocks from view change", ("num", missing_blocks.size()));
-               request_message req;
-               for (auto const &b: missing_blocks) {
-                   req.req_blocks.ids.push_back(b);
-               }
-               req.req_trx.mode = normal;
-               req.req_blocks.mode = normal;
-               c->enqueue(req);
-           }
-
-           bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
-           fc_dlog(logger, "received view change {cv: ${cv}, tv: ${tv}} from ${v}",
-                   ("cv", pmm.msg.current_view)("tv", pmm.msg.target_view)("v", pmm.sender_key));
-
-           pbft_incoming_view_change_channel.publish(std::make_shared<pbft_message_metadata<pbft_view_change>>(std::move(pmm)));
-       }
-    }
-
-    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_new_view &msg) {
-
-       if (maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
-
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-
-           if (time_point_sec(time_point::now()) > time_point_sec(msg.common.timestamp) + 60 * pbft_message_TTL
-               || msg.new_view <= pcc.state_machine.get_current_view()) {
-               //skip new view messages that are too old or whose target views are lower than mine.
-               return;
-           }
-
-           auto pmm = pbft_message_metadata<pbft_new_view>(msg, chain_id);
-
-           if (pmm.sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
-
-           bcast_pbft_msg(pmm.msg, 60 * pbft_message_TTL, c);
-           fc_dlog(logger, "received new view: ${n}, from ${v}", ("n", pmm.msg)("v", pmm.sender_key));
-
-           pbft_incoming_new_view_channel.publish(std::make_shared<pbft_message_metadata<pbft_new_view>>(std::move(pmm)));
-       }
-    }
-
-    void net_plugin_impl::handle_message( const connection_ptr& c, const compressed_pbft_message &msg) {
-
-        auto decompressed_msg = decompress_pbft(msg.content);
-
-        net_message message;
-        fc::datastream<const char *> ds(decompressed_msg.data(), decompressed_msg.size());
-        fc::raw::unpack(ds, message);
-
-        try {
-            msg_handler m(*this, c);
-            message.visit( m );
-        } catch(  const fc::exception& e ) {
-            edump((e.to_detail_string() ));
-        }
-    }
-
-    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_checkpoint &msg) {
-       if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
-           auto pmm = pbft_message_metadata<pbft_checkpoint>(msg, chain_id);
-
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           if (!pcc.pbft_db.is_valid_checkpoint(pmm.msg, pmm.sender_key)) return;
-
-           bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
-           fc_dlog(logger, "received checkpoint at ${n}, from ${v}",
-                   ("n", pmm.msg.block_info.block_num())("v", pmm.sender_key));
-
-           pbft_incoming_checkpoint_channel.publish(std::make_shared<pbft_message_metadata<pbft_checkpoint>>(std::move(pmm)));
-       }
-    }
-
-    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_stable_checkpoint &msg) {
-
-       pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-
-       if (!pcc.pbft_db.is_valid_stable_checkpoint(msg, true)) return;
-       fc_ilog(logger, "received stable checkpoint at ${n}, from ${v}",
-               ("n", msg.block_info.block_num())("v", c->peer_name()));
-    }
+      if (!pcc.pbft_db.is_valid_stable_checkpoint(msg, true)) return;
+      fc_ilog(logger, "received stable checkpoint at ${n}, from ${v}",
+         ("n", msg.block_info.block_num())("v", c->peer_name()));
+   }
 
    void net_plugin_impl::start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection) {
       connector_check->expires_from_now( du);
       connector_check->async_wait( [this, from_connection](boost::system::error_code ec) {
-            if( !ec) {
-               connection_monitor(from_connection);
-            }
-            else {
-               elog( "Error from connection check monitor: ${m}",( "m", ec.message()));
-               start_conn_timer( connector_period, std::weak_ptr<connection>());
-            }
-         });
+         if( !ec) {
+            connection_monitor(from_connection);
+         }
+         else {
+            elog( "Error from connection check monitor: ${m}",( "m", ec.message()));
+            start_conn_timer( connector_period, std::weak_ptr<connection>());
+         }
+      });
    }
 
    void net_plugin_impl::start_txn_timer() {
       transaction_check->expires_from_now( txn_exp_period);
       transaction_check->async_wait( [this](boost::system::error_code ec) {
-            if( !ec) {
-               expire_txns();
-            }
-            else {
-               elog( "Error from transaction check monitor: ${m}",( "m", ec.message()));
-               start_txn_timer();
-            }
-         });
+         if( !ec) {
+            expire_txns();
+         }
+         else {
+            elog( "Error from transaction check monitor: ${m}",( "m", ec.message()));
+            start_txn_timer();
+         }
+      });
    }
 
    void net_plugin_impl::pbft_message_cache_ticker() {
@@ -3240,21 +3240,21 @@ namespace eosio {
             pbft_message_cache_ticker();
          }
       });
-    }
+   }
 
    void net_plugin_impl::ticker() {
       keepalive_timer->expires_from_now(keepalive_interval);
       keepalive_timer->async_wait([this](boost::system::error_code ec) {
-            ticker();
-            if (ec) {
-               wlog("Peer keepalive ticked sooner than expected: ${m}", ("m", ec.message()));
+         ticker();
+         if (ec) {
+            wlog("Peer keepalive ticked sooner than expected: ${m}", ("m", ec.message()));
+         }
+         for (auto &c : connections ) {
+            if (c->socket->is_open()) {
+               c->send_time();
             }
-            for (auto &c : connections ) {
-               if (c->socket->is_open()) {
-                  c->send_time();
-               }
-            }
-         });
+         }
+      });
    }
 
    void net_plugin_impl::start_monitors() {
@@ -3284,7 +3284,7 @@ namespace eosio {
          stale_blk.erase( stale_blk.lower_bound(1), stale_blk.upper_bound(lib) );
       }
       fc_dlog(logger, "expire_txns ${n}us size ${s} removed ${r}",
-            ("n", time_point::now() - now)("s", start_size)("r", start_size - local_txns.size()) );
+         ("n", time_point::now() - now)("s", start_size)("r", start_size - local_txns.size()) );
    }
 
    void net_plugin_impl::expire_local_txns() {
@@ -3319,13 +3319,13 @@ namespace eosio {
                continue;
             }
          }else if((*it)->connecting && (*it)->connecting_deadline < fc::time_point::now()){
-             if( (*it)->peer_addr.length() > 0) {
-                 close(*it);
-             }
-             else {
-                 it = connections.erase(it);
-                 continue;
-             }
+            if( (*it)->peer_addr.length() > 0) {
+               close(*it);
+            }
+            else {
+               it = connections.erase(it);
+               continue;
+            }
          }
          ++it;
       }
@@ -3375,7 +3375,7 @@ namespace eosio {
             found_producer_key = producer_plug->is_producer_key(msg.key);
          if( allowed_it == allowed_peers.end() && private_it == private_keys.end() && !found_producer_key) {
             elog( "Peer ${peer} sent a handshake with an unauthorized key: ${key}.",
-                  ("peer", msg.p2p_address)("key", msg.key));
+               ("peer", msg.p2p_address)("key", msg.key));
             return false;
          }
       }
@@ -3385,7 +3385,7 @@ namespace eosio {
       auto time = sc::system_clock::now().time_since_epoch();
       if(time - msg_time > peer_authentication_interval) {
          elog( "Peer ${peer} sent a handshake with a timestamp skewed by more than ${time}.",
-               ("peer", msg.p2p_address)("time", "1 second")); // TODO Add to_variant for std::chrono::system_clock::duration
+            ("peer", msg.p2p_address)("time", "1 second")); // TODO Add to_variant for std::chrono::system_clock::duration
          return false;
       }
 
@@ -3393,7 +3393,7 @@ namespace eosio {
          sha256 hash = fc::sha256::hash(msg.time);
          if(hash != msg.token) {
             elog( "Peer ${peer} sent a handshake with an invalid token.",
-                  ("peer", msg.p2p_address));
+               ("peer", msg.p2p_address));
             return false;
          }
          chain::public_key_type peer_key;
@@ -3402,12 +3402,12 @@ namespace eosio {
          }
          catch (fc::exception& /*e*/) {
             elog( "Peer ${peer} sent a handshake with an unrecoverable key.",
-                  ("peer", msg.p2p_address));
+               ("peer", msg.p2p_address));
             return false;
          }
          if((allowed_connections & (Producers | Specified)) && peer_key != msg.key) {
             elog( "Peer ${peer} sent a handshake with an unauthenticated key.",
-                  ("peer", msg.p2p_address));
+               ("peer", msg.p2p_address));
             return false;
          }
       }
@@ -3481,7 +3481,7 @@ namespace eosio {
             hello.head_id = cc.get_block_id_for_num( hello.head_num );
          }
          catch( const unknown_block_exception &ex) {
-           hello.head_num = 0;
+            hello.head_num = 0;
          }
       }
    }
@@ -3505,27 +3505,27 @@ namespace eosio {
          ( "allowed-connection", bpo::value<vector<string>>()->multitoken()->default_value({"any"}, "any"), "Can be 'any' or 'producers' or 'specified' or 'none'. If 'specified', peer-key must be specified at least once. If only 'producers', peer-key is not required. 'producers' and 'specified' may be combined.")
          ( "peer-key", bpo::value<vector<string>>()->composing()->multitoken(), "Optional public key of peer allowed to connect.  May be used multiple times.")
          ( "peer-private-key", boost::program_options::value<vector<string>>()->composing()->multitoken(),
-           "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
+            "Tuple of [PublicKey, WIF private key] (may specify multiple times)")
          ( "max-clients", bpo::value<int>()->default_value(def_max_clients), "Maximum number of clients from which connections are accepted, use 0 for no limit")
          ( "connection-cleanup-period", bpo::value<int>()->default_value(def_conn_retry_wait), "number of seconds to wait before cleaning up dead connections")
          ( "max-cleanup-time-msec", bpo::value<int>()->default_value(10), "max connection cleanup time per cleanup call in millisec")
          ( "network-version-match", bpo::value<bool>()->default_value(false),
-           "True to require exact match of peer network version.")
+            "True to require exact match of peer network version.")
          ( "sync-fetch-span", bpo::value<uint32_t>()->default_value(def_sync_fetch_span), "number of blocks to retrieve in a chunk from any individual peer during synchronization")
          ( "use-socket-read-watermark", bpo::value<bool>()->default_value(false), "Enable expirimental socket read watermark optimization")
          ( "p2p-discoverable", bpo::value<bool>()->default_value(false),
-           "True to p2p discoverable.")
+            "True to p2p discoverable.")
          ( "peer-log-format", bpo::value<string>()->default_value( "[\"${_name}\" ${_ip}:${_port}]" ),
-           "The string used to format peers when logging messages about them.  Variables are escaped with ${<variable name>}.\n"
-           "Available Variables:\n"
-           "   _name  \tself-reported name\n\n"
-           "   _id    \tself-reported ID (64 hex characters)\n\n"
-           "   _sid   \tfirst 8 characters of _peer.id\n\n"
-           "   _ip    \tremote IP address of peer\n\n"
-           "   _port  \tremote port number of peer\n\n"
-           "   _lip   \tlocal IP address connected to peer\n\n"
-           "   _lport \tlocal port number connected to peer\n\n")
-        ;
+            "The string used to format peers when logging messages about them.  Variables are escaped with ${<variable name>}.\n"
+            "Available Variables:\n"
+            "   _name  \tself-reported name\n\n"
+            "   _id    \tself-reported ID (64 hex characters)\n\n"
+            "   _sid   \tfirst 8 characters of _peer.id\n\n"
+            "   _ip    \tremote IP address of peer\n\n"
+            "   _port  \tremote port number of peer\n\n"
+            "   _lip   \tlocal IP address connected to peer\n\n"
+            "   _lport \tlocal port number connected to peer\n\n")
+         ;
    }
 
    template<typename T>
@@ -3578,7 +3578,7 @@ namespace eosio {
                   if( ec.value() != boost::system::errc::success ) {
 
                      FC_THROW_EXCEPTION( fc::invalid_arg_exception,
-                                       "Unable to retrieve host_name. ${msg}", ("msg", ec.message()));
+                        "Unable to retrieve host_name. ${msg}", ("msg", ec.message()));
 
                   }
                   auto port = my->p2p_address.substr( my->p2p_address.find( ':' ), my->p2p_address.size());
@@ -3610,8 +3610,8 @@ namespace eosio {
 
          if( my->allowed_connections & net_plugin_impl::Specified )
             EOS_ASSERT( options.count( "peer-key" ),
-                        plugin_config_exception,
-                       "At least one peer-key must accompany 'allowed-connection=specified'" );
+               plugin_config_exception,
+               "At least one peer-key must accompany 'allowed-connection=specified'" );
 
          if( options.count( "peer-key" )) {
             const std::vector<std::string> key_strings = options["peer-key"].as<std::vector<std::string>>();
@@ -3624,7 +3624,7 @@ namespace eosio {
             const std::vector<std::string> key_id_to_wif_pair_strings = options["peer-private-key"].as<std::vector<std::string>>();
             for( const std::string& key_id_to_wif_pair_string : key_id_to_wif_pair_strings ) {
                auto key_id_to_wif_pair = dejsonify<std::pair<chain::public_key_type, std::string>>(
-                     key_id_to_wif_pair_string );
+                  key_id_to_wif_pair_string );
                my->private_keys[key_id_to_wif_pair.first] = fc::crypto::private_key( key_id_to_wif_pair.second );
             }
          }
@@ -3648,11 +3648,11 @@ namespace eosio {
          my->acceptor->open(my->listen_endpoint.protocol());
          my->acceptor->set_option(tcp::acceptor::reuse_address(true));
          try {
-           my->acceptor->bind(my->listen_endpoint);
+            my->acceptor->bind(my->listen_endpoint);
          } catch (const std::exception& e) {
-           ilog("net_plugin::plugin_startup failed to bind to port ${port}",
-             ("port", my->listen_endpoint.port()));
-           throw e;
+            ilog("net_plugin::plugin_startup failed to bind to port ${port}",
+               ("port", my->listen_endpoint.port()));
+            throw e;
          }
          my->acceptor->listen();
          ilog("starting listener, max clients is ${mc}",("mc",my->max_client_count));
@@ -3665,15 +3665,15 @@ namespace eosio {
 
       my->incoming_transaction_ack_subscription = app().get_channel<channels::transaction_ack>().subscribe(boost::bind(&net_plugin_impl::transaction_ack, my.get(), _1));
       my->pbft_outgoing_prepare_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::prepare_channel>().subscribe(
-               boost::bind(&net_plugin_impl::pbft_outgoing_prepare, my.get(), _1));
+         boost::bind(&net_plugin_impl::pbft_outgoing_prepare, my.get(), _1));
       my->pbft_outgoing_commit_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::commit_channel>().subscribe(
-               boost::bind(&net_plugin_impl::pbft_outgoing_commit, my.get(), _1));
+         boost::bind(&net_plugin_impl::pbft_outgoing_commit, my.get(), _1));
       my->pbft_outgoing_view_change_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::view_change_channel>().subscribe(
-               boost::bind(&net_plugin_impl::pbft_outgoing_view_change, my.get(), _1));
+         boost::bind(&net_plugin_impl::pbft_outgoing_view_change, my.get(), _1));
       my->pbft_outgoing_new_view_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::new_view_channel>().subscribe(
-               boost::bind(&net_plugin_impl::pbft_outgoing_new_view, my.get(), _1));
+         boost::bind(&net_plugin_impl::pbft_outgoing_new_view, my.get(), _1));
       my->pbft_outgoing_checkpoint_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel>().subscribe(
-               boost::bind(&net_plugin_impl::pbft_outgoing_checkpoint, my.get(), _1));
+         boost::bind(&net_plugin_impl::pbft_outgoing_checkpoint, my.get(), _1));
 
       if( cc.get_read_mode() == chain::db_read_mode::READ_ONLY ) {
          my->max_nodes_per_host = 0;
@@ -3683,13 +3683,13 @@ namespace eosio {
       my->start_monitors();
 
       for( auto seed_node : my->supplied_peers ) {
-            p2p_peer_record p2prcd;
-            p2prcd.peer_address=seed_node;
-            p2prcd.discoverable=false;
-            p2prcd.is_config=true;
-            p2prcd.connected=false;
-            p2prcd.expiry=time_point_sec((time_point::now()).sec_since_epoch()+10);
-            my->p2p_peer_records.insert(pair<string,p2p_peer_record>(seed_node,p2prcd));
+         p2p_peer_record p2prcd;
+         p2prcd.peer_address=seed_node;
+         p2prcd.discoverable=false;
+         p2prcd.is_config=true;
+         p2prcd.connected=false;
+         p2prcd.expiry=time_point_sec((time_point::now()).sec_since_epoch()+10);
+         my->p2p_peer_records.insert(pair<string,p2p_peer_record>(seed_node,p2prcd));
 
          connect( seed_node );
       }
@@ -3771,26 +3771,26 @@ namespace eosio {
    }
 
    void net_plugin::maybe_sync_stable_checkpoints() {
-       controller& cc = my->chain_plug->chain();
-       if (!cc.is_pbft_enabled()) return;
-       //there might be a better way to sync checkpoints, yet we do not want to modify the existing handshake msg.
-       uint32_t head = cc.fork_db_head_block_num();
+      controller& cc = my->chain_plug->chain();
+      if (!cc.is_pbft_enabled()) return;
+      //there might be a better way to sync checkpoints, yet we do not want to modify the existing handshake msg.
+      uint32_t head = cc.fork_db_head_block_num();
 
-       for (auto const &c: my->connections) {
-           if (c->current()) {
-               my->sync_master->sync_stable_checkpoints(c, head);
-           }
-       }
+      for (auto const &c: my->connections) {
+         if (c->current()) {
+            my->sync_master->sync_stable_checkpoints(c, head);
+         }
+      }
 
    }
 
 
    net_plugin_impl::net_plugin_impl():
-   pbft_incoming_prepare_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::prepare_channel>()),
-   pbft_incoming_commit_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::commit_channel>()),
-   pbft_incoming_view_change_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::view_change_channel>()),
-   pbft_incoming_new_view_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::new_view_channel>()),
-   pbft_incoming_checkpoint_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::checkpoint_channel>())
+      pbft_incoming_prepare_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::prepare_channel>()),
+      pbft_incoming_commit_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::commit_channel>()),
+      pbft_incoming_view_change_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::view_change_channel>()),
+      pbft_incoming_new_view_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::new_view_channel>()),
+      pbft_incoming_checkpoint_channel(app().get_channel<eosio::chain::plugin_interface::pbft::incoming::checkpoint_channel>())
    {}
 
    connection_ptr net_plugin_impl::find_connection(const string& host )const {
