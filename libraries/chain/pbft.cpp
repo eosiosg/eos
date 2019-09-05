@@ -166,7 +166,7 @@ namespace eosio {
 
         void psm_prepared_state::on_commit(const pbft_metadata_ptr<pbft_commit>& e) {
 
-        	std:lock_guard<std::mutex> lock(pbft_states_mtx_);
+//        	std::lock_guard<std::mutex> lock(pbft_states_mtx_);
             if (e->msg.view < m.get_current_view()) return;
             if (!pbft_db.is_valid_commit(e->msg, e->sender_key)) return;
 
@@ -203,7 +203,7 @@ namespace eosio {
          */
         void psm_committed_state::on_prepare(const pbft_metadata_ptr<pbft_prepare>& e) {
             //validate
-			std::lock_guard<std::mutex> lock(pbft_states_mtx_);
+//			std::lock_guard<std::mutex> lock(pbft_states_mtx_);
             if (e->msg.view < m.get_current_view()) return;
             if (!pbft_db.is_valid_prepare(e->msg, e->sender_key)) return;
 
@@ -221,7 +221,6 @@ namespace eosio {
         }
 
         void psm_committed_state::on_commit(const pbft_metadata_ptr<pbft_commit>& e) {
-			std::lock_guard<std::mutex> lock(pbft_states_mtx_);
 
             if (e->msg.view < m.get_current_view()) return;
             if (!pbft_db.is_valid_commit(e->msg, e->sender_key)) return;
@@ -290,6 +289,7 @@ namespace eosio {
 
         void psm_machine::transit_to_committed_state(bool to_new_view) {
 
+//        	std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
             if (!to_new_view) {
                 auto nv = pbft_db.get_committed_view();
                 if (nv > get_current_view()) {
@@ -313,7 +313,8 @@ namespace eosio {
 
         void psm_machine::transit_to_prepared_state() {
 
-            set_commit_cache(pbft_commit());
+//			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
+			set_commit_cache(pbft_commit());
             do_send_commit();
 
             set_view_change_cache(pbft_view_change());
@@ -324,7 +325,8 @@ namespace eosio {
 
         void psm_machine::transit_to_view_change_state() {
 
-            set_commit_cache(pbft_commit());
+//			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
+			set_commit_cache(pbft_commit());
             set_prepare_cache(pbft_prepare());
 
             set_view_change_timer(0);

@@ -650,6 +650,7 @@ namespace eosio {
 
                 for (const auto& pre: prepares) {
                     if (prepare_count.find(pre.first.first) == prepare_count.end()) prepare_count[pre.first.first] = 0;
+                    prepare_msg[pre.first.first].emplace_back(pre.second);
                 }
 
                 for (const auto& bp: as) {
@@ -1088,7 +1089,7 @@ namespace eosio {
 
             if (!committed_certs.empty()) {
                 EOS_ASSERT(is_valid_committed_certificate(committed_certs.back(), false, true), pbft_exception,
-                           "highest committed certificate is invalid, ${cc}", 
+                           "highest committed certificate is invalid, ${cc}",
                            ("cc", committed_certs.back()));
             }
 
