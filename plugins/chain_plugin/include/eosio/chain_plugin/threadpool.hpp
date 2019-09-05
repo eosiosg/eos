@@ -14,11 +14,12 @@
 #include <memory>
 #include <boost/thread/thread.hpp>
 #include <boost/function.hpp>
+#include <deque>
 using namespace std;
 
 namespace eosio{
 
-typedef boost::function<void()> func_type;
+typedef boost::function<void()> task_type;
 
 class thread_wrapper {
 private:
@@ -29,9 +30,10 @@ private:
 	bool finish = false;
 	bool stop = false;
 	std::mutex mutex_stop;
-	func_type func;
 	std::condition_variable cv_wait_finish;
 	std::mutex mutex_cv_wait_finish;
+	deque<task_type> task_queue;
+	std::mutex mutex_task_queue;
 
 	void thread_function(){
 		bool s;
@@ -50,8 +52,19 @@ private:
 				if(s) break;
 				task_ready = false;
 			}
-			func();
+			std::unique_lock<std::mutex> lock_queue(mutex_task_queue);
+			while (!task_queue.empty()) {
+				auto task = task_queue.front();
+				try {
+					task();
+				} catch (boost::bad_function_call &ex) {
+					elog("call to empty boost function ${err}", ("err", ex.what()));
+				}
+				task_queue.pop_front();
+			}
+			lock_queue.unlock();
 			{
+				/// for sync operation to wait the sub thread task finish
 				std::unique_lock<std::mutex> lock(mutex_cv_wait_finish);
 				finish = true;
 				cv_wait_finish.notify_one();
@@ -62,9 +75,12 @@ public:
 	thread_wrapper() {
 		thread = make_unique<std::thread>(&thread_wrapper::thread_function, this);
 	}
-	void set_run_func(func_type f){
-		func = f;
+
+	void push_task(const task_type &f) {
+		std::lock_guard<std::mutex> lock(mutex_task_queue);
+		task_queue.emplace_back(f);
 	}
+
 	void run() {
 		std::unique_lock<std::mutex> lock(mutex_cv_wait_task);
 		task_ready = true;
