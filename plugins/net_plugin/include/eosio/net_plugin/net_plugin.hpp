@@ -42,6 +42,9 @@ namespace eosio {
       void maybe_sync_stable_checkpoints();
 
       size_t num_peers() const;
+
+      static boost::asio::io_service& get_io_service();
+
    private:
       std::unique_ptr<class net_plugin_impl> my;
    };
