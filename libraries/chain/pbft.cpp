@@ -166,7 +166,7 @@ namespace eosio {
 
         void psm_prepared_state::on_commit(const pbft_metadata_ptr<pbft_commit>& e) {
 
-//        	std::lock_guard<std::mutex> lock(pbft_states_mtx_);
+        	std::lock_guard<std::mutex> lock(pbft_states_mtx_);
             if (e->msg.view < m.get_current_view()) return;
             if (!pbft_db.is_valid_commit(e->msg, e->sender_key)) return;
 

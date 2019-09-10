@@ -23,6 +23,7 @@
 #include <fc/io/json.hpp>
 #include <fc/scoped_exit.hpp>
 #include <fc/variant_object.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 
 namespace eosio { namespace chain {
@@ -146,6 +147,8 @@ struct controller_impl {
    bool                           trusted_producer_light_validation = false;
    uint32_t                       snapshot_head_block = 0;
    boost::asio::thread_pool       thread_pool;
+   std::mutex                     mtx_;
+   mutable boost::shared_mutex    pending_mtx_;
 
    typedef pair<scope_name,action_name>                   handler_key;
    map< account_name, map<handler_key, apply_handler> >   apply_handlers;
@@ -2278,7 +2281,10 @@ account_name  controller::fork_db_head_block_producer()const {
 }
 
 block_state_ptr controller::pending_block_state()const {
-   if( my->pending ) return my->pending->_pending_block_state;
+	boost::shared_lock_guard<boost::shared_mutex> lock(my->pending_mtx_);
+	if( my->pending ) {
+	   return my->pending->_pending_block_state;
+    }
    return block_state_ptr();
 }
 time_point controller::pending_block_time()const {
@@ -2515,7 +2521,9 @@ void controller::set_pbft_prepared(const block_id_type& id) {
    if (bs) {
       my->pbft_prepared = bs;
       my->fork_db.mark_pbft_prepared_fork(bs);
-      maybe_switch_forks();
+	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		   my->maybe_switch_forks(controller::block_status::complete);
+	   }
    }
 }
 
@@ -2525,7 +2533,9 @@ void controller::set_pbft_my_prepare(const block_id_type& id) {
    if (bs) {
       my->my_prepare = bs;
       my->fork_db.mark_pbft_my_prepare_fork(bs);
-      maybe_switch_forks();
+	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		   my->maybe_switch_forks(controller::block_status::complete);
+	   }
    }
 }
 
@@ -2543,14 +2553,18 @@ block_id_type controller::get_pbft_my_prepare() const {
 
 void controller::reset_pbft_my_prepare() {
    my->fork_db.remove_pbft_my_prepare_fork();
-   maybe_switch_forks();
+	if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		my->maybe_switch_forks(controller::block_status::complete);
+	}
    if (my->my_prepare) my->my_prepare.reset();
 }
 
 void controller::reset_pbft_prepared() {
     my->fork_db.remove_pbft_prepared_fork();
-    maybe_switch_forks();
-    if (my->pbft_prepared) my->pbft_prepared.reset();
+	if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		my->maybe_switch_forks(controller::block_status::complete);
+	}
+	if (my->pbft_prepared) my->pbft_prepared.reset();
 }
 
 db_read_mode controller::get_read_mode()const {
