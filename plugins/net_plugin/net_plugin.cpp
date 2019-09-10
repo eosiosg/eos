@@ -2059,7 +2059,7 @@ namespace eosio {
                   reqrw.req_blocks.ids.push_back( blkid );
                   entry.requested_time = fc::time_point::now();
                }
-               boost::asio::post(net_plugin::get_io_service(), [this, send_req, c, entry, reqrw](){
+               boost::asio::post(net_plugin::get_io_service(), [send_req, c, entry, reqrw](){
                   c->add_peer_block(entry);
                   fc_dlog( logger, "send req = ${sr}", ("sr",send_req));
                   if( send_req) {
@@ -2735,7 +2735,7 @@ namespace eosio {
 
                if( on_fork) {
                   elog( "Peer chain is forked");
-                  boost::asio::post(net_plugin::get_io_service(), [this, c](){
+                  boost::asio::post(net_plugin::get_io_service(), [c](){
                      c->enqueue( go_away_message( forked ));
                   });
                   return;
@@ -2939,7 +2939,7 @@ namespace eosio {
 
          if (!scp_stack->empty()) fc_dlog(logger, "sending ${n} stable checkpoints on my node",("n",scp_stack->size()));
 
-         boost::asio::post(net_plugin::get_io_service(), [this, scp_stack, c](){
+         boost::asio::post(net_plugin::get_io_service(), [scp_stack, c](){
             while (scp_stack->size()) {
                c->enqueue(scp_stack->back());
                scp_stack->pop_back();
@@ -3320,7 +3320,7 @@ namespace eosio {
    }
 
    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_stable_checkpoint &msg) {
-      boost::asio::post(app().get_io_service(), [this, c, msg](){
+      boost::asio::post(app().get_io_service(), [c, msg](){
          pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
          if (!pcc.pbft_db.is_valid_stable_checkpoint(msg, true)) return;
          fc_ilog(logger, "received stable checkpoint at ${n}, from ${v}",
@@ -3917,7 +3917,6 @@ namespace eosio {
 
    void net_plugin_impl::read_forkdb_cache(){
       cache_data_timer.reset(new boost::asio::steady_timer( app().get_io_service()));
-      ilog("zwg: cache forkdb data.");
       cache_data_timer->expires_from_now(cache_data_period);
       cache_data_timer->async_wait ([this](boost::system::error_code ec) {
          read_data();
