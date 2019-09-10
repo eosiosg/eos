@@ -1088,7 +1088,7 @@ namespace eosio {
 
             if (!committed_certs.empty()) {
                 EOS_ASSERT(is_valid_committed_certificate(committed_certs.back(), false, true), pbft_exception,
-                           "highest committed certificate is invalid, ${cc}", 
+                           "highest committed certificate is invalid, ${cc}",
                            ("cc", committed_certs.back()));
             }
 
