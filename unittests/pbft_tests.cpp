@@ -332,7 +332,7 @@ BOOST_AUTO_TEST_CASE(switch_fork_when_accept_new_view_with_prepare_certificate_o
 
     //can switch fork after apply prepare certificate in new view
     auto pmm = pbft_message_metadata<pbft_new_view>(nv_msg, pbft_short_prepared_fork.pbft_db.get_chain_id());
-    pbft_short_prepared_fork.on_pbft_new_view(std::make_shared<pbft_message_metadata<pbft_new_view>>(pmm));
+    pbft_short_prepared_fork.on_pbft_new_view(std::make_shared<pbft_message_metadata<pbft_new_view>>(std::move(pmm)));
 
     BOOST_CHECK_EQUAL(ctrl_short_prepared_fork.head_block_num(), 136);
     BOOST_CHECK_EQUAL(ctrl_short_prepared_fork.last_irreversible_block_num(), 101);
@@ -435,7 +435,7 @@ BOOST_AUTO_TEST_CASE(new_view_with_committed_cert_call_two_times_maybe_switch_fo
 	//can switch fork after apply prepare certificate in new view
 	auto pmm = pbft_message_metadata<pbft_new_view>(nv_msg, c1_pbft_controller.pbft_db.get_chain_id());
 
-	c1_pbft_controller.on_pbft_new_view(std::make_shared<pbft_message_metadata<pbft_new_view>>(pmm));
+	c1_pbft_controller.on_pbft_new_view(std::make_shared<pbft_message_metadata<pbft_new_view>>(std::move(pmm)));
 	c1_pbft_controller.maybe_pbft_commit();
 	c1.produce_blocks(2);
 	BOOST_CHECK_EQUAL(c1_ctrl.last_irreversible_block_num(), 137);
