@@ -904,7 +904,7 @@ namespace eosio {
       : blk_state(),
         trx_state(),
         peer_requested(),
-        socket( std::make_shared<tcp::socket>( std::ref( app().get_io_service() ))),
+        socket( std::make_shared<tcp::socket>( std::ref( net_plugin::get_io_service() ))),
         node_id(),
         last_handshake_recv(),
         last_handshake_sent(),
@@ -956,8 +956,8 @@ namespace eosio {
    void connection::initialize() {
       auto *rnd = node_id.data();
       rnd[0] = 0;
-      response_expected.reset(new boost::asio::steady_timer(app().get_io_service()));
-      read_delay_timer.reset(new boost::asio::steady_timer(app().get_io_service()));
+      response_expected.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
+      read_delay_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
    }
 
    bool connection::connected() {
@@ -1181,12 +1181,15 @@ namespace eosio {
 
       buffer_queue.fill_out_buffer( bufs );
       fill_out_buffer_with_pbft_queue( bufs );
-
+      fc_dlog(logger, "before async_write.");
       boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
          try {
             auto conn = c.lock();
-            if(!conn)
+            if(!conn){
+               fc_wlog(logger, "conn is not connected.");
                return;
+            }
+            fc_dlog(logger, "conn is connected.");
 
             conn->buffer_queue.out_callback( ec, w );
 
@@ -1293,6 +1296,7 @@ namespace eosio {
          controller& cc = my_impl->chain_plug->chain();
          signed_block_ptr sb = cc.fetch_block_by_number(num);
          if(sb) {
+            fc_dlog(logger, "signed_block sb is not nullptr.");
             signed_block_ptr new_sb = make_shared<signed_block>(sb->clone());
             boost::asio::post(net_plugin::get_io_service(), [this, new_sb, trigger_send](){
                try {
@@ -1302,6 +1306,7 @@ namespace eosio {
                }
             });
          }
+         fc_dlog(logger, "signed_block sb is nullptr.");
       });
    }
 
@@ -1341,7 +1346,7 @@ namespace eosio {
       ds.write( header, header_size );
       fc::raw::pack( ds, unsigned_int( which ));
       fc::raw::pack( ds, *sb );
-
+      fc_dlog(logger, "before enqueue_buffer.");
       enqueue_buffer( send_buffer, trigger_send, no_reason, to_sync_queue );
    }
 
@@ -1370,6 +1375,7 @@ namespace eosio {
    {
       pbft_queue.push_back(queued_pbft_message{m, deadline });
       if (buffer_queue.is_out_queue_empty()) {
+         fc_dlog(logger, "before do_queue_write.");
          do_queue_write();
       }
    }
@@ -2037,7 +2043,7 @@ namespace eosio {
          req.req_blocks.mode = normal;
          // known_blocks.ids is never > 1
          if( !msg.known_blocks.ids.empty() ) {
-            boost::asio::post(app().get_io_service(), [this, msg, req, c](){
+            boost::asio::post(app().get_io_service(), [msg, req, c](){
                auto reqrw = req;
                const block_id_type& blkid = msg.known_blocks.ids.back();
                signed_block_ptr b;
@@ -3113,6 +3119,7 @@ namespace eosio {
       auto enpbftmsg = encode_pbft_message(msg);
       for (auto &conn: connections) {
          if (conn != c && conn->pbft_ready()) {
+            fc_dlog(logger, "before enqueue_pbft.");
             conn->enqueue_pbft(enpbftmsg, deadline);
          }
       }
@@ -3383,8 +3390,8 @@ namespace eosio {
    }
 
    void net_plugin_impl::start_monitors() {
-      connector_check.reset(new boost::asio::steady_timer( app().get_io_service()));
-      transaction_check.reset(new boost::asio::steady_timer( app().get_io_service()));
+      connector_check.reset(new boost::asio::steady_timer( net_plugin::get_io_service()));
+      transaction_check.reset(new boost::asio::steady_timer( net_plugin::get_io_service()));
       start_conn_timer(connector_period, std::weak_ptr<connection>());
       start_txn_timer();
    }
@@ -3681,7 +3688,7 @@ namespace eosio {
 
          my->p2p_discoverable=options.at( "p2p-discoverable" ).as<bool>();
 
-         my->resolver = std::make_shared<tcp::resolver>( std::ref( app().get_io_service()));
+         my->resolver = std::make_shared<tcp::resolver>( std::ref( net_plugin::get_io_service()));
          if( options.count( "p2p-listen-endpoint" ) && options.at("p2p-listen-endpoint").as<string>().length()) {
             my->p2p_address = options.at( "p2p-listen-endpoint" ).as<string>();
             auto host = my->p2p_address.substr( 0, my->p2p_address.find( ':' ));
@@ -3692,7 +3699,7 @@ namespace eosio {
 
             my->listen_endpoint = *my->resolver->resolve( query );
 
-            my->acceptor.reset( new tcp::acceptor( app().get_io_service()));
+            my->acceptor.reset( new tcp::acceptor( net_plugin::get_io_service()));
 
             if( options.count( "p2p-server-address" )) {
                my->p2p_address = options.at( "p2p-server-address" ).as<string>();
@@ -3760,9 +3767,9 @@ namespace eosio {
          fc::rand_pseudo_bytes( my->node_id.data(), my->node_id.data_size());
          ilog( "my node_id is ${id}", ("id", my->node_id));
 
-         my->keepalive_timer.reset( new boost::asio::steady_timer( app().get_io_service()));
+         my->keepalive_timer.reset( new boost::asio::steady_timer( net_plugin::get_io_service()));
          my->ticker();
-         my->pbft_message_cache_timer.reset(new boost::asio::steady_timer( app().get_io_service()));
+         my->pbft_message_cache_timer.reset(new boost::asio::steady_timer( net_plugin::get_io_service()));
          my->pbft_message_cache_ticker();
       } FC_LOG_AND_RETHROW()
    }
@@ -3792,17 +3799,60 @@ namespace eosio {
             });
          });
 
-      my->incoming_transaction_ack_subscription = app().get_channel<channels::transaction_ack>().subscribe(boost::bind(&net_plugin_impl::transaction_ack, my.get(), _1));
-      my->pbft_outgoing_prepare_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::prepare_channel>().subscribe(
-         boost::bind(&net_plugin_impl::pbft_outgoing_prepare, my.get(), _1));
-      my->pbft_outgoing_commit_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::commit_channel>().subscribe(
-         boost::bind(&net_plugin_impl::pbft_outgoing_commit, my.get(), _1));
-      my->pbft_outgoing_view_change_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::view_change_channel>().subscribe(
-         boost::bind(&net_plugin_impl::pbft_outgoing_view_change, my.get(), _1));
-      my->pbft_outgoing_new_view_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::new_view_channel>().subscribe(
-         boost::bind(&net_plugin_impl::pbft_outgoing_new_view, my.get(), _1));
-      my->pbft_outgoing_checkpoint_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel>().subscribe(
-         boost::bind(&net_plugin_impl::pbft_outgoing_checkpoint, my.get(), _1));
+      my->incoming_transaction_ack_subscription = app().
+         get_channel<channels::transaction_ack>().subscribe(
+         [this](const std::pair<fc::exception_ptr, transaction_metadata_ptr>& results){
+            fc_dlog(logger, "before post transaction_ack.");
+            boost::asio::post(net_plugin::get_io_service(), [this, results](){
+               fc_dlog(logger, "before transaction_ack.");
+               my->transaction_ack(results);
+            });
+         });
+      my->pbft_outgoing_prepare_subscription = app().
+         get_channel<eosio::chain::plugin_interface::pbft::outgoing::prepare_channel>().subscribe(
+         [this](const pbft_prepare_ptr& msg){
+            fc_dlog(logger, "before post pbft_outgoing_prepare.");
+            boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+               fc_dlog(logger, "before pbft_outgoing_prepare.");
+               my->pbft_outgoing_prepare(msg);
+            });
+         });
+      my->pbft_outgoing_commit_subscription = app().
+         get_channel<eosio::chain::plugin_interface::pbft::outgoing::commit_channel>().subscribe(
+         [this](const pbft_commit_ptr& msg){
+            fc_dlog(logger, "before post pbft_outgoing_commit.");
+            boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+               fc_dlog(logger, "before pbft_outgoing_commit.");
+               my->pbft_outgoing_commit(msg);
+            });
+         });
+      my->pbft_outgoing_view_change_subscription = app().
+         get_channel<eosio::chain::plugin_interface::pbft::outgoing::view_change_channel>().subscribe(
+         [this](const pbft_view_change_ptr& msg) {
+            fc_dlog(logger, "before post pbft_outgoing_view_change.");
+            boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+               fc_dlog(logger, "before pbft_outgoing_view_change.");
+               my->pbft_outgoing_view_change(msg);
+            });
+         });
+      my->pbft_outgoing_new_view_subscription = app().
+         get_channel<eosio::chain::plugin_interface::pbft::outgoing::new_view_channel>().subscribe(
+         [this](const pbft_new_view_ptr& msg) {
+            fc_dlog(logger, "before post pbft_outgoing_new_view.");
+            boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+               fc_dlog(logger, "before pbft_outgoing_new_view.");
+               my->pbft_outgoing_new_view(msg);
+            });
+         });
+      my->pbft_outgoing_checkpoint_subscription = app().
+         get_channel<eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel>().subscribe(
+         [this](const pbft_checkpoint_ptr& msg) {
+            fc_dlog(logger, "before post pbft_outgoing_checkpoint.");
+         boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+            fc_dlog(logger, "before pbft_outgoing_checkpoint.");
+            my->pbft_outgoing_checkpoint(msg);
+         });
+      });
 
       if( cc.get_read_mode() == chain::db_read_mode::READ_ONLY ) {
          my->max_nodes_per_host = 0;
@@ -3980,6 +4030,7 @@ namespace eosio {
 
          connect( seed_node );
       }
+      fc_dlog(logger, "before ios.run.");
       ios.run();
    }
 
