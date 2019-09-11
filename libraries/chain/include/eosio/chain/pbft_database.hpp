@@ -10,6 +10,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/composite_key.hpp>
 #include <fc/bitutil.hpp>
+#include <eosio/chain/thread_utils.hpp>
 
 namespace eosio {
     namespace chain {
@@ -62,16 +63,20 @@ namespace eosio {
 
         template<typename pbft_message_body>
         struct pbft_message_metadata {
-            explicit pbft_message_metadata(pbft_message_body m, chain_id_type& chain_id): msg{m} {
-                try {
-                    sender_key = crypto::public_key(msg.sender_signature, msg.digest(chain_id), true);
-                } catch (fc::exception & /*e*/) {
-                    wlog("bad pbft message signature: ${m}", ("m", msg));
-                }
+            explicit pbft_message_metadata(pbft_message_body m, chain_id_type& chain_id): msg{m} {}
+
+            void get_sender_key(boost::asio::thread_pool &thread_pool, chain_id_type& chain_id) {
+				try {
+					sender_key = async_thread_pool(thread_pool, [this, &chain_id](){
+						return crypto::public_key(msg.sender_signature, msg.digest(chain_id), true);
+					});
+				} catch (fc::exception & /*e*/) {
+					wlog("bad pbft message signature: ${m}", ("m", msg));
+				}
             }
 
             pbft_message_body   msg;
-            public_key_type     sender_key;
+            std::future<public_key_type>     sender_key;
         };
 
         template<typename pbft_message_body>
@@ -518,15 +523,13 @@ namespace eosio {
             pbft_view_change_state_ptr get_view_changes_by_target_view(pbft_view_type tv) const;
             vector<block_num_type> get_pbft_watermarks() const;
             flat_map<public_key_type, uint32_t> get_pbft_fork_schedules() const;
+            boost::asio::thread_pool& get_thread_pool() { return ctrl.get_thread_pool(); };
 
         private:
             controller&                                 ctrl;
             pbft_state_multi_index_type                 pbft_state_index;
-            std::mutex									pbft_state_mtx_;
             pbft_view_state_multi_index_type            view_state_index;
-			std::mutex									view_state_mtx_;
 			pbft_checkpoint_state_multi_index_type      checkpoint_index;
-			std::mutex									checkpoint_mtx_;
             fc::path                                    pbft_db_dir;
             fc::path                                    checkpoints_dir;
             vector<block_num_type>                      prepare_watermarks;

@@ -3137,12 +3137,15 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_prepare>(msg, chain_id);
 
+           pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
            pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           if (!pcc.pbft_db.is_valid_prepare(pmm.msg, pmm.sender_key)) return;
+		   auto sender_key = pmm.sender_key.get();
+
+		   if (!pcc.pbft_db.is_valid_prepare(pmm.msg, sender_key)) return;
 
            bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
            fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ",
-                   ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", pmm.sender_key));
+                   ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", sender_key));
 
            pbft_incoming_prepare_channel.publish(std::make_shared<pbft_message_metadata<pbft_prepare>>(std::move(pmm)));
        }
@@ -3153,12 +3156,15 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_commit>(msg, chain_id);
 
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           if (!pcc.pbft_db.is_valid_commit(pmm.msg, pmm.sender_key)) return;
+		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+		   pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+		   auto sender_key = pmm.sender_key.get();
+
+		   if (!pcc.pbft_db.is_valid_commit(pmm.msg, sender_key)) return;
 
            bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
            fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ",
-                   ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", pmm.sender_key));
+                   ("n", pmm.msg.block_info.block_num())("v", pmm.msg.view)("k", sender_key));
 
            pbft_incoming_commit_channel.publish(std::make_shared<pbft_message_metadata<pbft_commit>>(std::move(pmm)));
        }
@@ -3168,9 +3174,12 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_view_change>(msg, chain_id);
 
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+		   pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
            controller &ctrl = my_impl->chain_plug->chain();
-           if (!pcc.pbft_db.is_valid_view_change(pmm.msg, pmm.sender_key)) return;
+		   auto sender_key = pmm.sender_key.get();
+
+		   if (!pcc.pbft_db.is_valid_view_change(pmm.msg, sender_key)) return;
 
            auto missing_blocks = set<block_id_type>{};
            for (auto const &b: pmm.msg.prepared_cert.pre_prepares) {
@@ -3190,7 +3199,7 @@ namespace eosio {
 
            bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
            fc_dlog(logger, "received view change {cv: ${cv}, tv: ${tv}} from ${v}",
-                   ("cv", pmm.msg.current_view)("tv", pmm.msg.target_view)("v", pmm.sender_key));
+                   ("cv", pmm.msg.current_view)("tv", pmm.msg.target_view)("v", sender_key));
 
            pbft_incoming_view_change_channel.publish(std::make_shared<pbft_message_metadata<pbft_view_change>>(std::move(pmm)));
        }
@@ -3209,11 +3218,14 @@ namespace eosio {
            }
 
            auto pmm = pbft_message_metadata<pbft_new_view>(msg, chain_id);
+		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
 
-           if (pmm.sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
+		   auto sender_key = pmm.sender_key.get();
+
+		   if (sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
 
            bcast_pbft_msg(pmm.msg, 60 * pbft_message_TTL, c);
-           fc_dlog(logger, "received new view: ${n}, from ${v}", ("n", pmm.msg)("v", pmm.sender_key));
+           fc_dlog(logger, "received new view: ${n}, from ${v}", ("n", pmm.msg)("v", sender_key));
 
            pbft_incoming_new_view_channel.publish(std::make_shared<pbft_message_metadata<pbft_new_view>>(std::move(pmm)));
        }
@@ -3239,12 +3251,15 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_checkpoint>(msg, chain_id);
 
-           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-           if (!pcc.pbft_db.is_valid_checkpoint(pmm.msg, pmm.sender_key)) return;
+		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+		   pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+		   auto sender_key = pmm.sender_key.get();
+
+		   if (!pcc.pbft_db.is_valid_checkpoint(pmm.msg, sender_key)) return;
 
            bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
            fc_dlog(logger, "received checkpoint at ${n}, from ${v}",
-                   ("n", pmm.msg.block_info.block_num())("v", pmm.sender_key));
+                   ("n", pmm.msg.block_info.block_num())("v", sender_key));
 
            pbft_incoming_checkpoint_channel.publish(std::make_shared<pbft_message_metadata<pbft_checkpoint>>(std::move(pmm)));
        }
