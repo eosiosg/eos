@@ -1292,7 +1292,9 @@ namespace eosio {
       uint32_t num = ++peer_requested->last;
       bool trigger_send = num == peer_requested->start_block;
       if(num == peer_requested->end_block) peer_requested.reset();
+      fc_dlog(logger, "before post.");
       boost::asio::post(app().get_io_service(), [this, num, trigger_send](){
+         fc_dlog(logger, "in callback.");
          controller& cc = my_impl->chain_plug->chain();
          signed_block_ptr sb = cc.fetch_block_by_number(num);
          if(sb) {
@@ -2897,11 +2899,13 @@ namespace eosio {
    }
 
    void net_plugin_impl::handle_message(const connection_ptr& c, const sync_request_message& msg) {
+      fc_dlog(logger, "handle_message sync_request_message");
       if( msg.end_block == 0) {
          c->peer_requested.reset();
          c->flush_queues();
       } else {
          c->peer_requested = sync_state( msg.start_block,msg.end_block,msg.start_block-1);
+         fc_dlog(logger, "before enqueue_sync_block.");
          c->enqueue_sync_block();
       }
    }
@@ -3794,7 +3798,7 @@ namespace eosio {
             uint32_t block_num = block->block_num;
             signed_block_ptr block_ptr = make_shared<signed_block>(block->block->clone());
             boost::asio::post(net_plugin::get_io_service(), [this, id, block_num, block_ptr](){
-               ilog("subthread process accepted_block.");
+               fc_dlog(logger, "subthread process accepted_block.");
                my->accepted_block(id, block_num, block_ptr);
             });
          });
