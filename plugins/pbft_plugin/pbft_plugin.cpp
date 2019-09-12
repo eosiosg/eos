@@ -70,8 +70,11 @@ namespace eosio {
             } else if (ec) {
                 wlog ("pbft plugin prepare timer tick error: ${m}", ("m", ec.message()));
             } else if (pbft_ready()) {
-                chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
-                pbft_ctrl.maybe_pbft_prepare();
+            	auto &chain_plug = app().get_plugin<chain_plugin>();
+                chain::pbft_controller& pbft_ctrl = chain_plug.pbft_ctrl();
+                chain_plug.get_pbft_thread()->push_task(boost::bind(&chain::pbft_controller::maybe_pbft_prepare, &pbft_ctrl));
+                chain_plug.get_pbft_thread()->run();
+//                pbft_ctrl.maybe_pbft_prepare();
             }
             prepare_timer_tick();
         });
@@ -86,8 +89,11 @@ namespace eosio {
             } else if (ec) {
                 wlog ("pbft plugin commit timer tick error: ${m}", ("m", ec.message()));
             } else if (pbft_ready()) {
-                chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
-                pbft_ctrl.maybe_pbft_commit();
+				auto &chain_plug = app().get_plugin<chain_plugin>();
+				chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
+				chain_plug.get_pbft_thread()->push_task(boost::bind(&chain::pbft_controller::maybe_pbft_commit, &pbft_ctrl));
+				chain_plug.get_pbft_thread()->run();
+//				pbft_ctrl.maybe_pbft_commit();
             }
             commit_timer_tick();
         });
@@ -106,8 +112,11 @@ namespace eosio {
             if (ec) {
                 wlog ("pbft plugin view change timer tick error: ${m}", ("m", ec.message()));
             } else if (pbft_ready()) {
-                chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
-                pbft_ctrl.maybe_pbft_view_change();
+				auto &chain_plug = app().get_plugin<chain_plugin>();
+				chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
+				chain_plug.get_pbft_thread()->push_task(boost::bind(&chain::pbft_controller::maybe_pbft_view_change, &pbft_ctrl));
+				chain_plug.get_pbft_thread()->run();
+//                pbft_ctrl.maybe_pbft_view_change();
             }
         });
     }
@@ -121,8 +130,12 @@ namespace eosio {
             } if (ec) {
                 wlog ("pbft plugin checkpoint timer tick error: ${m}", ("m", ec.message()));
             } else if (pbft_ready()) {
-                chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
-                pbft_ctrl.maybe_pbft_checkpoint();
+				auto &chain_plug = app().get_plugin<chain_plugin>();
+				chain::pbft_controller& pbft_ctrl = app().get_plugin<chain_plugin>().pbft_ctrl();
+				chain_plug.get_pbft_thread()->push_task(boost::bind(&chain::pbft_controller::maybe_pbft_checkpoint, &pbft_ctrl));
+			    chain_plug.get_pbft_thread()->run();
+
+//				pbft_ctrl.maybe_pbft_checkpoint();
 
                 chain::controller& ctrl = app().get_plugin<chain_plugin>().chain();
                 if ( ctrl.head_block_num() - ctrl.last_stable_checkpoint_block_num() / pbft_ctrl.pbft_db.get_checkpoint_interval() > 1) {

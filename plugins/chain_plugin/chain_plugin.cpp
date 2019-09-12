@@ -27,7 +27,6 @@
 #include <fc/variant.hpp>
 #include <signal.h>
 #include <cstdlib>
-#include <eosio/chain_plugin/threadpool.hpp>
 
 namespace eosio {
 
@@ -142,7 +141,7 @@ using boost::signals2::scoped_connection;
 class chain_plugin_impl {
 public:
    chain_plugin_impl()
-   :pbft_thread_ptr(make_unique<thread_wrapper>())
+   :pbft_thread_ptr(make_shared<thread_wrapper>())
    ,pre_accepted_block_channel(app().get_channel<channels::pre_accepted_block>())
    ,accepted_block_header_channel(app().get_channel<channels::accepted_block_header>())
    ,accepted_block_channel(app().get_channel<channels::accepted_block>())
@@ -180,7 +179,7 @@ public:
    fc::optional<vm_type>            wasm_runtime;
    fc::microseconds                 abi_serializer_max_time_ms;
    fc::optional<bfs::path>          snapshot_path;
-   unique_ptr<thread_wrapper>       pbft_thread_ptr;
+   shared_ptr<thread_wrapper>       pbft_thread_ptr;
 
    void on_pbft_incoming_prepare(const pbft_metadata_ptr<pbft_prepare>& p);
    void on_pbft_incoming_commit(const pbft_metadata_ptr<pbft_commit>& c);
@@ -1158,6 +1157,7 @@ controller& chain_plugin::chain() { return *my->chain; }
 const controller& chain_plugin::chain() const { return *my->chain; }
 pbft_controller& chain_plugin::pbft_ctrl() { return *my->pbft_ctrl; }
 const pbft_controller& chain_plugin::pbft_ctrl() const { return *my->pbft_ctrl; }
+shared_ptr<thread_wrapper> &chain_plugin::get_pbft_thread() {return my->pbft_thread_ptr; }
 
 chain::chain_id_type chain_plugin::get_chain_id()const {
    EOS_ASSERT( my->chain_id.valid(), chain_id_type_exception, "chain ID has not been initialized yet" );

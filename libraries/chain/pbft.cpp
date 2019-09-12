@@ -33,17 +33,26 @@ namespace eosio {
             if (view_change_timeout != pbft_db.get_view_change_timeout()) {
                 ///if there is a change in global states, update timeout and reset timer.
                 view_change_timeout = pbft_db.get_view_change_timeout();
-                state_machine.set_view_change_timer(0);
-            }
+				{
+					std::lock_guard<std::mutex> lock(view_change_timer_mtx_);
+					state_machine.set_view_change_timer(0);
+				}
+			}
 
             if (state_machine.get_view_change_timer() <= view_change_timeout) {
                 if (!state_machine.get_view_change_cache().empty()) {
                     pbft_db.generate_and_add_pbft_view_change(state_machine.get_view_change_cache());
                 }
-                state_machine.set_view_change_timer(state_machine.get_view_change_timer() + 1);
+				{
+					std::lock_guard<std::mutex> lock(view_change_timer_mtx_);
+					state_machine.set_view_change_timer(state_machine.get_view_change_timer() + 1);
+				}
             } else {
-                state_machine.set_view_change_timer(0);
-                state_machine.send_view_change();
+				{
+					std::lock_guard<std::mutex> lock(view_change_timer_mtx_);
+					state_machine.set_view_change_timer(0);
+				}
+				state_machine.send_view_change();
             }
         }
 
@@ -307,7 +316,7 @@ namespace eosio {
 
         void psm_machine::transit_to_committed_state(bool to_new_view) {
 
-//        	std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
+        	std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
             if (!to_new_view) {
                 auto nv = pbft_db.get_committed_view();
                 if (nv > get_current_view()) {
@@ -331,7 +340,7 @@ namespace eosio {
 
         void psm_machine::transit_to_prepared_state() {
 
-//			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
+			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
 			set_commit_cache(pbft_commit());
             do_send_commit();
 
@@ -343,7 +352,7 @@ namespace eosio {
 
         void psm_machine::transit_to_view_change_state() {
 
-//			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
+			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
 			set_commit_cache(pbft_commit());
             set_prepare_cache(pbft_prepare());
 
