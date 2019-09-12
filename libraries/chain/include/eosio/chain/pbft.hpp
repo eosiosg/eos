@@ -112,6 +112,7 @@ namespace eosio {
 			std::mutex      send_commit_mtx_;
 			std::mutex      send_view_change_mtx_;
 			std::mutex      send_checkpoint_mtx_;
+			std::mutex	    pbft_sm_mtx_;
 		};
 
         using psm_machine_ptr = std::shared_ptr<psm_machine>;
@@ -136,7 +137,6 @@ namespace eosio {
         protected:
             psm_machine&    m;
             pbft_database&  pbft_db;
-			std::mutex	pbft_states_mtx_;
         };
 
         class psm_prepared_state final: public psm_state {
@@ -214,6 +214,7 @@ namespace eosio {
         private:
             fc::path    datadir;
             uint16_t    view_change_timeout = 6;
+            std::mutex  view_change_timer_mtx_;
         };
     }
 } /// namespace eosio::chain

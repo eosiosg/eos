@@ -21,6 +21,7 @@
 
 #include <fc/static_variant.hpp>
 #include <eosio/chain/pbft.hpp>
+#include <eosio/chain_plugin/threadpool.hpp>
 
 namespace fc { class variant; }
 
@@ -697,6 +698,8 @@ public:
    chain::pbft_controller& pbft_ctrl();
    // Only call this after plugin_initialize()!
    const chain::pbft_controller& pbft_ctrl() const;
+
+   shared_ptr<thread_wrapper> &get_pbft_thread();
 
    chain::chain_id_type get_chain_id() const;
    fc::microseconds get_abi_serializer_max_time() const;
