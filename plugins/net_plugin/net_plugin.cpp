@@ -119,8 +119,6 @@ namespace eosio {
       std::vector<char> compress_pbft(const std::shared_ptr<std::vector<char>>& m)const;
       std::vector<char> decompress_pbft(const std::vector<char>& m)const;
       std::shared_ptr<std::vector<char>> encode_pbft_message(const net_message &msg, bool compress = false)const;
-      void read_forkdb_cache();
-      void read_data();
       void subthread_start_up();
       void subthread_shutdown();
    public:
@@ -3288,7 +3286,9 @@ namespace eosio {
    }
 
    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_stable_checkpoint &msg) {
-      boost::asio::post(app().get_io_service(), [c, msg](){
+      fc_dlog(logger, "receive pbft_stable_checkpoint message.");
+      boost::asio::post(app().get_io_service(), [this, c, msg](){
+         fc_dlog(logger, "receive pbft_stable_checkpoint message in main thread.");
          pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
          if (!pcc.pbft_db.is_valid_stable_checkpoint(msg, true)) return;
          fc_ilog(logger, "received stable checkpoint at ${n}, from ${v}",
@@ -3926,17 +3926,6 @@ namespace eosio {
    }
 
    boost::asio::io_service net_plugin_impl::ios;
-
-   void net_plugin_impl::read_data() {
-      if(chain_plug != nullptr) {
-         auto last_irreversible_block_num = chain_plug->chain().last_irreversible_block_num();
-         auto last_irreversible_block_id = chain_plug->chain().last_irreversible_block_id();
-         auto last_stable_checkpoint_block_num = chain_plug->chain().last_stable_checkpoint_block_num();
-         auto fork_db_head_block_id = chain_plug->chain().fork_db_head_block_id();
-         auto fork_db_head_block_num = chain_plug->chain().fork_db_head_block_num();
-         auto head_block_num = chain_plug->chain().head_block_num();
-      }
-   }
 
    void net_plugin_impl::subthread_start_up(){
       stringstream ss;
