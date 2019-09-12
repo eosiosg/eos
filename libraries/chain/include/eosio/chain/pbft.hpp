@@ -108,7 +108,11 @@ namespace eosio {
         private:
             psm_state_ptr   current = nullptr;
             pbft_database&  pbft_db;
-        };
+            std::mutex      send_prepare_mtx_;
+			std::mutex      send_commit_mtx_;
+			std::mutex      send_view_change_mtx_;
+			std::mutex      send_checkpoint_mtx_;
+		};
 
         using psm_machine_ptr = std::shared_ptr<psm_machine>;
 

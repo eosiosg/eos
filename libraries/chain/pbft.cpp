@@ -441,6 +441,7 @@ namespace eosio {
         }
 
         void psm_machine::do_send_prepare() {
+        	std::lock_guard<std::mutex> lock(send_prepare_mtx_);
             auto prepares = pbft_db.generate_and_add_pbft_prepare(get_prepare_cache());
             if (!prepares.empty()) {
                 for (const auto& p: prepares) {
@@ -451,7 +452,8 @@ namespace eosio {
         }
 
         void psm_machine::do_send_commit() {
-            auto commits = pbft_db.generate_and_add_pbft_commit(get_commit_cache());
+			std::lock_guard<std::mutex> lock(send_commit_mtx_);
+			auto commits = pbft_db.generate_and_add_pbft_commit(get_commit_cache());
 
             if (!commits.empty()) {
                 for (const auto& c: commits) {
@@ -463,7 +465,8 @@ namespace eosio {
 
         void psm_machine::do_send_view_change() {
 
-            auto reset_view_change_state = [&]() {
+			std::lock_guard<std::mutex> lock(send_view_change_mtx_);
+			auto reset_view_change_state = [&]() {
                 set_view_change_cache(pbft_view_change());
                 set_prepared_certificate(pbft_db.generate_prepared_certificate());
                 set_committed_certificate(pbft_db.generate_committed_certificate());
@@ -496,7 +499,8 @@ namespace eosio {
         }
 
         void psm_machine::send_checkpoint() {
-            auto checkpoints = pbft_db.generate_and_add_pbft_checkpoint();
+			std::lock_guard<std::mutex> lock(send_checkpoint_mtx_);
+			auto checkpoints = pbft_db.generate_and_add_pbft_checkpoint();
             for (const auto& cp: checkpoints) {
                 emit(pbft_outgoing_checkpoint, std::make_shared<pbft_checkpoint>(cp));
             }
