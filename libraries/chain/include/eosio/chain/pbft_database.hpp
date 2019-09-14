@@ -70,7 +70,7 @@ namespace eosio {
 					sender_key = async_thread_pool(thread_pool, [this, &chain_id](){
 						try{
 							return crypto::public_key(msg.sender_signature, msg.digest(chain_id), true);
-						} catch (fc::exception &) {
+						} catch (...) {
 							return fc::crypto::public_key();
 						}
 					});
@@ -250,7 +250,6 @@ namespace eosio {
                 fc::raw::pack(enc, common);
                 fc::raw::pack(enc, current_view);
                 fc::raw::pack(enc, target_view);
-                // if pre-prepared is null packed error
                 fc::raw::pack(enc, prepared_cert);
                 fc::raw::pack(enc, committed_certs);
                 fc::raw::pack(enc, stable_checkpoint);
