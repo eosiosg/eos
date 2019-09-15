@@ -33,25 +33,16 @@ namespace eosio {
             if (view_change_timeout != pbft_db.get_view_change_timeout()) {
                 ///if there is a change in global states, update timeout and reset timer.
                 view_change_timeout = pbft_db.get_view_change_timeout();
-				{
-					std::lock_guard<std::mutex> lock(view_change_timer_mtx_);
-					state_machine.set_view_change_timer(0);
-				}
+                state_machine.set_view_change_timer(0);
 			}
 
             if (state_machine.get_view_change_timer() <= view_change_timeout) {
                 if (!state_machine.get_view_change_cache().empty()) {
                     pbft_db.generate_and_add_pbft_view_change(state_machine.get_view_change_cache());
                 }
-				{
-					std::lock_guard<std::mutex> lock(view_change_timer_mtx_);
-					state_machine.set_view_change_timer(state_machine.get_view_change_timer() + 1);
-				}
+                state_machine.set_view_change_timer(state_machine.get_view_change_timer() + 1);
             } else {
-				{
-					std::lock_guard<std::mutex> lock(view_change_timer_mtx_);
-					state_machine.set_view_change_timer(0);
-				}
+            	state_machine.set_view_change_timer(0);
 				state_machine.send_view_change();
             }
         }
@@ -316,7 +307,6 @@ namespace eosio {
 
         void psm_machine::transit_to_committed_state(bool to_new_view) {
 
-        	std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
             if (!to_new_view) {
                 auto nv = pbft_db.get_committed_view();
                 if (nv > get_current_view()) {
@@ -340,7 +330,6 @@ namespace eosio {
 
         void psm_machine::transit_to_prepared_state() {
 
-			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
 			set_commit_cache(pbft_commit());
             do_send_commit();
 
@@ -352,7 +341,6 @@ namespace eosio {
 
         void psm_machine::transit_to_view_change_state() {
 
-			std::lock_guard<std::mutex> state_lock(pbft_sm_mtx_);
 			set_commit_cache(pbft_commit());
             set_prepare_cache(pbft_prepare());
 
@@ -450,7 +438,6 @@ namespace eosio {
         }
 
         void psm_machine::do_send_prepare() {
-        	std::lock_guard<std::mutex> lock(send_prepare_mtx_);
             auto prepares = pbft_db.generate_and_add_pbft_prepare(get_prepare_cache());
             if (!prepares.empty()) {
                 for (const auto& p: prepares) {
@@ -461,7 +448,6 @@ namespace eosio {
         }
 
         void psm_machine::do_send_commit() {
-			std::lock_guard<std::mutex> lock(send_commit_mtx_);
 			auto commits = pbft_db.generate_and_add_pbft_commit(get_commit_cache());
 
             if (!commits.empty()) {
@@ -474,7 +460,6 @@ namespace eosio {
 
         void psm_machine::do_send_view_change() {
 
-			std::lock_guard<std::mutex> lock(send_view_change_mtx_);
 			auto reset_view_change_state = [&]() {
                 set_view_change_cache(pbft_view_change());
                 set_prepared_certificate(pbft_db.generate_prepared_certificate());
@@ -508,7 +493,6 @@ namespace eosio {
         }
 
         void psm_machine::send_checkpoint() {
-			std::lock_guard<std::mutex> lock(send_checkpoint_mtx_);
 			auto checkpoints = pbft_db.generate_and_add_pbft_checkpoint();
             for (const auto& cp: checkpoints) {
                 emit(pbft_outgoing_checkpoint, std::make_shared<pbft_checkpoint>(cp));
