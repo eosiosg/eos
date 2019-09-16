@@ -281,6 +281,8 @@ namespace eosio {
       void handle_message( const connection_ptr& c, const checkpoint_request_message& msg);
       void handle_message( const connection_ptr& c, const compressed_pbft_message& msg);
 
+      void process_stable_checkpoint( const connection_ptr& c, const pbft_stable_checkpoint& msg);
+
       void start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection);
       void start_txn_timer();
       void start_monitors();
@@ -2971,10 +2973,7 @@ namespace eosio {
          auto scp = pcc.pbft_db.fetch_stable_checkpoint_from_blk_extn(msg);
          if (!scp.empty() && scp.block_info.block_num() > block_num) {
             if (pcc.pbft_db.get_stable_checkpoint_by_id(msg->id(), false).empty()) {
-               boost::asio::post(net_plugin::get_io_service(), [this, c, scp](){
-                  //async execute in net_plugin sub-thread.
-                  handle_message(c, scp);
-               });
+                  process_stable_checkpoint(c, scp);
             } else {
                pcc.pbft_db.checkpoint_local();
             }
@@ -3288,12 +3287,16 @@ namespace eosio {
    void net_plugin_impl::handle_message( const connection_ptr& c, const pbft_stable_checkpoint &msg) {
       fc_dlog(logger, "receive pbft_stable_checkpoint message.");
       boost::asio::post(app().get_io_service(), [this, c, msg](){
-         fc_dlog(logger, "receive pbft_stable_checkpoint message in main thread.");
-         pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-         if (!pcc.pbft_db.is_valid_stable_checkpoint(msg, true)) return;
-         fc_ilog(logger, "received stable checkpoint at ${n}, from ${v}",
-            ("n", msg.block_info.block_num())("v", c->peer_name()));
+         process_stable_checkpoint(c, msg);
       });
+   }
+
+   void net_plugin_impl::process_stable_checkpoint( const connection_ptr& c, const pbft_stable_checkpoint &msg) {
+      fc_dlog(logger, "receive pbft_stable_checkpoint message in process_stable_checkpoint.");
+      pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+      if (!pcc.pbft_db.is_valid_stable_checkpoint(msg, true)) return;
+      fc_ilog(logger, "received stable checkpoint at ${n}, from ${v}",
+         ("n", msg.block_info.block_num())("v", c->peer_name()));
    }
 
    void net_plugin_impl::start_conn_timer(boost::asio::steady_timer::duration du, std::weak_ptr<connection> from_connection) {
