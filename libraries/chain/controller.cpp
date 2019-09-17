@@ -128,9 +128,13 @@ struct controller_impl {
    bool                           pbft_enabled = false;
    bool                           pbft_upgrading = false;
    optional<block_id_type>        pending_pbft_lib;
+   std::mutex                     pending_pbft_lib_mtx_;
    optional<block_id_type>        pending_pbft_checkpoint;
+   std::mutex                     pending_pbft_checkpoint_mtx_;
    block_state_ptr                pbft_prepared;
+   std::mutex                     pbft_prepared_mtx_;
    block_state_ptr                my_prepare;
+   std::mutex                     my_prepare_mtx_;
    block_state_ptr                head;
    fork_database                  fork_db;
    wasm_interface                 wasmif;
@@ -1645,6 +1649,7 @@ struct controller_impl {
    }
 
    void pbft_commit_local( const block_id_type& id ) {
+   	  std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
       pending_pbft_lib.reset();
       pending_pbft_lib.emplace(id);
    }
@@ -1654,8 +1659,10 @@ struct controller_impl {
       if (!pbft_enabled) return;
 
       if ( pending_pbft_lib ) {
-         fork_db.set_bft_irreversible(*pending_pbft_lib);
+      	 std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
+      	 fork_db.set_bft_irreversible(*pending_pbft_lib);
          pending_pbft_lib.reset();
+         lock.unlock();
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks(controller::block_status::complete);
@@ -1664,6 +1671,7 @@ struct controller_impl {
    }
 
    void set_pbft_latest_checkpoint( const block_id_type& id ) {
+   	  std::lock_guard<std::mutex> lock(pending_pbft_checkpoint_mtx_);
       pending_pbft_checkpoint.reset();
       pending_pbft_checkpoint.emplace(id);
    }
@@ -1674,18 +1682,26 @@ struct controller_impl {
 
        if ( pending_pbft_checkpoint ) {
 
-           auto checkpoint_block_state = fork_db.get_block(*pending_pbft_checkpoint);
+		   std::unique_lock<std::mutex> lock(pending_pbft_checkpoint_mtx_);
+		   auto checkpoint_block_state = fork_db.get_block(*pending_pbft_checkpoint);
            if (checkpoint_block_state) {
               fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
+              lock.unlock();
               auto checkpoint_num = checkpoint_block_state->block_num;
+              std::unique_lock<std::mutex> prepared_lock(pbft_prepared_mtx_);
               if (pbft_prepared && pbft_prepared->block_num < checkpoint_num) {
                  pbft_prepared.reset();
+                 prepared_lock.unlock();
               }
+              std::unique_lock<std::mutex> my_prepare_lock(pbft_prepared_mtx_);
               if (my_prepare && my_prepare->block_num < checkpoint_num) {
                  my_prepare.reset();
+                 my_prepare_lock.unlock();
               }
            }
+		   std::unique_lock<std::mutex> checkpoint_lock(pending_pbft_checkpoint_mtx_);
            pending_pbft_checkpoint.reset();
+           checkpoint_lock.unlock();
 
        }
    }
@@ -2516,11 +2532,13 @@ chain_id_type controller::get_chain_id()const {
 }
 
 void controller::set_pbft_prepared(const block_id_type& id) {
-   my->pbft_prepared.reset();
+	std::unique_lock<std::mutex> lock(my->pbft_prepared_mtx_);
+	my->pbft_prepared.reset();
    auto bs = fetch_block_state_by_id(id);
    if (bs) {
       my->pbft_prepared = bs;
       my->fork_db.mark_pbft_prepared_fork(bs);
+      lock.unlock();
 	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		   my->maybe_switch_forks(controller::block_status::complete);
 	   }
@@ -2528,11 +2546,13 @@ void controller::set_pbft_prepared(const block_id_type& id) {
 }
 
 void controller::set_pbft_my_prepare(const block_id_type& id) {
+	std::unique_lock<std::mutex> lock(my->my_prepare_mtx_);
    my->my_prepare.reset();
    auto bs = fetch_block_state_by_id(id);
    if (bs) {
       my->my_prepare = bs;
       my->fork_db.mark_pbft_my_prepare_fork(bs);
+      lock.unlock();
 	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		   my->maybe_switch_forks(controller::block_status::complete);
 	   }
@@ -2552,11 +2572,14 @@ block_id_type controller::get_pbft_my_prepare() const {
 }
 
 void controller::reset_pbft_my_prepare() {
-   my->fork_db.remove_pbft_my_prepare_fork();
+	my->fork_db.remove_pbft_my_prepare_fork();
 	if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		my->maybe_switch_forks(controller::block_status::complete);
 	}
+
+	std::unique_lock<std::mutex> lock(my->my_prepare_mtx_);
    if (my->my_prepare) my->my_prepare.reset();
+   lock.unlock();
 }
 
 void controller::reset_pbft_prepared() {
