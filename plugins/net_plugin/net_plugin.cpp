@@ -535,10 +535,12 @@ namespace eosio {
       bool batch_add_write_queue(const std::list<std::shared_ptr<vector<char>>>& buff_list);
 
       void fill_out_buffer( std::vector<boost::asio::const_buffer>& bufs ) {
+         bool keep = true;
          if( _sync_write_queue.size() > 0 ) { // always send msgs from sync_write_queue first
             fc_dlog(logger, "fill_out_buffer with _sync_write_queue");
-            fill_out_buffer( bufs, _sync_write_queue );
-         } else { // postpone real_time write_queue if sync queue is not empty
+            keep = fill_out_buffer( bufs, _sync_write_queue );
+         }
+         if(keep) {
             fc_dlog(logger, "fill_out_buffer with _write_queue");
             fill_out_buffer( bufs, _write_queue );
          }
@@ -552,8 +554,9 @@ namespace eosio {
 
    private:
       struct queued_write;
-      void fill_out_buffer( std::vector<boost::asio::const_buffer>& bufs,
+      bool fill_out_buffer( std::vector<boost::asio::const_buffer>& bufs,
          deque<queued_write>& w_queue ) {
+         //true means caller can keep filling data.
          auto i = 0;
          while ( w_queue.size() > 0 ) {
             auto& m = w_queue.front();
@@ -561,9 +564,10 @@ namespace eosio {
             _write_queue_size -= m.buff->size();
             _out_queue.emplace_back( m );
             w_queue.pop_front();
-            if(i >= 50) break;
+            if(i >= 50) return false;
             i++;
          }
+         return true;
       }
 
    private:
