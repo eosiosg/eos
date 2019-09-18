@@ -967,17 +967,19 @@ namespace eosio {
 
    void connection::blk_send_branch() {
       fc_dlog(logger, "in blk_send_branch");
-      boost::asio::post(app().get_io_service(), [this]{
+      connection_wptr wpconn = shared_from_this();
+      boost::asio::post(app().get_io_service(), [wpconn](){
          auto head_num = my_impl->chain_plug->chain().fork_db_head_block_num();
          auto temp_lib_id = my_impl->chain_plug->chain().last_irreversible_block_id();
          auto temp_head_id = my_impl->chain_plug->chain().fork_db_head_block_id();
-         boost::asio::post(net_plugin::get_io_service(), [this, head_num, temp_head_id, temp_lib_id](){
+         boost::asio::post(net_plugin::get_io_service(), [wpconn, head_num, temp_head_id, temp_lib_id](){
+            auto conn = wpconn.lock();
             notice_message note;
             note.known_blocks.mode = normal;
             note.known_blocks.pending = 0;
             fc_dlog(logger, "head_num = ${h}",("h",head_num));
             if(head_num == 0) {
-               enqueue(note);
+               conn->enqueue(note);
                return;
             }
             block_id_type head_id;
@@ -985,24 +987,24 @@ namespace eosio {
             block_id_type remote_head_id;
             uint32_t remote_head_num = 0;
             try {
-               if (last_handshake_recv.generation >= 1) {
-                  remote_head_id = last_handshake_recv.head_id;
+               if (conn->last_handshake_recv.generation >= 1) {
+                  remote_head_id = conn->last_handshake_recv.head_id;
                   remote_head_num = block_header::num_from_id(remote_head_id);
                   fc_dlog(logger, "maybe truncating branch at  = ${h}:${id}",("h",remote_head_num)("id",remote_head_id));
                }
 
                // base our branch off of the last handshake we sent the peer instead of our current
                // LIB which could have moved forward in time as packets were in flight.
-               if (last_handshake_sent.generation >= 1) {
-                  lib_id = last_handshake_sent.last_irreversible_block_id;
+               if (conn->last_handshake_sent.generation >= 1) {
+                  lib_id = conn->last_handshake_sent.last_irreversible_block_id;
                } else {
                   lib_id = temp_lib_id;
                }
                head_id = temp_head_id;
             }
             catch (const assert_exception& ex) {
-               elog( "unable to retrieve block info: ${n} for ${p}",("n",ex.to_string())("p",peer_name()));
-               enqueue(note);
+               elog( "unable to retrieve block info: ${n} for ${p}",("n",ex.to_string())("p",conn->peer_name()));
+               conn->enqueue(note);
                return;
             }
             catch (const fc::exception& ex) {
@@ -1013,46 +1015,48 @@ namespace eosio {
             auto li = block_header::num_from_id(lib_id);
             auto hi = block_header::num_from_id(head_id);
 
-            if( !peer_requested ) {
+            if( !conn->peer_requested ) {
                fc_dlog(logger, "peer_requested is empty.");
-               peer_requested = sync_state(li + 1, hi, li);
+               conn->peer_requested = sync_state(li + 1, hi, li);
             } else {
                fc_dlog(logger, "peer_requested is not empty.");
-               uint32_t start = std::min(peer_requested->last + 1, li + 1);
-               uint32_t end   = std::max(peer_requested->end_block, hi);
-               peer_requested = sync_state(start, end, start - 1);
+               uint32_t start = std::min(conn->peer_requested->last + 1, li + 1);
+               uint32_t end   = std::max(conn->peer_requested->end_block, hi);
+               conn->peer_requested = sync_state(start, end, start - 1);
             }
-            enqueue_sync_block();
+            conn->enqueue_sync_block();
 
             // still want to send transactions along during blk branch sync
-            syncing = false;
+            conn->syncing = false;
          });
       });
    }
 
    void connection::blk_send(const block_id_type& blkid) {
-      boost::asio::post(app().get_io_service(), [this, blkid](){
+      connection_wptr wpconn = shared_from_this();
+      boost::asio::post(app().get_io_service(), [wpconn, blkid](){
          controller &cc = my_impl->chain_plug->chain();
          signed_block_ptr b = cc.fetch_block_by_id(blkid);
-         boost::asio::post(net_plugin::get_io_service(), [this, blkid, b](){
+         boost::asio::post(net_plugin::get_io_service(), [wpconn, blkid, b](){
+            auto conn = wpconn.lock();
             try {
                if(b) {
                   fc_dlog(logger,"found block for id at num ${n}",("n",b->block_num()));
                   peer_block_state pbstate = {blkid, block_header::num_from_id(blkid), true, true, time_point()};
-                  add_peer_block(pbstate);
-                  enqueue_block( b );
+                  conn->add_peer_block(pbstate);
+                  conn->enqueue_block( b );
                } else {
                   ilog("fetch block by id returned null, id ${id} for ${p}",
-                     ("id",blkid)("p",peer_name()));
+                     ("id",blkid)("p",conn->peer_name()));
                }
             }
             catch (const assert_exception &ex) {
                elog( "caught assert on fetch_block_by_id, ${ex}, id ${id} for ${p}",
-                  ("ex",ex.to_string())("id",blkid)("p",peer_name()));
+                  ("ex",ex.to_string())("id",blkid)("p",conn->peer_name()));
             }
             catch (...) {
                elog( "caught other exception fetching block id ${id} for ${p}",
-                  ("id",blkid)("p",peer_name()));
+                  ("id",blkid)("p",conn->peer_name()));
             }
          });
       });
@@ -1086,13 +1090,15 @@ namespace eosio {
    }
 
    void connection::send_handshake() {
-      boost::asio::post(app().get_io_service(), [this](){
-         handshake_initializer::populate(last_handshake_sent);
-         boost::asio::post(net_plugin::get_io_service(), [this](){
-            last_handshake_sent.generation = ++sent_handshake_count;
+      connection_wptr wpconn = shared_from_this();
+      boost::asio::post(app().get_io_service(), [wpconn](){
+         handshake_initializer::populate(wpconn.lock()->last_handshake_sent);
+         boost::asio::post(net_plugin::get_io_service(), [wpconn](){
+            auto conn = wpconn.lock();
+            conn->last_handshake_sent.generation = ++conn->sent_handshake_count;
             fc_dlog(logger, "Sending handshake generation ${g} to ${ep}",
-               ("g",last_handshake_sent.generation)("ep", peer_name()));
-            enqueue(last_handshake_sent);
+               ("g",conn->last_handshake_sent.generation)("ep", conn->peer_name()));
+            conn->enqueue(conn->last_handshake_sent);
          });
       });
    }
@@ -1148,7 +1154,7 @@ namespace eosio {
          // current, no data to write.
          write_out_timer->expires_from_now(def_write_delay);
          write_out_timer->async_wait(
-            [this, weak_conn](boost::system::error_code ec) {
+            [weak_conn](boost::system::error_code ec) {
                if (ec == boost::asio::error::operation_aborted) return;
                auto conn = weak_conn.lock();
                if(!conn) return;
@@ -1261,7 +1267,8 @@ namespace eosio {
       auto start = peer_requested->last+1;
       auto end = peer_requested->end_block;
       peer_requested.reset();
-      boost::asio::post(app().get_io_service(), [this, start, end](){
+      connection_wptr wpconn = shared_from_this();
+      boost::asio::post(app().get_io_service(), [wpconn, start, end](){
          fc_dlog(logger, "in callback.");
          controller& cc = my_impl->chain_plug->chain();
          auto p_list_sb = make_shared<std::list<signed_block_ptr>>();
@@ -1275,9 +1282,10 @@ namespace eosio {
             p_list_sb->emplace_back(sb);
          }
 
-         boost::asio::post(net_plugin::get_io_service(), [this, p_list_sb](){
+         boost::asio::post(net_plugin::get_io_service(), [wpconn, p_list_sb](){
+            auto conn = wpconn.lock();
             try {
-               batch_enqueue_block(p_list_sb);
+               conn->batch_enqueue_block(p_list_sb);
             } catch ( ... ) {
                wlog( "write loop exception" );
             }
@@ -1351,27 +1359,6 @@ namespace eosio {
       fc::raw::pack( ds, *sb );
       return send_buffer;
    }
-
-//   void connection::batch_enqueue_block(const std::list<signed_block_ptr>& batch_sb) {
-//      while(!batch_sb.empty()) {
-//         auto sb = batch_sb.front();
-//         batch_sb.pop_front();
-//         auto send_buffer = pack_signed_block(sb);
-//
-//         connection_wptr weak_this = shared_from_this();
-//         auto callback = [weak_this](boost::system::error_code ec, std::size_t){
-//            if (!weak_this.lock())
-//               fc_wlog(logger, "connection expired before enqueued net_message called callback!");
-//         };
-//
-//         if(!buffer_queue.add_write_queue(send_buffer, callback, true)){
-//            fc_wlog( logger, "write_queue full ${s} bytes, giving up on connection ${p}",
-//               ("s", buffer_queue.write_queue_size())("p", peer_name()) );
-//            my_impl->close( shared_from_this() );
-//            return;
-//         }
-//      }
-//   }
 
    void connection::enqueue_buffer( const std::shared_ptr<std::vector<char>>& send_buffer, bool trigger_send,
       go_away_reason close_after_send,
