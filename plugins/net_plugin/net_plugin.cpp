@@ -372,7 +372,7 @@ namespace eosio {
    constexpr auto     def_send_buffer_size = 1024*1024*def_send_buffer_size_mb;
    constexpr auto     def_max_write_queue_size = def_send_buffer_size*10;
    constexpr boost::asio::chrono::milliseconds def_read_delay_for_full_write_queue{100};
-   constexpr boost::asio::chrono::milliseconds def_write_delay{100};
+   constexpr boost::asio::chrono::milliseconds def_write_delay{20};
    constexpr auto     def_max_reads_in_flight = 1000;
    constexpr auto     def_max_trx_in_progress_size = 100*1024*1024; // 100 MB
    constexpr auto     def_max_clients = 25; // 0 for unlimited clients
@@ -541,7 +541,6 @@ namespace eosio {
          } else { // postpone real_time write_queue if sync queue is not empty
             fc_dlog(logger, "fill_out_buffer with _write_queue");
             fill_out_buffer( bufs, _write_queue );
-            EOS_ASSERT( _write_queue_size == 0, plugin_exception, "write queue size expected to be zero" );
          }
       }
 
@@ -555,12 +554,15 @@ namespace eosio {
       struct queued_write;
       void fill_out_buffer( std::vector<boost::asio::const_buffer>& bufs,
          deque<queued_write>& w_queue ) {
+         auto i = 0;
          while ( w_queue.size() > 0 ) {
             auto& m = w_queue.front();
             bufs.push_back( boost::asio::buffer( *m.buff ));
             _write_queue_size -= m.buff->size();
             _out_queue.emplace_back( m );
             w_queue.pop_front();
+            if(i >= 50) break;
+            i++;
          }
       }
 
@@ -587,7 +589,7 @@ namespace eosio {
    class connection : public std::enable_shared_from_this<connection> {
    public:
       explicit connection( string endpoint );
-
+      void batch_enqueue_block(const shared_ptr<std::list<signed_block_ptr>>& batch_sb);
       explicit connection( socket_ptr s );
       ~connection();
       void initialize();
@@ -1123,11 +1125,6 @@ namespace eosio {
          my_impl->close( shared_from_this() );
          return;
       }
-      if( buffer_queue.is_out_queue_empty() && trigger_send) {
-         fc_dlog(logger, "call do_queue_write.");
-         do_queue_write();
-      }
-      fc_dlog(logger, "out_queue is not empty or trigger_send is false.");
    }
 
    bool connection::pbft_read_to_send() {
@@ -1135,74 +1132,64 @@ namespace eosio {
    }
 
    void connection::do_queue_write() {
-      connection_wptr c(shared_from_this());
-      if( !(buffer_queue.ready_to_send() || pbft_read_to_send()) ) {
-         fc_dlog(logger, "queue is not ready to send data, peer:${p}", ("p", peer_name()));
-         return;
-//         if(!write_out_timer) return;
-//         write_out_timer->
-//         write_out_timer->expires_from_now(def_write_delay);
-//         write_out_timer->async_wait([this, c](boost::system::error_code ec){
-//            auto conn = c.lock();
-//            if (!conn || !conn->socket || !conn->socket->is_open()) {
-//               return;
-//            }
-//            conn->do_queue_write();
-//         });
-      }
-
       if(!socket->is_open()) {
          fc_elog(logger,"socket not open to ${p}",("p",peer_name()));
-         my_impl->close(c.lock());
          return;
       }
+      connection_wptr weak_conn = shared_from_this();
       std::vector<boost::asio::const_buffer> bufs;
-
       buffer_queue.fill_out_buffer( bufs );
       fill_out_buffer_with_pbft_queue( bufs );
+      if(bufs.empty()){
+         if(!write_out_timer) {
+            fc_wlog(logger, "write_out_timer is null.");
+            return;
+         }
+         // current, no data to write.
+         write_out_timer->expires_from_now(def_write_delay);
+         write_out_timer->async_wait(
+            [this, weak_conn](boost::system::error_code ec) {
+               if (ec == boost::asio::error::operation_aborted) return;
+               auto conn = weak_conn.lock();
+               if(!conn) return;
+               conn->do_queue_write();
+            });
+         return;
+      }
+
       fc_dlog(logger, "before async_write, length:${p}.", ("p", bufs.size()));
-      boost::asio::async_write(*socket, bufs, [c](boost::system::error_code ec, std::size_t w) {
+      boost::asio::async_write(*socket, bufs, [weak_conn](boost::system::error_code ec, std::size_t w) {
+         auto conn = weak_conn.lock();
          try {
-            auto conn = c.lock();
-            if(!conn){
-               fc_wlog(logger, "conn is not connected.");
-               return;
-            }
+            if(!conn) return;
             fc_dlog(logger, "conn is connected, ${p}.", ("p", conn->peer_name()));
-
             conn->buffer_queue.out_callback( ec, w );
-
             if(ec) {
                string pname = conn ? conn->peer_name() : "no connection name";
-               if( ec.value() != boost::asio::error::eof) {
+               if( ec.value() != boost::asio::error::eof)
                   elog("Error sending to peer ${p}: ${i}", ("p",pname)("i", ec.message()));
-               }
-               else {
-                  ilog("connection closure detected on write to ${p}",("p",pname));
-               }
+               else ilog("connection closure detected on write to ${p}",("p",pname));
                my_impl->close(conn);
                return;
             }
             conn->buffer_queue.clear_out_queue();
-            fc_dlog(logger, "before call enqueue_sync_block.");
-            conn->enqueue_sync_block();
-            conn->do_queue_write();
          }
          catch(const std::exception &ex) {
-            auto conn = c.lock();
+            auto conn = weak_conn.lock();
             string pname = conn ? conn->peer_name() : "no connection name";
             elog("Exception in do_queue_write to ${p} ${s}", ("p",pname)("s",ex.what()));
          }
          catch(const fc::exception &ex) {
-            auto conn = c.lock();
+            auto conn = weak_conn.lock();
             string pname = conn ? conn->peer_name() : "no connection name";
             elog("Exception in do_queue_write to ${p} ${s}", ("p",pname)("s",ex.to_string()));
          }
          catch(...) {
-            auto conn = c.lock();
+            auto conn = weak_conn.lock();
             string pname = conn ? conn->peer_name() : "no connection name";
             elog("Exception in do_queue_write to ${p}", ("p",pname) );
          }
+         conn->do_queue_write();
       });
    }
 
@@ -1268,38 +1255,57 @@ namespace eosio {
    }
 
    void connection::enqueue_sync_block() {
-      if (!peer_requested) {
-         fc_dlog(logger, "peer_requested is empty, peer_addr:${p}.", ("p", peer_name()));
-         return;
-      }
       fc_dlog(logger, "begin call enqueue_sync_block,peer_requested: last = ${last}, start = ${start}, "
                       "end = ${end}.", ("last", peer_requested->last) ("start", peer_requested->start_block)
          ("end", peer_requested->end_block));
-      uint32_t num = ++peer_requested->last;
-//      bool trigger_send = num == peer_requested->start_block;
-      bool trigger_send = true;
-      if(num == peer_requested->end_block) {
-         fc_dlog(logger, "reset peer_requested.");
-         peer_requested.reset();
-      }
-      boost::asio::post(app().get_io_service(), [this, num, trigger_send](){
+      auto start = peer_requested->last+1;
+      auto end = peer_requested->end_block;
+      peer_requested.reset();
+      boost::asio::post(app().get_io_service(), [this, start, end](){
          fc_dlog(logger, "in callback.");
          controller& cc = my_impl->chain_plug->chain();
-         signed_block_ptr sb = cc.fetch_block_by_number(num);
-         if(sb) {
-            fc_dlog(logger, "signed_block sb is not nullptr.");
-            signed_block_ptr new_sb = make_shared<signed_block>(sb->clone());
-            boost::asio::post(net_plugin::get_io_service(), [this, new_sb, trigger_send](){
-               try {
-                  enqueue_block( new_sb, trigger_send, true);
-               } catch ( ... ) {
-                  wlog( "write loop exception" );
-               }
-            });
-         } else
-            fc_dlog(logger, "signed_block sb is nullptr.");
+         auto p_list_sb = make_shared<std::list<signed_block_ptr>>();
+
+         for(auto num = start; num<= end; num++){
+            signed_block_ptr sb = cc.fetch_block_by_number(num);
+            if(!sb) {
+               fc_dlog(logger, "block num: ${num} is not existed.", ("num", num));
+               continue;
+            }
+            p_list_sb->emplace_back(sb);
+         }
+
+         boost::asio::post(net_plugin::get_io_service(), [this, p_list_sb](){
+            try {
+               batch_enqueue_block(p_list_sb);
+            } catch ( ... ) {
+               wlog( "write loop exception" );
+            }
+         });
       });
    }
+
+   void connection::batch_enqueue_block(const shared_ptr<std::list<signed_block_ptr>>& batch_sb) {
+      while(!batch_sb->empty()) {
+         auto sb = batch_sb->front();
+         batch_sb->pop_front();
+         auto send_buffer = pack_signed_block(sb);
+
+         connection_wptr weak_this = shared_from_this();
+         auto callback = [weak_this](boost::system::error_code ec, std::size_t){
+            if (!weak_this.lock())
+               fc_wlog(logger, "connection expired before enqueued net_message called callback!");
+         };
+
+         if(!buffer_queue.add_write_queue(send_buffer, callback, true)){
+            fc_wlog( logger, "write_queue full ${s} bytes, giving up on connection ${p}",
+               ("s", buffer_queue.write_queue_size())("p", peer_name()) );
+            my_impl->close( shared_from_this() );
+            return;
+         }
+      }
+   }
+
 
    void connection::enqueue( const net_message& m, bool trigger_send ) {
       go_away_reason close_after_send = no_reason;
@@ -1391,10 +1397,6 @@ namespace eosio {
    void connection::enqueue_pbft(const std::shared_ptr<std::vector<char>>& m, const time_point_sec deadline)
    {
       pbft_queue.push_back(queued_pbft_message{m, deadline });
-      if (buffer_queue.is_out_queue_empty()) {
-         fc_dlog(logger, "before do_queue_write.");
-         do_queue_write();
-      }
    }
 
    void connection::cancel_wait() {
@@ -2349,6 +2351,7 @@ namespace eosio {
       }
       else {
          start_read_message( con );
+         con->do_queue_write();
          ++started_sessions;
          return true;
          // for now, we can just use the application main loop.
@@ -3901,7 +3904,9 @@ namespace eosio {
    }
 
    void net_plugin::plugin_shutdown() {
-      my->subthread_shutdown();
+      boost::asio::post(get_io_service(), [this](){
+         my->subthread_shutdown();
+      });
       my->net_thread.join();
    }
 
