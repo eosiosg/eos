@@ -1142,14 +1142,14 @@ namespace eosio {
    }
 
    void connection::do_queue_write() {
-      if(!socket->is_open()) {
+      if(!socket || !socket->is_open()) {
          fc_elog(logger,"socket not open to ${p}",("p",peer_name()));
          return;
       }
       connection_wptr weak_conn = shared_from_this();
       std::vector<boost::asio::const_buffer> bufs;
-      buffer_queue.fill_out_buffer( bufs );
-      fill_out_buffer_with_pbft_queue( bufs );
+      buffer_queue.fill_out_buffer(bufs);
+      fill_out_buffer_with_pbft_queue(bufs);
       if(bufs.empty()){
          if(!write_out_timer) {
             fc_wlog(logger, "write_out_timer is null.");
@@ -1288,6 +1288,10 @@ namespace eosio {
 
          boost::asio::post(net_plugin::get_io_service(), [wpconn, p_list_sb](){
             auto conn = wpconn.lock();
+            if(conn == nullptr) {
+               fc_ilog(logger, "conn is nullptr.");
+               return;
+            }
             try {
                conn->batch_enqueue_block(p_list_sb);
             } catch ( ... ) {
@@ -1312,7 +1316,7 @@ namespace eosio {
          if(!buffer_queue.add_write_queue(send_buffer, callback, true)){
             fc_wlog( logger, "write_queue full ${s} bytes, giving up on connection ${p}",
                ("s", buffer_queue.write_queue_size())("p", peer_name()) );
-            my_impl->close( shared_from_this() );
+            my_impl->close(shared_from_this());
             return;
          }
       }
@@ -2991,11 +2995,11 @@ namespace eosio {
             fc_dlog(logger, "got a txn in read-only mode - dropping");
             return;
          }
-         if (sync_master->is_active(c)) {
-            fc_dlog(logger, "got a txn during sync - dropping");
-            return;
-         }
          boost::asio::post(net_plugin::get_io_service(), [this, c, trx]{
+            if (sync_master->is_active(c)) {
+               fc_dlog(logger, "got a txn during sync - dropping");
+               return;
+            }
             auto ptrx = std::make_shared<transaction_metadata>(trx);
             const auto& tid = ptrx->id;
 
@@ -3016,7 +3020,9 @@ namespace eosio {
                      auto trace = result.get<transaction_trace_ptr>();
                      if (!trace->except) {
                         fc_dlog(logger, "chain accepted transaction");
-                        this->dispatcher->bcast_transaction(ptrx);
+                        boost::asio::post(net_plugin::get_io_service(), [this, ptrx](){
+                           dispatcher->bcast_transaction(ptrx);
+                        });
                         return;
                      }
                      fc_dlog(logger, "bad packed_transaction : ${m}", ("m",trace->except->what()));
@@ -3502,6 +3508,10 @@ namespace eosio {
    }
 
    void net_plugin_impl::close(const connection_ptr& c) {
+      if(!c){
+         fc_ilog(logger, "conn had been closed.");
+         return;
+      }
       if( c->peer_addr.empty() && c->socket->is_open() ) {
          if (num_clients == 0) {
             fc_wlog( logger, "num_clients already at 0");
