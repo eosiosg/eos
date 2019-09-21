@@ -200,7 +200,7 @@ namespace eosio {
             explicit pbft_prepared_certificate() = default;
 
             block_info_type      block_info;
-            set<block_id_type>   pre_prepares;
+            vector<block_id_type>   pre_prepares;
             vector<pbft_prepare> prepares;
 
             bool operator<(const pbft_prepared_certificate& rhs) const {
@@ -520,6 +520,12 @@ namespace eosio {
             uint16_t get_checkpoint_interval() const;
             const pbft_view_type get_current_view() { return _current_view; }
             void set_current_view(pbft_view_type view) { _current_view = view; }
+
+			template<typename Signal, typename Arg>
+			void emit(const Signal& s, Arg&& a);
+			signal<void(const block_id_type&)> set_pbft_prepared;
+			signal<void(const block_id_type&)> set_pbft_my_prepare;
+			signal<void()> reset_pbft_my_prepare;
 
             //api related
             pbft_state_ptr get_pbft_state_by_id(const block_id_type& id) const;

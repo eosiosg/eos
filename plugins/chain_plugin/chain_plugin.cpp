@@ -857,6 +857,27 @@ void chain_plugin::plugin_initialize(const variables_map& options) {
                   my->pbft_outgoing_checkpoint_channel.publish( checkpoint );
               });
 
+      my->pbft_ctrl->pbft_db.set_pbft_prepared.connect(
+      		[this] (const block_id_type& prepared) {
+      			app().get_io_service().post([this, &prepared](){
+      				my->chain->set_pbft_prepared(prepared);
+      			});
+      		});
+
+	  my->pbft_ctrl->pbft_db.set_pbft_my_prepare.connect(
+	   		[this] (const block_id_type& my_prepare) {
+	   			app().get_io_service().post([this, &my_prepare](){
+	   				my->chain->set_pbft_my_prepare(my_prepare);
+	   			});
+	   		});
+	  my->pbft_ctrl->pbft_db.reset_pbft_my_prepare.connect(
+	  		[this] () {
+	  			app().get_io_service().post([this](){
+	  				my->chain->reset_pbft_my_prepare();
+	  			});
+	  		});
+
+
       my->chain->add_indices();
    } FC_LOG_AND_RETHROW()
 

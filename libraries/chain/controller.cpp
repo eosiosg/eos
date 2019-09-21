@@ -151,7 +151,6 @@ struct controller_impl {
    bool                           trusted_producer_light_validation = false;
    uint32_t                       snapshot_head_block = 0;
    boost::asio::thread_pool       thread_pool;
-   std::mutex                     mtx_;
    mutable boost::shared_mutex    pending_mtx_;
 
    typedef pair<scope_name,action_name>                   handler_key;
@@ -1707,7 +1706,7 @@ struct controller_impl {
    }
 
    void maybe_switch_forks( controller::block_status s ) {
-      auto new_head = fork_db.head();
+	   auto new_head = fork_db.head();
 
       if( new_head->header.previous == head->id ) {
          try {

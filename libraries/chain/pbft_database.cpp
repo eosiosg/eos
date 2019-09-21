@@ -237,7 +237,9 @@ namespace eosio {
                             prepares_to_be_cached.emplace_back(new_p);
                         }
                     }
-                    if (sent) ctrl.set_pbft_my_prepare(hwbs->id);
+                    if (sent) {
+                    	emit(set_pbft_my_prepare, hwbs->id);
+                    }
                 }
             }
             return prepares_to_be_cached;
@@ -252,7 +254,7 @@ namespace eosio {
             pbft_state_ptr psp = *itr;
 
             if (psp->is_prepared && (psp->block_num > ctrl.last_irreversible_block_num())) {
-                ctrl.set_pbft_prepared((*itr)->block_id);
+            	emit(set_pbft_prepared, (*itr)->block_id);
                 return true;
             }
             return false;
@@ -577,7 +579,7 @@ namespace eosio {
 
         void pbft_database::cleanup_on_new_view() {
             view_state_index.clear();
-            ctrl.reset_pbft_my_prepare();
+            reset_pbft_my_prepare();
         }
 
         pbft_new_view pbft_database::generate_pbft_new_view(
@@ -673,11 +675,11 @@ namespace eosio {
 
                 ppc.block_info = {psp->block_id};
                 ppc.prepares=valid_prepares;
-                ppc.pre_prepares.emplace(psp->block_id);
+                ppc.pre_prepares.emplace_back(psp->block_id);
                 for (const auto& p: valid_prepares) {
                     auto bid = p.block_info.block_id;
-                    while (bid != psp->block_id) {
-                        ppc.pre_prepares.emplace(bid);
+                    while (bid != psp->block_id && std::find(ppc.pre_prepares.begin(), ppc.pre_prepares.end(), bid) == ppc.pre_prepares.end()) {
+                        ppc.pre_prepares.emplace_back(bid);
                         bid = ctrl.fetch_block_state_by_id(bid)->prev();
                     }
                 }
@@ -804,6 +806,7 @@ namespace eosio {
             auto prepares_metadata = vector<pbft_message_metadata<pbft_prepare>>{};
             prepares_metadata.reserve(prepares.size());
 
+            boost::asio::thread_pool &thread_pool = get_thread_pool();
             for (auto& p : prepares) {
                 auto pmm = pbft_message_metadata<pbft_prepare>(p, chain_id);
                 prepares_metadata.emplace_back(pmm);
@@ -1622,5 +1625,22 @@ namespace eosio {
                 checkpoint_index.erase(itr);
             }
         }
+
+		template<typename Signal, typename Arg>
+		void pbft_database::emit(const Signal& s, Arg&& a) {
+			try {
+				s(std::forward<Arg>(a));
+			} catch (boost::interprocess::bad_alloc &e) {
+				wlog("bad alloc");
+				throw e;
+			} catch (controller_emit_signal_exception &e) {
+				wlog("${details}", ("details", e.to_detail_string()));
+				throw e;
+			} catch (fc::exception &e) {
+				wlog("${details}", ("details", e.to_detail_string()));
+			} catch (...) {
+				wlog("signal handler threw exception");
+			}
+		}
     }
 }
