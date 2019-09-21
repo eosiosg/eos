@@ -1600,7 +1600,7 @@ struct controller_impl {
          set_pbft_lib();
 
          if ( read_mode != db_read_mode::IRREVERSIBLE ) {
-             maybe_switch_forks( s );
+             maybe_switch_forks( s , __FUNCTION__);
          }
 
          set_pbft_lscb();
@@ -1628,7 +1628,7 @@ struct controller_impl {
          emit( self.accepted_block_header, new_header_state );
 
          if ( read_mode != db_read_mode::IRREVERSIBLE ) {
-            maybe_switch_forks( s );
+            maybe_switch_forks( s , __FUNCTION__);
          }
 
          // apply stable checkpoint when there is one
@@ -1658,13 +1658,14 @@ struct controller_impl {
       if (!pbft_enabled) return;
 
       if ( pending_pbft_lib ) {
-      	 std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
-      	 fork_db.set_bft_irreversible(*pending_pbft_lib);
-         pending_pbft_lib.reset();
-         lock.unlock();
+		 std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
+		 block_id_type pending_lib = *pending_pbft_lib;
+		 pending_pbft_lib.reset();
+		 lock.unlock();
+      	 fork_db.set_bft_irreversible(pending_lib);
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
-            maybe_switch_forks(controller::block_status::complete);
+            maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
          }
       }
    }
@@ -1682,10 +1683,12 @@ struct controller_impl {
        if ( pending_pbft_checkpoint ) {
 
 		   std::unique_lock<std::mutex> lock(pending_pbft_checkpoint_mtx_);
-		   auto checkpoint_block_state = fork_db.get_block(*pending_pbft_checkpoint);
+		   block_id_type pending_checkpoint = *pending_pbft_checkpoint;
+		   pending_pbft_checkpoint.reset();
+		   lock.unlock();
+		   auto checkpoint_block_state = fork_db.get_block(pending_checkpoint);
            if (checkpoint_block_state) {
-              fork_db.set_latest_checkpoint(*pending_pbft_checkpoint);
-              lock.unlock();
+              fork_db.set_latest_checkpoint(pending_checkpoint);
               auto checkpoint_num = checkpoint_block_state->block_num;
               std::unique_lock<std::mutex> prepared_lock(pbft_prepared_mtx_);
               if (pbft_prepared && pbft_prepared->block_num < checkpoint_num) {
@@ -1698,14 +1701,10 @@ struct controller_impl {
                  my_prepare_lock.unlock();
               }
            }
-		   std::unique_lock<std::mutex> checkpoint_lock(pending_pbft_checkpoint_mtx_);
-           pending_pbft_checkpoint.reset();
-           checkpoint_lock.unlock();
-
        }
    }
 
-   void maybe_switch_forks( controller::block_status s ) {
+   void maybe_switch_forks( controller::block_status s, const char *caller = __FUNCTION__ ) {
 	   auto new_head = fork_db.head();
 
       if( new_head->header.previous == head->id ) {
@@ -1719,8 +1718,8 @@ struct controller_impl {
             throw;
          }
       } else if( new_head->id != head->id ) {
-         ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
-              ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
+         ilog("caller ${func} switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num}) ",
+              ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num)("func", caller) );
          auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
 
          for( auto itr = branches.second.begin(); itr != branches.second.end(); ++itr ) {
@@ -2539,7 +2538,7 @@ void controller::set_pbft_prepared(const block_id_type& id) {
       my->fork_db.mark_pbft_prepared_fork(bs);
       lock.unlock();
 	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
-		   my->maybe_switch_forks(controller::block_status::complete);
+		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	   }
    }
 }
@@ -2553,7 +2552,7 @@ void controller::set_pbft_my_prepare(const block_id_type& id) {
       my->fork_db.mark_pbft_my_prepare_fork(bs);
       lock.unlock();
 	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
-		   my->maybe_switch_forks(controller::block_status::complete);
+		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	   }
    }
 }
@@ -2573,7 +2572,7 @@ block_id_type controller::get_pbft_my_prepare() const {
 void controller::reset_pbft_my_prepare() {
 	my->fork_db.remove_pbft_my_prepare_fork();
 	if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
-		my->maybe_switch_forks(controller::block_status::complete);
+		my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	}
 
 	std::unique_lock<std::mutex> lock(my->my_prepare_mtx_);
