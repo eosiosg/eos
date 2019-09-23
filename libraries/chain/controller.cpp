@@ -132,9 +132,8 @@ struct controller_impl {
    optional<block_id_type>        pending_pbft_checkpoint;
    std::mutex                     pending_pbft_checkpoint_mtx_;
    block_state_ptr                pbft_prepared;
-   std::mutex                     pbft_prepared_mtx_;
    block_state_ptr                my_prepare;
-   std::mutex                     my_prepare_mtx_;
+   mutable boost::shared_mutex    my_prepare_mtx_;
    block_state_ptr                head;
    fork_database                  fork_db;
    wasm_interface                 wasmif;
@@ -151,7 +150,6 @@ struct controller_impl {
    bool                           trusted_producer_light_validation = false;
    uint32_t                       snapshot_head_block = 0;
    boost::asio::thread_pool       thread_pool;
-   mutable boost::shared_mutex    pending_mtx_;
 
    typedef pair<scope_name,action_name>                   handler_key;
    map< account_name, map<handler_key, apply_handler> >   apply_handlers;
@@ -1361,7 +1359,7 @@ struct controller_impl {
       set_pbft_lscb();
 
       auto guard_pending = fc::make_scoped_exit([this](){
-         pending.reset();
+		   pending.reset();
       });
 
       if (!self.skip_db_sessions(s)) {
@@ -2295,7 +2293,6 @@ account_name  controller::fork_db_head_block_producer()const {
 }
 
 block_state_ptr controller::pending_block_state()const {
-	boost::shared_lock_guard<boost::shared_mutex> lock(my->pending_mtx_);
 	if( my->pending ) {
 	   return my->pending->_pending_block_state;
     }
@@ -2530,13 +2527,11 @@ chain_id_type controller::get_chain_id()const {
 }
 
 void controller::set_pbft_prepared(const block_id_type& id) {
-	std::unique_lock<std::mutex> lock(my->pbft_prepared_mtx_);
-	my->pbft_prepared.reset();
+   my->pbft_prepared.reset();
    auto bs = fetch_block_state_by_id(id);
    if (bs) {
       my->pbft_prepared = bs;
       my->fork_db.mark_pbft_prepared_fork(bs);
-      lock.unlock();
 	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	   }
@@ -2544,13 +2539,15 @@ void controller::set_pbft_prepared(const block_id_type& id) {
 }
 
 void controller::set_pbft_my_prepare(const block_id_type& id) {
-	std::unique_lock<std::mutex> lock(my->my_prepare_mtx_);
-   my->my_prepare.reset();
+	boost::unique_lock<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
+	my->my_prepare.reset();
+	my_prepare_lock.unlock();
    auto bs = fetch_block_state_by_id(id);
    if (bs) {
-      my->my_prepare = bs;
-      my->fork_db.mark_pbft_my_prepare_fork(bs);
-      lock.unlock();
+   	boost::unique_lock<boost::shared_mutex> lock(my->my_prepare_mtx_);
+   	my->my_prepare = bs;
+	   lock.unlock();
+	   my->fork_db.mark_pbft_my_prepare_fork(bs);
 	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	   }
@@ -2565,6 +2562,7 @@ block_id_type controller::get_pbft_prepared() const {
 
 block_id_type controller::get_pbft_my_prepare() const {
    block_id_type mp;
+   boost::shared_lock_guard<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
    if (my->my_prepare) mp = my->my_prepare->id;
    return mp;
 }
@@ -2575,9 +2573,8 @@ void controller::reset_pbft_my_prepare() {
 		my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	}
 
-	std::unique_lock<std::mutex> lock(my->my_prepare_mtx_);
-   if (my->my_prepare) my->my_prepare.reset();
-   lock.unlock();
+	boost::unique_lock<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
+	if (my->my_prepare) my->my_prepare.reset();
 }
 
 void controller::reset_pbft_prepared() {
