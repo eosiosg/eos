@@ -113,8 +113,9 @@ namespace eosio {
             if (e->msg.new_view <= get_current_view()) return;
 
             e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-            try {
-                pbft_db.validate_new_view(e->msg, e->sender_key.get());
+				auto sender_key = e->sender_key.get();
+				try {
+                pbft_db.validate_new_view(e->msg, sender_key);
             } catch (const fc::exception& ex) {
                 elog("bad new view, ${s} ", ("s",ex.to_string()));
                 return;
