@@ -3188,7 +3188,8 @@ namespace eosio {
 
            if (!missing_blocks.empty()) {
                fc_dlog(logger, "requesting ${num} missing blocks from view change", ("num", missing_blocks.size()));
-               request_message req;
+					wlog("requesting ${num} missing blocks from view change", ("num", missing_blocks.size()));
+					request_message req;
                for (auto const &b: missing_blocks) {
                    req.req_blocks.ids.push_back(b);
                }
