@@ -3182,7 +3182,7 @@ namespace eosio {
 		   if (!pcc.pbft_db.is_valid_view_change(pmm.msg, sender_key)) return;
 
            auto missing_blocks = set<block_id_type>{};
-           for (auto const &b: pmm.msg.prepared_cert.pre_prepares) {
+           for (auto const b: pmm.msg.prepared_cert.pre_prepares) {
                if (!ctrl.fetch_block_by_id(b)) missing_blocks.emplace(b);
            }
 
