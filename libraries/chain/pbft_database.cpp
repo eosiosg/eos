@@ -1036,7 +1036,7 @@ namespace eosio {
             auto schedule_threshold = lscb_producers.size() * 2 / 3 + 1;
 
             auto view_changes = nv.view_changed_cert.view_changes;
-            auto view_changes_metadata = vector<pbft_message_metadata<pbft_view_change>>{};
+            auto view_changes_metadata = vector<std::pair<pbft_view_change, fc::crypto::public_key>>{};
             view_changes_metadata.reserve(view_changes.size());
 
             vector<public_key_type> view_change_producers;
@@ -1049,7 +1049,7 @@ namespace eosio {
                     add_pbft_view_change(vc, sender_key);
                     view_change_producers.emplace_back(sender_key);
                 }
-                view_changes_metadata.emplace_back(std::move(pmm));
+                view_changes_metadata.emplace_back(std::make_pair(vc, sender_key));
             }
 
             vector<public_key_type> intersection;
