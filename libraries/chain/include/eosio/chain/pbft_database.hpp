@@ -66,17 +66,17 @@ namespace eosio {
             explicit pbft_message_metadata(pbft_message_body m, chain_id_type& chain_id): msg{m} {}
 
             void get_sender_key(boost::asio::thread_pool &thread_pool, chain_id_type& chain_id) {
-				try {
-					sender_key = async_thread_pool(thread_pool, [this, &chain_id](){
-						try{
-							return crypto::public_key(msg.sender_signature, this->msg.digest(chain_id), true);
-						} catch (...) {
-							return fc::crypto::public_key();
-						}
-					});
-				} catch (fc::exception & /*e*/) {
-					wlog("bad pbft message signature: ${m}", ("m", msg));
-				}
+					 try {
+						 sender_key = async_thread_pool(thread_pool, [this, &chain_id](){
+							 try{
+								 return crypto::public_key(msg.sender_signature, this->msg.digest(chain_id), true);
+							 } catch (...) {
+								 return fc::crypto::public_key();
+							 }
+						 });
+					 } catch (fc::exception & /*e*/) {
+						 wlog("bad pbft message signature: ${m}", ("m", msg));
+					 }
             }
 
             pbft_message_body   msg;
