@@ -238,7 +238,7 @@ namespace eosio {
                         }
                     }
                     if (sent) {
-                    	emit(set_pbft_my_prepare, hwbs->id);
+                    	 	emit(set_pbft_my_prepare, hwbs->id);
                     }
                 }
             }
@@ -254,7 +254,7 @@ namespace eosio {
             pbft_state_ptr psp = *itr;
 
             if (psp->is_prepared && (psp->block_num > ctrl.last_irreversible_block_num())) {
-            	emit(set_pbft_prepared, (*itr)->block_id);
+            	 emit(set_pbft_prepared, (*itr)->block_id);
                 return true;
             }
             return false;
@@ -803,15 +803,17 @@ namespace eosio {
             if (certificate.block_info.block_num() <= ctrl.last_irreversible_block_num()) return true;
 
             auto prepares = certificate.prepares;
-            auto prepares_metadata = vector<pbft_message_metadata<pbft_prepare>>{};
+            auto prepares_metadata = vector<std::pair<pbft_prepare, fc::crypto::public_key>>{};
             prepares_metadata.reserve(prepares.size());
 
             boost::asio::thread_pool &thread_pool = get_thread_pool();
-            for (auto& p : prepares) {
-                auto pmm = pbft_message_metadata<pbft_prepare>(p, chain_id);
-                prepares_metadata.emplace_back(pmm);
-                if ( add_to_pbft_db && is_valid_prepare(p, pmm.sender_key) ) add_pbft_prepare(p, pmm.sender_key);
-            }
+				for (auto& p : prepares) {
+					 auto pmm = pbft_message_metadata<pbft_prepare>(p, chain_id);
+					 pmm.get_sender_key(thread_pool, chain_id);
+					 auto sender_key = pmm.sender_key.get();
+					 if (add_to_pbft_db && is_valid_prepare(p, sender_key)) add_pbft_prepare(p, sender_key);
+					 prepares_metadata.emplace_back(std::make_pair(p, sender_key));
+				}
 
             auto cert_id = certificate.block_info.block_id;
             auto cert_bs = ctrl.fetch_block_state_by_id(cert_id);
@@ -825,18 +827,21 @@ namespace eosio {
             flat_map<pbft_view_type, vector<producer_and_block_info>> prepare_msg;
 
             for (const auto& pm: prepares_metadata) {
-                if (prepare_count.find(pm.msg.view) == prepare_count.end()) {
-                    prepare_count[pm.msg.view] = 0;
-                    prepare_msg[pm.msg.view].reserve(bp_threshold);
+            	 auto prepare = pm.first;
+                if (prepare_count.find(prepare.view) == prepare_count.end()) {
+                    prepare_count[prepare.view] = 0;
+                    prepare_msg[prepare.view].reserve(bp_threshold);
                 }
             }
 
             for (const auto& bp: producer_schedule.producers) {
-                for (const auto& pm: prepares_metadata) {
-                    if (bp.block_signing_key == pm.sender_key) {
-                        prepare_count[pm.msg.view] += 1;
-                        prepare_msg[pm.msg.view].emplace_back(std::make_pair(pm.sender_key, pm.msg.block_info));
-                    }
+                for (auto& pm: prepares_metadata) {
+                	 auto prepare = pm.first;
+                	 auto sender_key = pm.second;
+                	 if (bp.block_signing_key == sender_key) {
+                	 	 prepare_count[prepare.view] += 1;
+                	 	 prepare_msg[prepare.view].emplace_back(std::make_pair(sender_key, prepare.block_info));
+                	 }
                 }
             }
 
@@ -860,14 +865,17 @@ namespace eosio {
             if (certificate.block_info.block_num() <= ctrl.last_stable_checkpoint_block_num()) return true;
 
             auto commits = certificate.commits;
-            auto commits_metadata = vector<pbft_message_metadata<pbft_commit>>{};
-            commits_metadata.reserve(commits.size());
+            auto commits_metadata = vector<std::pair<pbft_commit, fc::crypto::public_key>>{};
+				commits_metadata.reserve(commits.size());
 
-            for (auto& c : commits) {
-                auto pmm = pbft_message_metadata<pbft_commit>(c, chain_id);
-                commits_metadata.emplace_back(pmm);
-                if (add_to_pbft_db && is_valid_commit(c, pmm.sender_key)) add_pbft_commit(c, pmm.sender_key);
-            }
+				boost::asio::thread_pool &thread_pool = get_thread_pool();
+				for (auto& c : commits) {
+					 auto pmm = pbft_message_metadata<pbft_commit>(c, chain_id);
+					 pmm.get_sender_key(thread_pool, chain_id);
+					 auto sender_key = pmm.sender_key.get();
+					 if (add_to_pbft_db && is_valid_commit(c, sender_key)) add_pbft_commit(c, sender_key);
+					 commits_metadata.emplace_back(std::make_pair(c, sender_key));
+				}
 
             auto cert_id = certificate.block_info.block_id;
             auto cert_bs = ctrl.fetch_block_state_by_id(cert_id);
@@ -881,18 +889,21 @@ namespace eosio {
             flat_map<pbft_view_type, vector<producer_and_block_info>> commit_msg;
 
             for (const auto& cm: commits_metadata) {
-                if (commit_count.find(cm.msg.view) == commit_count.end()) {
-                    commit_count[cm.msg.view] = 0;
-                    commit_msg[cm.msg.view].reserve(bp_threshold);
+            	 auto commit = cm.first;
+                if (commit_count.find(commit.view) == commit_count.end()) {
+                    commit_count[commit.view] = 0;
+                    commit_msg[commit.view].reserve(bp_threshold);
                 }
             }
 
             for (const auto& bp: producer_schedule.producers) {
-                for (const auto& cm: commits_metadata) {
-                    if (bp.block_signing_key == cm.sender_key) {
-                        commit_count[cm.msg.view] += 1;
-                        commit_msg[cm.msg.view].emplace_back(std::make_pair(cm.sender_key, cm.msg.block_info));
-                    }
+                for (auto& cm: commits_metadata) {
+                	 auto commit = cm.first;
+                	 auto sender_key = cm.second;
+                	if (bp.block_signing_key == sender_key) {
+                    	commit_count[commit.view] += 1;
+							commit_msg[commit.view].emplace_back(std::make_pair(sender_key, commit.block_info));
+						}
                 }
             }
 
@@ -1015,8 +1026,9 @@ namespace eosio {
             }
 
             EOS_ASSERT(nv.view_changed_cert.target_view == nv.new_view, pbft_exception, "target view not match");
+				boost::asio::thread_pool &thread_pool = get_thread_pool();
 
-            vector<public_key_type> lscb_producers;
+				vector<public_key_type> lscb_producers;
             lscb_producers.reserve(lscb_active_producers().producers.size());
             for (const auto& bp: lscb_active_producers().producers) {
                 lscb_producers.emplace_back(bp.block_signing_key);
@@ -1031,11 +1043,13 @@ namespace eosio {
             view_change_producers.reserve(view_changes.size());
             for (auto& vc : view_changes) {
                 auto pmm = pbft_message_metadata<pbft_view_change>(vc, chain_id);
-                view_changes_metadata.emplace_back(pmm);
-                if (is_valid_view_change(vc, pmm.sender_key)) {
-                    add_pbft_view_change(vc, pmm.sender_key);
-                    view_change_producers.emplace_back(pmm.sender_key);
+                pmm.get_sender_key(thread_pool, chain_id);
+                auto sender_key = pmm.sender_key.get();
+                if (is_valid_view_change(vc, sender_key)) {
+                    add_pbft_view_change(vc, sender_key);
+                    view_change_producers.emplace_back(sender_key);
                 }
+                view_changes_metadata.emplace_back(std::move(pmm));
             }
 
             vector<public_key_type> intersection;
@@ -1377,15 +1391,19 @@ namespace eosio {
                 return true;
 
             auto checkpoints = scp.checkpoints;
-            auto checkpoints_metadata = vector<pbft_message_metadata<pbft_checkpoint>>{};
-            checkpoints_metadata.reserve(checkpoints.size());
+            auto checkpoints_metadata = vector<std::pair<pbft_checkpoint, fc::crypto::public_key>>{};
+				checkpoints_metadata.reserve(checkpoints.size());
+
+				boost::asio::thread_pool &thread_pool = get_thread_pool();
 
             for (auto& cp : checkpoints) {
                 auto pmm = pbft_message_metadata<pbft_checkpoint>(cp, chain_id);
-                checkpoints_metadata.emplace_back(pmm);
-                if (cp.block_info != scp.block_info || !is_valid_checkpoint(cp, pmm.sender_key)) return false;
-                if (add_to_pbft_db) add_pbft_checkpoint(cp, pmm.sender_key);
-            }
+                pmm.get_sender_key(thread_pool, chain_id);
+                auto sender_key = pmm.sender_key.get();
+                if (cp.block_info != scp.block_info || !is_valid_checkpoint(cp, sender_key)) return false;
+                if (add_to_pbft_db) add_pbft_checkpoint(cp, sender_key);
+                checkpoints_metadata.emplace_back(std::make_pair(cp, sender_key));
+				}
 
             if (add_to_pbft_db) checkpoint_local();
 
@@ -1395,7 +1413,8 @@ namespace eosio {
                 auto cp_count = 0;
                 for (const auto& bp: as.producers) {
                     for (const auto& cpm: checkpoints_metadata) {
-                        if (bp.block_signing_key == cpm.sender_key) cp_count += 1;
+                    	 	auto sender_key = cpm.second;
+                        if (bp.block_signing_key == sender_key) cp_count += 1;
                     }
                 }
                 return cp_count >= as.producers.size() * 2 / 3 + 1;
