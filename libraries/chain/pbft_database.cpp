@@ -1389,7 +1389,7 @@ namespace eosio {
                 // it will not be applied nor saved, thus considered safe.
                 return true;
 
-            auto checkpoints = scp.checkpoints;
+            vector<pbft_checkpoint> checkpoints(scp.checkpoints);
             auto checkpoints_metadata = vector<std::pair<pbft_checkpoint, fc::crypto::public_key>>{};
 				checkpoints_metadata.reserve(checkpoints.size());
 
