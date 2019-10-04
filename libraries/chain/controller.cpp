@@ -1669,7 +1669,7 @@ struct controller_impl {
    }
 
    void set_pbft_latest_checkpoint( const block_id_type& id ) {
-   	  std::lock_guard<std::mutex> lock(pending_pbft_checkpoint_mtx_);
+   	 std::lock_guard<std::mutex> lock(pending_pbft_checkpoint_mtx_);
       pending_pbft_checkpoint.reset();
       pending_pbft_checkpoint.emplace(id);
    }
@@ -1688,12 +1688,10 @@ struct controller_impl {
            if (checkpoint_block_state) {
               fork_db.set_latest_checkpoint(pending_checkpoint);
               auto checkpoint_num = checkpoint_block_state->block_num;
-              std::unique_lock<std::mutex> prepared_lock(pbft_prepared_mtx_);
               if (pbft_prepared && pbft_prepared->block_num < checkpoint_num) {
                  pbft_prepared.reset();
-                 prepared_lock.unlock();
               }
-              std::unique_lock<std::mutex> my_prepare_lock(pbft_prepared_mtx_);
+              boost::unique_lock<boost::shared_mutex> my_prepare_lock(my_prepare_mtx_);
               if (my_prepare && my_prepare->block_num < checkpoint_num) {
                  my_prepare.reset();
                  my_prepare_lock.unlock();

@@ -69,7 +69,7 @@ namespace eosio {
 					 try {
 						 sender_key = async_thread_pool(thread_pool, [this, &chain_id](){
 							 try{
-								 return crypto::public_key(msg.sender_signature, this->msg.digest(chain_id), true);
+								 return crypto::public_key(msg.sender_signature, msg.digest(chain_id), true);
 							 } catch (...) {
 								 return fc::crypto::public_key();
 							 }
