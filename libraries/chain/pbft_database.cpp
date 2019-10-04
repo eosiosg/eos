@@ -652,7 +652,6 @@ namespace eosio {
 
                 for (const auto& pre: prepares) {
                     if (prepare_count.find(pre.first.first) == prepare_count.end()) prepare_count[pre.first.first] = 0;
-                    prepare_msg[pre.first.first].emplace_back(pre.second);
                 }
 
                 for (const auto& bp: as) {
