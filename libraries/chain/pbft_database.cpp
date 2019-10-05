@@ -801,7 +801,7 @@ namespace eosio {
             // a certificate under lib is also treated as null.
             if (certificate.block_info.block_num() <= ctrl.last_irreversible_block_num()) return true;
 
-            auto prepares = certificate.prepares;
+            vector<pbft_prepare> prepares(certificate.prepares);
             auto prepares_metadata = vector<std::pair<pbft_prepare, fc::crypto::public_key>>{};
             prepares_metadata.reserve(prepares.size());
 
