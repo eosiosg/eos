@@ -1008,7 +1008,10 @@ namespace eosio {
 
         void pbft_database::validate_new_view(const pbft_new_view& nv, const public_key_type& pk) {
 
-            EOS_ASSERT(pk == get_new_view_primary_key(nv.new_view), pbft_exception,
+        	   // implicit copy view change avoid core dump
+				vector<pbft_view_change> view_changes(nv.view_changed_cert.view_changes);
+
+				EOS_ASSERT(pk == get_new_view_primary_key(nv.new_view), pbft_exception,
                        "new view is not signed with expected key");
 
             EOS_ASSERT(is_valid_prepared_certificate(nv.prepared_cert, true), pbft_exception,
@@ -1034,7 +1037,6 @@ namespace eosio {
             }
             auto schedule_threshold = lscb_producers.size() * 2 / 3 + 1;
 
-            auto view_changes = nv.view_changed_cert.view_changes;
             auto view_changes_metadata = vector<std::pair<pbft_view_change, fc::crypto::public_key>>{};
             view_changes_metadata.reserve(view_changes.size());
 
