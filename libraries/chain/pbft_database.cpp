@@ -808,8 +808,8 @@ namespace eosio {
             boost::asio::thread_pool &thread_pool = get_thread_pool();
 				for (auto& p : prepares) {
 					 auto pmm = pbft_message_metadata<pbft_prepare>(p, chain_id);
-					 pmm.get_sender_key(thread_pool, chain_id);
-					 auto sender_key = pmm.sender_key.get();
+					 pmm.cal_sender_key(thread_pool, chain_id);
+					 auto sender_key = pmm.get_sender_key();
 					 if (add_to_pbft_db && is_valid_prepare(p, sender_key)) add_pbft_prepare(p, sender_key);
 					 prepares_metadata.emplace_back(std::make_pair(p, sender_key));
 				}
@@ -870,8 +870,8 @@ namespace eosio {
 				boost::asio::thread_pool &thread_pool = get_thread_pool();
 				for (auto& c : commits) {
 					 auto pmm = pbft_message_metadata<pbft_commit>(c, chain_id);
-					 pmm.get_sender_key(thread_pool, chain_id);
-					 auto sender_key = pmm.sender_key.get();
+					 pmm.cal_sender_key(thread_pool, chain_id);
+					 auto sender_key = pmm.get_sender_key();
 					 if (add_to_pbft_db && is_valid_commit(c, sender_key)) add_pbft_commit(c, sender_key);
 					 commits_metadata.emplace_back(std::make_pair(c, sender_key));
 				}
@@ -1008,9 +1008,6 @@ namespace eosio {
 
         void pbft_database::validate_new_view(const pbft_new_view& nv, const public_key_type& pk) {
 
-        	   // implicit copy view change avoid core dump
-				vector<pbft_view_change> view_changes(nv.view_changed_cert.view_changes);
-
 				EOS_ASSERT(pk == get_new_view_primary_key(nv.new_view), pbft_exception,
                        "new view is not signed with expected key");
 
@@ -1037,15 +1034,16 @@ namespace eosio {
             }
             auto schedule_threshold = lscb_producers.size() * 2 / 3 + 1;
 
-            auto view_changes_metadata = vector<std::pair<pbft_view_change, fc::crypto::public_key>>{};
+            auto view_changes = nv.view_changed_cert.view_changes;
+				auto view_changes_metadata = vector<std::pair<pbft_view_change, fc::crypto::public_key>>{};
             view_changes_metadata.reserve(view_changes.size());
 
             vector<public_key_type> view_change_producers;
             view_change_producers.reserve(view_changes.size());
             for (auto& vc : view_changes) {
                 auto pmm = pbft_message_metadata<pbft_view_change>(vc, chain_id);
-                pmm.get_sender_key(thread_pool, chain_id);
-                auto sender_key = pmm.sender_key.get();
+                pmm.cal_sender_key(thread_pool, chain_id);
+                auto sender_key = pmm.get_sender_key();
                 if (is_valid_view_change(vc, sender_key)) {
                     add_pbft_view_change(vc, sender_key);
                     view_change_producers.emplace_back(sender_key);
@@ -1399,8 +1397,8 @@ namespace eosio {
 
             for (auto& cp : checkpoints) {
                 auto pmm = pbft_message_metadata<pbft_checkpoint>(cp, chain_id);
-                pmm.get_sender_key(thread_pool, chain_id);
-                auto sender_key = pmm.sender_key.get();
+                pmm.cal_sender_key(thread_pool, chain_id);
+                auto sender_key = pmm.get_sender_key();
                 if (cp.block_info != scp.block_info || !is_valid_checkpoint(cp, sender_key)) return false;
                 if (add_to_pbft_db) add_pbft_checkpoint(cp, sender_key);
                 checkpoints_metadata.emplace_back(std::make_pair(cp, sender_key));

@@ -65,22 +65,28 @@ namespace eosio {
         struct pbft_message_metadata {
             explicit pbft_message_metadata(pbft_message_body m, chain_id_type& chain_id): msg{m} {}
 
-            void get_sender_key(boost::asio::thread_pool &thread_pool, chain_id_type& chain_id) {
-					 try {
-						 sender_key = async_thread_pool(thread_pool, [this, &chain_id](){
-							 try{
-								 return crypto::public_key(msg.sender_signature, msg.digest(chain_id), true);
-							 } catch (...) {
-								 return fc::crypto::public_key();
-							 }
-						 });
-					 } catch (fc::exception & /*e*/) {
-						 wlog("bad pbft message signature: ${m}", ("m", msg));
-					 }
+            void cal_sender_key(boost::asio::thread_pool &thread_pool, chain_id_type& chain_id) {
+            	 if (sender_key == public_key_type()) {
+						  try {
+								sender_key_future = async_thread_pool(thread_pool, [this, &chain_id](){
+									 return crypto::public_key(msg.sender_signature, msg.digest(chain_id), true);
+								});
+						  } catch (fc::exception & /*e*/) {
+								wlog("bad pbft message signature: ${m}", ("m", msg));
+						  }
+            	 }
             }
 
-            pbft_message_body   msg;
-            std::future<public_key_type>     sender_key;
+            public_key_type& get_sender_key() {
+            	 if (sender_key == public_key_type()) {
+						  sender_key = sender_key_future.get();
+					 }
+					 return sender_key;
+            }
+
+            pbft_message_body   					msg;
+            std::future<public_key_type>     sender_key_future;
+            public_key_type        				sender_key;
         };
 
         template<typename pbft_message_body>

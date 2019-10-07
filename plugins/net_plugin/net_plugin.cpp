@@ -3123,11 +3123,11 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_prepare>(msg, chain_id);
 
-           pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+           pmm.cal_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
            pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-		   auto sender_key = pmm.sender_key.get();
+           auto sender_key = pmm.get_sender_key();
 
-		   if (!pcc.pbft_db.is_valid_prepare(pmm.msg, sender_key)) return;
+           if (!pcc.pbft_db.is_valid_prepare(pmm.msg, sender_key)) return;
 
            bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
            fc_dlog(logger, "received prepare at height: ${n}, view: ${v}, from ${k}, ",
@@ -3142,11 +3142,11 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_commit>(msg, chain_id);
 
-		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
-		   pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-		   auto sender_key = pmm.sender_key.get();
+           pmm.cal_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+           pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+           auto sender_key = pmm.get_sender_key();
 
-		   if (!pcc.pbft_db.is_valid_commit(pmm.msg, sender_key)) return;
+           if (!pcc.pbft_db.is_valid_commit(pmm.msg, sender_key)) return;
 
            bcast_pbft_msg(pmm.msg, pbft_message_TTL, c);
            fc_dlog(logger, "received commit at height: ${n}, view: ${v}, from ${k}, ",
@@ -3160,12 +3160,12 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_view_change>(msg, chain_id);
 
-		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
-		   pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
+           pmm.cal_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+			  auto sender_key = pmm.get_sender_key();
+			  pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
            controller &ctrl = my_impl->chain_plug->chain();
-		   auto sender_key = pmm.sender_key.get();
 
-		   if (!pcc.pbft_db.is_valid_view_change(pmm.msg, sender_key)) return;
+           if (!pcc.pbft_db.is_valid_view_change(pmm.msg, sender_key)) return;
 
            auto missing_blocks = set<block_id_type>{};
            for (auto const b: pmm.msg.prepared_cert.pre_prepares) {
@@ -3205,11 +3205,11 @@ namespace eosio {
            }
 
            auto pmm = pbft_message_metadata<pbft_new_view>(msg, chain_id);
-		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+           pmm.cal_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
 
-		   auto sender_key = pmm.sender_key.get();
+           auto sender_key = pmm.get_sender_key();
 
-		   if (sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
+           if (sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
 
            bcast_pbft_msg(pmm.msg, 60 * pbft_message_TTL, c);
            fc_dlog(logger, "received new view: ${n}, from ${v}", ("n", pmm.msg)("v", sender_key));
@@ -3238,9 +3238,9 @@ namespace eosio {
        if (is_pbft_msg_valid(msg) && maybe_add_to_pbft_cache(std::string(msg.sender_signature))) {
            auto pmm = pbft_message_metadata<pbft_checkpoint>(msg, chain_id);
 
-		   pmm.get_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
+		   pmm.cal_sender_key(my_impl->chain_plug->chain().get_thread_pool(), chain_id);
 		   pbft_controller &pcc = my_impl->chain_plug->pbft_ctrl();
-		   auto sender_key = pmm.sender_key.get();
+		   auto sender_key = pmm.get_sender_key();
 
 		   if (!pcc.pbft_db.is_valid_checkpoint(pmm.msg, sender_key)) return;
 
