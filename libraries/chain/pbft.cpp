@@ -70,8 +70,8 @@ namespace eosio {
         }
 
         void pbft_controller::on_pbft_checkpoint(const pbft_metadata_ptr<pbft_checkpoint>& cp) {
-        	cp->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-			auto sender_key = cp->sender_key.get();
+        	cp->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+			auto sender_key = cp->get_sender_key();
 
 			if (!pbft_db.is_valid_checkpoint(cp->msg, sender_key)) return;
             pbft_db.add_pbft_checkpoint(cp->msg, sender_key);
@@ -112,8 +112,8 @@ namespace eosio {
         void psm_machine::on_new_view(const pbft_metadata_ptr<pbft_new_view>& e) {
             if (e->msg.new_view <= get_current_view()) return;
 
-            e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-				auto sender_key = e->sender_key.get();
+            e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+				auto sender_key = e->get_sender_key();
 				try {
                 pbft_db.validate_new_view(e->msg, sender_key);
             } catch (const fc::exception& ex) {
@@ -171,11 +171,11 @@ namespace eosio {
 
         void psm_prepared_state::on_commit(const pbft_metadata_ptr<pbft_commit>& e) {
 
-        	e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+        		e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
             if (e->msg.view < m.get_current_view()) return;
-			auto sender_key = e->sender_key.get();
+				auto sender_key = e->get_sender_key();
 
-			if (!pbft_db.is_valid_commit(e->msg, sender_key)) return;
+				if (!pbft_db.is_valid_commit(e->msg, sender_key)) return;
 
             pbft_db.add_pbft_commit(e->msg, sender_key);
             maybe_transit_to_committed();
@@ -189,11 +189,11 @@ namespace eosio {
 
         void psm_prepared_state::on_view_change(const pbft_metadata_ptr<pbft_view_change>& e) {
 
-			e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-			if (e->msg.target_view <= m.get_current_view()) return;
-			auto sender_key = e->sender_key.get();
+        	 	e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+				if (e->msg.target_view <= m.get_current_view()) return;
+				auto sender_key = e->get_sender_key();
 
-			if (!pbft_db.is_valid_view_change(e->msg, sender_key)) return;
+				if (!pbft_db.is_valid_view_change(e->msg, sender_key)) return;
 
             pbft_db.add_pbft_view_change(e->msg, sender_key);
             m.maybe_view_change();
@@ -212,9 +212,9 @@ namespace eosio {
          */
         void psm_committed_state::on_prepare(const pbft_metadata_ptr<pbft_prepare>& e) {
             //validate
-			if (e->msg.view < m.get_current_view()) return;
-			e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-			auto sender_key = e->sender_key.get();
+				if (e->msg.view < m.get_current_view()) return;
+				e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+				auto sender_key = e->get_sender_key();
             if (!pbft_db.is_valid_prepare(e->msg, sender_key)) return;
 
             //do action add prepare
@@ -233,10 +233,10 @@ namespace eosio {
         void psm_committed_state::on_commit(const pbft_metadata_ptr<pbft_commit>& e) {
 
             if (e->msg.view < m.get_current_view()) return;
-			e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-			auto sender_key = e->sender_key.get();
+				e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+				auto sender_key = e->get_sender_key();
 
-			if (!pbft_db.is_valid_commit(e->msg, sender_key)) return;
+				if (!pbft_db.is_valid_commit(e->msg, sender_key)) return;
 
             pbft_db.add_pbft_commit(e->msg, sender_key);
         }
@@ -250,10 +250,10 @@ namespace eosio {
         void psm_committed_state::on_view_change(const pbft_metadata_ptr<pbft_view_change>& e) {
 
             if (e->msg.target_view <= m.get_current_view()) return;
-			e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-			auto sender_key = e->sender_key.get();
+				e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+				auto sender_key = e->get_sender_key();
 
-			if (!pbft_db.is_valid_view_change(e->msg, sender_key)) return;
+				if (!pbft_db.is_valid_view_change(e->msg, sender_key)) return;
 
             pbft_db.add_pbft_view_change(e->msg, sender_key);
             m.maybe_view_change();
@@ -289,10 +289,10 @@ namespace eosio {
             if (m.maybe_stop_view_change()) return;
 
             if (e->msg.target_view <= m.get_current_view()) return;
-			e->get_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
-			auto sender_key = e->sender_key.get();
+				e->cal_sender_key(pbft_db.get_thread_pool(), pbft_db.get_chain_id());
+				auto sender_key = e->get_sender_key();
 
-			if (!pbft_db.is_valid_view_change(e->msg, sender_key)) return;
+				if (!pbft_db.is_valid_view_change(e->msg, sender_key)) return;
 
             pbft_db.add_pbft_view_change(e->msg, sender_key);
             m.maybe_new_view();
