@@ -3865,7 +3865,6 @@ namespace eosio {
          my->chain_id = my->chain_plug->get_chain_id();
          fc::rand_pseudo_bytes( my->node_id.data(), my->node_id.data_size());
          ilog( "my node_id is ${id}", ("id", my->node_id));
-
       } FC_LOG_AND_RETHROW()
    }
 
@@ -4058,14 +4057,15 @@ namespace eosio {
    boost::asio::io_service net_plugin_impl::ios;
 
    void net_plugin_impl::subthread_start_up(){
+      stringstream ss;
+      ss << "sub thread id:" << std::this_thread::get_id();
+      ilog(ss.str());
+
       keepalive_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
       ticker();
       pbft_message_cache_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
       pbft_message_cache_ticker();
 
-      stringstream ss;
-      ss << "sub thread id:" << std::this_thread::get_id();
-      ilog(ss.str());
       if( acceptor ) {
          acceptor->open(listen_endpoint.protocol());
          acceptor->set_option(tcp::acceptor::reuse_address(true));
