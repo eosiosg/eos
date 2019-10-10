@@ -948,7 +948,7 @@ namespace eosio {
    void connection::close() {
       if(socket) {
          socket->close();
-         socket.reset( new tcp::socket( app().get_io_service()) );
+         socket.reset( new tcp::socket( net_plugin::get_io_service()) );
       }
       else {
          wlog("no socket to close!");
@@ -4058,10 +4058,10 @@ namespace eosio {
    boost::asio::io_service net_plugin_impl::ios;
 
    void net_plugin_impl::subthread_start_up(){
-      my->keepalive_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
-      my->ticker();
-      my->pbft_message_cache_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
-      my->pbft_message_cache_ticker();
+      keepalive_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
+      ticker();
+      pbft_message_cache_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
+      pbft_message_cache_ticker();
 
       stringstream ss;
       ss << "sub thread id:" << std::this_thread::get_id();
