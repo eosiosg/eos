@@ -368,14 +368,18 @@ struct txn_test_gen_plugin_impl {
           if (e) {
               elog("pushing transaction failed: ${e}", ("e", e->to_detail_string()));
               stop_generation();
-              auto peers_conn = app().get_plugin<net_plugin>().connections();
-              for(const auto c : peers_conn){
-                  app().get_plugin<net_plugin>().disconnect(c.peer);
-              }
-              for(const auto c : peers_conn){
-                  app().get_plugin<net_plugin>().connect(c.peer);
-              }
-              start_generation(cached_salt,cached_period,cached_batch_size);
+              boost::asio::post(net_plugin::get_io_service(), [this](){
+                 auto peers_conn = app().get_plugin<net_plugin>().connections();
+                 for(const auto c : peers_conn){
+                    app().get_plugin<net_plugin>().disconnect(c.peer);
+                 }
+                 for(const auto c : peers_conn){
+                    app().get_plugin<net_plugin>().connect(c.peer);
+                 }
+                 boost::asio::post(app().get_io_service(), [this](){
+                    start_generation(cached_salt,cached_period,cached_batch_size);
+                 });
+              });
           } else {
               arm_timer(timer.expires_at());
           }

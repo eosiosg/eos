@@ -25,6 +25,7 @@
 #include <fc/variant_object.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
+#include <atomic>
 
 namespace eosio { namespace chain {
 
@@ -125,7 +126,7 @@ struct controller_impl {
    chainbase::database            reversible_blocks; ///< a special database to persist blocks that have successfully been applied but are still reversible
    block_log                      blog;
    optional<pending_state>        pending;
-   bool                           pbft_enabled = false;
+   std::atomic<bool>              pbft_enabled{false};
    bool                           pbft_upgrading = false;
    optional<block_id_type>        pending_pbft_lib;
    std::mutex                     pending_pbft_lib_mtx_;
@@ -1569,7 +1570,7 @@ struct controller_impl {
       auto prev = fork_db.get_block( b->previous );
       EOS_ASSERT( prev, unlinkable_block_exception, "unlinkable block ${id}", ("id", id)("previous", b->previous) );
 
-      auto pbft = pbft_enabled;
+      bool pbft = pbft_enabled;
 
       return async_thread_pool( thread_pool, [b, prev, pbft]() {
          const bool skip_validate_signee = false;
