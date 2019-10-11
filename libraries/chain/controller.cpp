@@ -2561,7 +2561,7 @@ block_id_type controller::get_pbft_prepared() const {
 
 block_id_type controller::get_pbft_my_prepare() const {
    block_id_type mp;
-   boost::shared_lock_guard<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
+   boost::unique_lock<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
    if (my->my_prepare) mp = my->my_prepare->id;
    return mp;
 }
