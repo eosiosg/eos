@@ -801,8 +801,8 @@ namespace eosio {
             // a certificate under lib is also treated as null.
             if (certificate.block_info.block_num() <= ctrl.last_irreversible_block_num()) return true;
 
-            vector<pbft_prepare> prepares(certificate.prepares);
-            auto prepares_metadata = vector<std::pair<pbft_prepare, fc::crypto::public_key>>{};
+				auto prepares = certificate.prepares;
+				auto prepares_metadata = vector<std::pair<pbft_prepare, fc::crypto::public_key>>{};
             prepares_metadata.reserve(prepares.size());
 
             boost::asio::thread_pool &thread_pool = get_thread_pool();
@@ -1389,7 +1389,7 @@ namespace eosio {
                 // it will not be applied nor saved, thus considered safe.
                 return true;
 
-            vector<pbft_checkpoint> checkpoints(scp.checkpoints);
+				auto checkpoints = scp.checkpoints;
             auto checkpoints_metadata = vector<std::pair<pbft_checkpoint, fc::crypto::public_key>>{};
 				checkpoints_metadata.reserve(checkpoints.size());
 
