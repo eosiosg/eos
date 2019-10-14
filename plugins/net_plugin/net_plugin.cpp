@@ -2294,7 +2294,7 @@ namespace eosio {
       connection_wptr weak_conn = c;
       // Note: need to add support for IPv6 too
 
-      auto resolver = std::make_shared<tcp::resolver>( app().get_io_service() );
+      auto resolver = std::make_shared<tcp::resolver>( net_plugin::get_io_service() );
       resolver->async_resolve( query,
                 [weak_conn, resolver, this]( const boost::system::error_code& err, tcp::resolver::results_type endpoints ) {
                       auto c = weak_conn.lock();
@@ -3056,7 +3056,8 @@ namespace eosio {
          return;
       }
       dispatcher->recv_transaction(c, tid);
-      c->trx_in_progress_size += calc_trx_size( ptrx->packed_trx );boost::asio::post(app().get_io_service(), [c, this, ptrx](){
+      c->trx_in_progress_size += calc_trx_size( ptrx->packed_trx );
+      boost::asio::post(app().get_io_service(), [c, this, ptrx](){
                chain_plug->accept_transaction(ptrx, [c, this, ptrx](const static_variant<fc::exception_ptr, transaction_trace_ptr>& result) {
                   c->trx_in_progress_size -= calc_trx_size(ptrx->packed_trx);
                   if (result.contains<fc::exception_ptr>()) {
@@ -3798,6 +3799,8 @@ namespace eosio {
             tcp::resolver::query query( tcp::v4(), host.c_str(), port.c_str());
             // Note: need to add support for IPv6 too?
 
+            my->listen_endpoint = *my->resolver->resolve( query );
+
             my->acceptor.reset( new tcp::acceptor( net_plugin::get_io_service()));
 
             if( options.count( "p2p-server-address" )) {
@@ -4096,6 +4099,7 @@ namespace eosio {
       }
       fc_dlog(logger, "before ios.run.");
       ios.run();
+      fc_dlog(logger, "after ios.run.");
    }
 
    void net_plugin_impl::subthread_shutdown() {
