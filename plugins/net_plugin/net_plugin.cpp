@@ -835,7 +835,7 @@ namespace eosio {
       void recv_handshake(const connection_ptr& c, const handshake_message& msg);
       void recv_notice(const connection_ptr& c, const notice_message& msg);
       bool is_syncing();
-      void sync_stable_checkpoints(const connection_ptr& c, uint32_t, uint32_t, uint32_t);
+      bool sync_stable_checkpoints(const connection_ptr& c, uint32_t, uint32_t);
    };
 
    class dispatch_manager {
@@ -948,7 +948,7 @@ namespace eosio {
    void connection::close() {
       if(socket) {
          socket->close();
-         socket.reset( new tcp::socket( net_plugin::get_io_service()) );
+         socket.reset( new tcp::socket( std::ref( app().get_io_service())) );
       }
       else {
          wlog("no socket to close!");
@@ -1714,23 +1714,23 @@ namespace eosio {
       });
    }
 
-   void sync_manager::sync_stable_checkpoints(const connection_ptr& c,
-      uint32_t target, uint32_t lscb_num, uint32_t head_num) {
-      if (last_req_scp_num < lscb_num
-         || last_req_scp_num == 0
-         || last_req_scp_num > target) last_req_scp_num = lscb_num;
-
+   bool sync_manager::sync_stable_checkpoints(const connection_ptr& c, uint32_t target, uint32_t lscb_num) {
       auto pbft_checkpoint_granularity = chain_plug->pbft_ctrl().pbft_db.get_checkpoint_interval();
-      auto end = target;
-      auto max_target_scp_num = last_req_scp_num + pbft_checkpoint_granularity * 10;
-      if (target > max_target_scp_num) end = std::min(max_target_scp_num, head_num);
+      if (last_req_scp_num < lscb_num || last_req_scp_num == 0) last_req_scp_num = lscb_num;
 
-      if (end - last_req_scp_num < pbft_checkpoint_granularity) return;
+      auto max_target_scp_num = last_req_scp_num + pbft_checkpoint_granularity * 10;
+      auto end = std::min(max_target_scp_num, target);
+
+      if (end - last_req_scp_num < pbft_checkpoint_granularity) {
+          last_req_scp_num = lscb_num;
+          return false;
+      }
       checkpoint_request_message crm = {last_req_scp_num+1,end};
       c->enqueue( net_message(crm));
       fc_dlog(logger, "request sync stable checkpoints from ${s} to ${e}",
-         ("s", last_req_scp_num+1)("e", end));
+              ("s", last_req_scp_num+1)("e", end));
       last_req_scp_num = end;
+      return true;
    }
 
    void sync_manager::reassign_fetch(const connection_ptr& c, go_away_reason reason) {
@@ -2518,9 +2518,9 @@ namespace eosio {
 
          boost::asio::async_read(*conn->socket,
             conn->pending_message_buffer.get_buffer_sequence_for_boost_async_read(), completion_handler,
-            [this,weak_conn]( boost::system::error_code ec, std::size_t bytes_transferred ) {
+            [this,weak_conn,socket=conn->socket]( boost::system::error_code ec, std::size_t bytes_transferred ) {
                auto conn = weak_conn.lock();
-               if (!conn || !conn->socket || !conn->socket->is_open()) {
+               if (!conn || !conn->socket || !conn->socket->is_open() || !socket->is_open()) {
                   return;
                }
 
@@ -3792,32 +3792,10 @@ namespace eosio {
          my->resolver = std::make_shared<tcp::resolver>( std::ref( net_plugin::get_io_service()));
          if( options.count( "p2p-listen-endpoint" ) && options.at("p2p-listen-endpoint").as<string>().length()) {
             my->p2p_address = options.at( "p2p-listen-endpoint" ).as<string>();
-            auto host = my->p2p_address.substr( 0, my->p2p_address.find( ':' ));
-            auto port = my->p2p_address.substr( host.size() + 1, my->p2p_address.size());
-            idump((host)( port ));
-            tcp::resolver::query query( tcp::v4(), host.c_str(), port.c_str());
-            // Note: need to add support for IPv6 too?
-
-            my->acceptor.reset( new tcp::acceptor( net_plugin::get_io_service()));
-
-            if( options.count( "p2p-server-address" )) {
-               my->p2p_address = options.at( "p2p-server-address" ).as<string>();
-            } else {
-               if( my->listen_endpoint.address().to_v4() == address_v4::any()) {
-                  boost::system::error_code ec;
-                  auto host = host_name( ec );
-                  if( ec.value() != boost::system::errc::success ) {
-
-                     FC_THROW_EXCEPTION( fc::invalid_arg_exception,
-                        "Unable to retrieve host_name. ${msg}", ("msg", ec.message()));
-
-                  }
-                  auto port = my->p2p_address.substr( my->p2p_address.find( ':' ), my->p2p_address.size());
-                  my->p2p_address = host + port;
-               }
-            }
          }
-
+         if( options.count( "p2p-server-address" ) ) {
+            my->p2p_server_address = options.at( "p2p-server-address" ).as<string>();
+         }
          if( options.count( "p2p-peer-address" )) {
             my->supplied_peers = options.at( "p2p-peer-address" ).as<vector<string> >();
          }
@@ -3869,20 +3847,21 @@ namespace eosio {
    }
 
    void net_plugin::plugin_startup() {
-      stringstream ss;
-      ss << "main thread id:" << std::this_thread::get_id();
-      ilog(ss.str());
-      if(fc::get_logger_map().find(logger_name) != fc::get_logger_map().end())
+      try {
+         stringstream ss;
+         ss << "main thread id:" << std::this_thread::get_id();
+         ilog(ss.str());
+         if(fc::get_logger_map().find(logger_name) != fc::get_logger_map().end())
          logger = fc::get_logger_map()[logger_name];
 
-      my->net_thread = std::thread(&net_plugin_impl::subthread_start_up, my.get());
+         my->net_thread = std::thread(&net_plugin_impl::subthread_start_up, my.get());
 
-      my->producer_plug = app().find_plugin<producer_plugin>();
+         my->producer_plug = app().find_plugin<producer_plugin>();
 
-      chain::controller&cc = my->chain_plug->chain();
-      cc.accepted_block.connect(
-         [this](const block_state_ptr& block){
-            // Here, can not post shared pointer to subthread.
+         chain::controller&cc = my->chain_plug->chain();
+         cc.accepted_block.connect(
+                 [this](const block_state_ptr& block){
+                     // Here, can not post shared pointer to subthread.
             block_id_type id = block->id;
             uint32_t block_num = block->block_num;
             signed_block_ptr block_ptr = make_shared<signed_block>(block->block->clone());
@@ -3892,55 +3871,74 @@ namespace eosio {
             });
          });
 
-          my->incoming_transaction_ack_subscription = app().get_channel<channels::transaction_ack>().subscribe(
-                  [this](const std::pair<fc::exception_ptr, transaction_metadata_ptr>& results){
-            fc_dlog(logger, "before post transaction_ack.");
-            boost::asio::post(net_plugin::get_io_service(), [this, results](){
-               fc_dlog(logger, "before transaction_ack.");
-               my->transaction_ack(results);
-            });
+         my->incoming_transaction_ack_subscription = app().get_channel<channels::transaction_ack>().subscribe([this](const std::pair<fc::exception_ptr, transaction_metadata_ptr>& results){
+             fc_dlog(logger, "before post transaction_ack.");
+             boost::asio::post(net_plugin::get_io_service(), [this, results](){
+                 fc_dlog(logger, "before transaction_ack.");
+                 my->transaction_ack(results);
+             });
          });
-          my->pbft_outgoing_prepare_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::prepare_channel>().subscribe([this](const pbft_prepare_ptr& msg){
-            fc_dlog(logger, "before post pbft_outgoing_prepare.");
-                  boost::asio::post(net_plugin::get_io_service(), [this, msg](){
-               fc_dlog(logger, "before pbft_outgoing_prepare.");
-               my->pbft_outgoing_prepare(msg);
-            });
+         my->pbft_outgoing_prepare_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::prepare_channel>().subscribe([this](const pbft_prepare_ptr& msg){
+             fc_dlog(logger, "before post pbft_outgoing_prepare.");
+             boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+                 fc_dlog(logger, "before pbft_outgoing_prepare.");
+                 my->pbft_outgoing_prepare(msg);
+             });
          });
-          my->pbft_outgoing_commit_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::commit_channel>().subscribe([this](const pbft_commit_ptr& msg){
-            fc_dlog(logger, "before post pbft_outgoing_commit.");
-                  boost::asio::post(net_plugin::get_io_service(), [this, msg](){
-               fc_dlog(logger, "before pbft_outgoing_commit.");
-               my->pbft_outgoing_commit(msg);
-            });
+         my->pbft_outgoing_commit_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::commit_channel>().subscribe([this](const pbft_commit_ptr& msg){
+             fc_dlog(logger, "before post pbft_outgoing_commit.");
+             boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+                 fc_dlog(logger, "before pbft_outgoing_commit.");
+                 my->pbft_outgoing_commit(msg);
+             });
          });
-          my->pbft_outgoing_view_change_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::view_change_channel>().subscribe([this](const pbft_view_change_ptr& msg) {
-            fc_dlog(logger, "before post pbft_outgoing_view_change.");
-                  boost::asio::post(net_plugin::get_io_service(), [this, msg](){
-               fc_dlog(logger, "before pbft_outgoing_view_change.");
-               my->pbft_outgoing_view_change(msg);
-            });
+         my->pbft_outgoing_view_change_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::view_change_channel>().subscribe([this](const pbft_view_change_ptr& msg) {
+             fc_dlog(logger, "before post pbft_outgoing_view_change.");
+             boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+                 fc_dlog(logger, "before pbft_outgoing_view_change.");
+                 my->pbft_outgoing_view_change(msg);
+             });
          });
-          my->pbft_outgoing_new_view_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::new_view_channel>().subscribe(
-            [this](const pbft_new_view_ptr& msg) {
-            fc_dlog(logger, "before post pbft_outgoing_new_view.");
-            boost::asio::post(net_plugin::get_io_service(), [this, msg](){
-               fc_dlog(logger, "before pbft_outgoing_new_view.");
-               my->pbft_outgoing_new_view(msg);
-            });
+         my->pbft_outgoing_new_view_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::new_view_channel>().subscribe([this](const pbft_new_view_ptr& msg) {
+             fc_dlog(logger, "before post pbft_outgoing_new_view.");
+             boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+                 fc_dlog(logger, "before pbft_outgoing_new_view.");
+                 my->pbft_outgoing_new_view(msg);
+             });
          });
-          my->pbft_outgoing_checkpoint_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel>().subscribe(
-            [this](const pbft_checkpoint_ptr& msg) {
-            fc_dlog(logger, "before post pbft_outgoing_checkpoint.");
-            boost::asio::post(net_plugin::get_io_service(), [this, msg](){
-               fc_dlog(logger, "before pbft_outgoing_checkpoint.");
-               my->pbft_outgoing_checkpoint(msg);
-            });
+         my->pbft_outgoing_checkpoint_subscription = app().get_channel<eosio::chain::plugin_interface::pbft::outgoing::checkpoint_channel>().subscribe([this](const pbft_checkpoint_ptr& msg) {
+             fc_dlog(logger, "before post pbft_outgoing_checkpoint.");
+             boost::asio::post(net_plugin::get_io_service(), [this, msg](){
+                 fc_dlog(logger, "before pbft_outgoing_checkpoint.");
+                 my->pbft_outgoing_checkpoint(msg);
+             });
          });
 
-      if( cc.get_read_mode() == chain::db_read_mode::READ_ONLY ) {
-         my->max_nodes_per_host = 0;
-         ilog( "node in read-only mode setting max_nodes_per_host to 0 to prevent connections" );
+         if( cc.get_read_mode() == chain::db_read_mode::READ_ONLY ) {
+             my->max_nodes_per_host = 0;
+             ilog( "node in read-only mode setting max_nodes_per_host to 0 to prevent connections" );
+         }
+
+         my->start_monitors();
+
+         for( auto seed_node : my->supplied_peers ) {
+             p2p_peer_record p2prcd;
+             p2prcd.peer_address=seed_node;
+             p2prcd.discoverable=false;
+             p2prcd.is_config=true;
+             p2prcd.connected=false;
+             p2prcd.expiry=time_point_sec((time_point::now()).sec_since_epoch()+10);
+             my->p2p_peer_records.insert(pair<string,p2p_peer_record>(seed_node,p2prcd));
+
+             connect( seed_node );
+         }
+
+         if (fc::get_logger_map().find(logger_name) != fc::get_logger_map().end())
+             logger = fc::get_logger_map()[logger_name];
+      } catch (...) {
+       // always want plugin_shutdown even on exception
+       plugin_shutdown();
+       throw;
       }
    }
 
@@ -4013,14 +4011,14 @@ namespace eosio {
          if (!cc.is_pbft_enabled()) return;
          //there might be a better way to sync checkpoints, yet we do not want to modify the existing handshake msg.
 
-         auto head = cc.fork_db_head_block_num();
          auto lscb_num = cc.last_stable_checkpoint_block_num();
          auto head_num = cc.head_block_num();
 
-         boost::asio::post(net_plugin::get_io_service(), [this, head, lscb_num, head_num](){
+         boost::asio::post(net_plugin::get_io_service(), [this, head_num, lscb_num](){
             for (auto const &c: my->connections) {
                if (c->current()) {
-                  my->sync_master->sync_stable_checkpoints(c, head, lscb_num, head_num);
+                  auto requested = my->sync_master->sync_stable_checkpoints(c, head_num, lscb_num);
+                  if (!requested) break;
                }
             }
          });
@@ -4061,6 +4059,34 @@ namespace eosio {
       ss << "sub thread id:" << std::this_thread::get_id();
       ilog(ss.str());
 
+      auto resolver = std::make_shared<tcp::resolver>( app().get_io_service() );
+      if( p2p_address.size() > 0 ) {
+         auto host = p2p_address.substr( 0, p2p_address.find( ':' ));
+         auto port = p2p_address.substr( host.size() + 1, p2p_address.size());
+         tcp::resolver::query query( tcp::v4(), host.c_str(), port.c_str());
+         // Note: need to add support for IPv6 too?
+
+         listen_endpoint = *resolver->resolve( query );
+
+         acceptor.reset( new tcp::acceptor( std::ref(app().get_io_service()) ) );
+
+         if( !p2p_server_address.empty() ) {
+             p2p_address = p2p_server_address;
+         } else {
+            if( listen_endpoint.address().to_v4() == address_v4::any()) {
+               boost::system::error_code ec;
+               auto host = host_name( ec );
+               if( ec.value() != boost::system::errc::success ) {
+                  FC_THROW_EXCEPTION( fc::invalid_arg_exception,
+                          "Unable to retrieve host_name. ${msg}", ("msg", ec.message()));
+
+               }
+               auto port = p2p_address.substr( p2p_address.find( ':' ), p2p_address.size());
+               p2p_address = host + port;
+            }
+         }
+      }
+
       keepalive_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
       ticker();
       pbft_message_cache_timer.reset(new boost::asio::steady_timer(net_plugin::get_io_service()));
@@ -4081,19 +4107,6 @@ namespace eosio {
          start_listen_loop();
       }
 
-      start_monitors();
-
-      for( auto seed_node : supplied_peers ) {
-         p2p_peer_record p2prcd;
-         p2prcd.peer_address=seed_node;
-         p2prcd.discoverable=false;
-         p2prcd.is_config=true;
-         p2prcd.connected=false;
-         p2prcd.expiry=time_point_sec((time_point::now()).sec_since_epoch()+10);
-         p2p_peer_records.insert(pair<string,p2p_peer_record>(seed_node,p2prcd));
-
-         connect( seed_node );
-      }
       fc_dlog(logger, "before ios.run.");
       ios.run();
    }
