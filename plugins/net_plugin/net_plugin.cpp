@@ -538,11 +538,9 @@ namespace eosio {
       void fill_out_buffer( std::vector<boost::asio::const_buffer>& bufs ) {
          bool keep = true;
          if( _sync_write_queue.size() > 0 ) { // always send msgs from sync_write_queue first
-            fc_dlog(logger, "fill_out_buffer with _sync_write_queue");
             keep = fill_out_buffer( bufs, _sync_write_queue );
          }
          if(keep) {
-            fc_dlog(logger, "fill_out_buffer with _write_queue");
             fill_out_buffer( bufs, _write_queue );
          }
       }
@@ -975,7 +973,6 @@ namespace eosio {
    }
 
    void connection::blk_send_branch() {
-      fc_dlog(logger, "in blk_send_branch");
       connection_wptr wpconn = shared_from_this();
       boost::asio::post(app().get_io_service(), [wpconn](){
          auto head_num = my_impl->chain_plug->chain().fork_db_head_block_num();
@@ -986,7 +983,6 @@ namespace eosio {
             notice_message note;
             note.known_blocks.mode = normal;
             note.known_blocks.pending = 0;
-            fc_dlog(logger, "head_num = ${h}",("h",head_num));
             if(head_num == 0) {
                conn->enqueue(note);
                return;
@@ -999,8 +995,7 @@ namespace eosio {
                if (conn->last_handshake_recv.generation >= 1) {
                   remote_head_id = conn->last_handshake_recv.head_id;
                   remote_head_num = block_header::num_from_id(remote_head_id);
-                  fc_dlog(logger, "maybe truncating branch at  = ${h}:${id}",("h",remote_head_num)("id",remote_head_id));
-               }
+                  }
 
                lib_id = conn->last_handshake_sent.last_irreversible_block_id;
                head_id = temp_head_id;
@@ -1019,10 +1014,8 @@ namespace eosio {
             auto hi = block_header::num_from_id(head_id);
 
             if( !conn->peer_requested ) {
-               fc_dlog(logger, "peer_requested is empty.");
                conn->peer_requested = sync_state(li + 1, hi, li);
             } else {
-               fc_dlog(logger, "peer_requested is not empty.");
                uint32_t start = std::min(conn->peer_requested->last + 1, li + 1);
                uint32_t end   = std::max(conn->peer_requested->end_block, hi);
                conn->peer_requested = sync_state(start, end, start - 1);
@@ -1050,7 +1043,6 @@ namespace eosio {
             auto conn = wpconn.lock();
             try {
                if(b) {
-                  fc_dlog(logger,"found block for id at num ${n}",("n",b->block_num()));
                   peer_block_state pbstate = {blkid, block_header::num_from_id(blkid), true, true, time_point()};
                   conn->add_peer_block(pbstate);
                   conn->enqueue_block( b );
@@ -1133,7 +1125,6 @@ namespace eosio {
       bool trigger_send,
       std::function<void(boost::system::error_code, std::size_t)> callback,
       bool to_sync_queue) {
-      fc_dlog(logger, "in queue_write.");
       if( !buffer_queue.add_write_queue( buff, callback, to_sync_queue )) {
          fc_wlog( logger, "write_queue full ${s} bytes, giving up on connection ${p}",
             ("s", buffer_queue.write_queue_size())("p", peer_name()) );
@@ -1270,15 +1261,11 @@ namespace eosio {
    }
 
    void connection::enqueue_sync_block() {
-      fc_dlog(logger, "begin call enqueue_sync_block,peer_requested: last = ${last}, start = ${start}, "
-                      "end = ${end}.", ("last", peer_requested->last) ("start", peer_requested->start_block)
-         ("end", peer_requested->end_block));
       auto start = peer_requested->last+1;
       auto end = peer_requested->end_block;
       peer_requested.reset();
       connection_wptr wpconn = shared_from_this();
       boost::asio::post(app().get_io_service(), [wpconn, start, end](){
-         fc_dlog(logger, "in callback.");
          controller& cc = my_impl->chain_plug->chain();
          auto p_list_sb = make_shared<std::list<signed_block_ptr>>();
 
@@ -1350,7 +1337,6 @@ namespace eosio {
 
    void connection::enqueue_block( const signed_block_ptr& sb, bool trigger_send, bool to_sync_queue ) {
       auto send_buffer = pack_signed_block(sb);
-      fc_dlog(logger, "before enqueue_buffer.");
       enqueue_buffer( send_buffer, trigger_send, no_reason, to_sync_queue );
    }
 
@@ -4059,7 +4045,7 @@ namespace eosio {
       ss << "sub thread id:" << std::this_thread::get_id();
       ilog(ss.str());
 
-      auto resolver = std::make_shared<tcp::resolver>( app().get_io_service() );
+      auto resolver = std::make_shared<tcp::resolver>(net_plugin::get_io_service() );
       if( p2p_address.size() > 0 ) {
          auto host = p2p_address.substr( 0, p2p_address.find( ':' ));
          auto port = p2p_address.substr( host.size() + 1, p2p_address.size());
@@ -4068,7 +4054,7 @@ namespace eosio {
 
          listen_endpoint = *resolver->resolve( query );
 
-         acceptor.reset( new tcp::acceptor( std::ref(app().get_io_service()) ) );
+         acceptor.reset( new tcp::acceptor( std::ref(net_plugin::get_io_service()) ) );
 
          if( !p2p_server_address.empty() ) {
              p2p_address = p2p_server_address;
