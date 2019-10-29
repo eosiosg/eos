@@ -1,5 +1,5 @@
 FROM boscore/builder as builder
-ARG branch=feature/pbft-multithread
+ARG branch=feature/pbft-cal-multithread
 ARG symbol=EOS
 
 ENV OPENSSL_ROOT_DIR /usr/include/openssl
@@ -14,7 +14,7 @@ RUN git clone -b $branch https://github.com/eosiosg/eos.git --recursive \
 
 FROM ubuntu:18.04
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install curl openssl ca-certificates gdb&& rm -rf /var/lib/apt/lists/*
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install curl openssl ca-certificates gdb iproute2&& rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/local/lib/* /usr/local/lib/
 COPY --from=builder /tmp/build/bin /opt/eosio/bin
 COPY --from=builder /tmp/build/contracts /contracts
