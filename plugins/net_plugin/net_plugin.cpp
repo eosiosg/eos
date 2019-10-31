@@ -34,6 +34,13 @@
 #include <thread>
 #include <mutex>
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <cstdio>
+#include <fc/io/json.hpp>
+
+using namespace std;
+
 using namespace eosio::chain::plugin_interface::compat;
 
 namespace fc {
@@ -42,7 +49,7 @@ namespace fc {
 
 namespace eosio {
    static appbase::abstract_plugin& _net_plugin = app().register_plugin<net_plugin>();
-
+   static int sm = 0;
    using std::vector;
 
    using boost::asio::ip::tcp;
@@ -1635,6 +1642,34 @@ namespace eosio {
       sync_wait();
    }
 
+   void WriteFile(const char* FileName, const char* Buffer, size_t Len)
+   {
+      static const char *dir = "/tmp/unit_test_case/";
+      static const int dirLen = strlen(dir);
+      ::mkdir(dir, 0777);
+      char path[100];
+      strcpy(path, dir);
+      strcpy(path+strlen(dir), FileName);
+      FILE* file = fopen(path, "w+");
+      fwrite(Buffer, Len, 1, file);
+      fclose(file);
+   }
+
+   template <typename T>
+   void SaveTestCase(T& testcase, const char* json, const char* FileNamePrefix) {
+      const char* p = (const char*) &testcase;
+      int size = sizeof(T);
+      char FileName[100];
+      strcpy(FileName, FileNamePrefix);
+
+      // 写二进制文件
+      strcpy(FileName+strlen(FileNamePrefix), ".bin");
+      WriteFile(FileName, p, size);
+      // 写json文件
+      strcpy(FileName+strlen(FileNamePrefix), ".json");
+      WriteFile(FileName, json, strlen(json));
+   }
+
    bool connection::process_next_message(net_plugin_impl& impl, uint32_t message_length)
    {
       try {
@@ -1651,6 +1686,106 @@ namespace eosio {
          else {
             msg.visit(m);
          }
+
+         char FileName[100];
+
+         if(msg.contains<handshake_message>()) {
+            auto hmsg = msg.get<handshake_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "handshake_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<chain_size_message>()) {
+            auto hmsg = msg.get<chain_size_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "chain_size_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+//         } else if(msg.contains<go_away_message>()) {
+//            auto hmsg = msg.get<go_away_message>();
+//            string p = json::to_string(hmsg);
+//            sprintf(FileName, "go_away_message.%d", sm);
+//            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<time_message>()) {
+            auto hmsg = msg.get<time_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "time_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+//         } else if(msg.contains<notice_message>()) {
+//            auto hmsg = msg.get<notice_message>();
+//            string p = json::to_string(hmsg);
+//            sprintf(FileName, "notice_message.%d", sm);
+//            SaveTestCase(hmsg, p.c_str(), FileName);
+//         } else if(msg.contains<request_message>()) {
+//            auto hmsg = msg.get<request_message>();
+//            string p = json::to_string(hmsg);
+//            sprintf(FileName, "request_message.%d", sm);
+//            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<sync_request_message>()) {
+            auto hmsg = msg.get<sync_request_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "sync_request_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<signed_block>()) {
+            auto hmsg = msg.get<signed_block>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "signed_block.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<packed_transaction>()) {
+            auto hmsg = msg.get<packed_transaction>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "packed_transaction.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<response_p2p_message>()) {
+            auto hmsg = msg.get<response_p2p_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "response_p2p_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<request_p2p_message>()) {
+            auto hmsg = msg.get<request_p2p_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "request_p2p_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<pbft_prepare>()) {
+            auto hmsg = msg.get<pbft_prepare>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "pbft_prepare.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<pbft_commit>()) {
+            auto hmsg = msg.get<pbft_commit>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "pbft_commit.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<pbft_view_change>()) {
+            auto hmsg = msg.get<pbft_view_change>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "pbft_view_change.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<pbft_new_view>()) {
+            auto hmsg = msg.get<pbft_new_view>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "pbft_new_view.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<pbft_checkpoint>()) {
+            auto hmsg = msg.get<pbft_checkpoint>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "pbft_checkpoint.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<pbft_stable_checkpoint>()) {
+            auto hmsg = msg.get<pbft_stable_checkpoint>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "pbft_stable_checkpoint.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<checkpoint_request_message>()) {
+            auto hmsg = msg.get<checkpoint_request_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "checkpoint_request_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         } else if(msg.contains<compressed_pbft_message>()) {
+            auto hmsg = msg.get<compressed_pbft_message>();
+            string p = json::to_string(hmsg);
+            sprintf(FileName, "compressed_pbft_message.%d", sm);
+            SaveTestCase(hmsg, p.c_str(), FileName);
+         }
+         sm++;
       }
       catch (const fc::exception& e) {
          edump((e.to_detail_string()));
@@ -3043,6 +3178,11 @@ namespace eosio {
 
    void net_plugin_impl::handle_message(const connection_ptr& c, const go_away_message& msg)
    {
+      char p[1000];
+      sprintf(p, "{\"go_away_reason\":%d, \"fc::sha256\":\"%s\"}", msg.reason, string(msg.node_id).c_str());
+      char FileName[100];
+      sprintf(FileName, "go_away_message.%d", sm);
+      SaveTestCase(msg, p, FileName);
       fc_dlog(logger, "handle_message, go_away_message");
       string rsn = reason_str(msg.reason);
       peer_ilog(c, "received go_away_message");
@@ -3096,6 +3236,13 @@ namespace eosio {
       // peer tells us about one or more blocks or txns. When done syncing, forward on
       // notices of previously unknown blocks or txns,
       //
+
+      char p[1000*16];
+      msg.to_json(p);
+      char FileName[100];
+      sprintf(FileName, "notice_message.%d", sm);
+      SaveTestCase(msg, p, FileName);
+
       fc_dlog(logger, "handle_message, notice_message");
       peer_ilog(c, "received notice_message");
       c->connecting = false;
@@ -3162,6 +3309,12 @@ namespace eosio {
 
    void net_plugin_impl::handle_message(const connection_ptr& c, const request_message& msg)
    {
+      char p[1024*16];
+      msg.to_json(p);
+      char FileName[100];
+      sprintf(FileName, "request_message.%d", sm);
+      SaveTestCase(msg, p, FileName);
+
       fc_dlog(logger, "handle_message, request_message");
       switch (msg.req_blocks.mode) {
       case catch_up :

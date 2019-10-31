@@ -7,6 +7,10 @@
 #include <eosio/chain/types.hpp>
 #include <eosio/chain/pbft_database.hpp>
 #include <chrono>
+#include <cstring>
+#include <cstdio>
+
+using namespace std;
 
 namespace eosio {
    using namespace chain;
@@ -111,6 +115,19 @@ namespace eosio {
     uint32_t       pending;
     vector<T>      ids;
     bool           empty () const { return (mode == none || ids.empty()); }
+
+    int to_json_sha256(char* value) const{
+       char p[4*1024];
+       char *x = p;
+       for(vector<fc::sha256>::const_iterator q = ids.begin(); q != ids.end(); q++) {
+          string xxx = string(*q);
+          sprintf(x, "%s,", xxx.c_str());
+          x += xxx.size();
+       }
+       x[-1] = '\0';
+       sprintf(value, "{\"id_list_modes\":\"%d\", \"pending\":\"%u\", \"ids\":[%s]}", mode, pending, p);
+       return x-1-p;
+    }
   };
 
   using ordered_txn_ids = select_ids<transaction_id_type>;
@@ -120,12 +137,26 @@ namespace eosio {
     notice_message () : known_trx(), known_blocks() {}
     ordered_txn_ids known_trx;
     ordered_blk_ids known_blocks;
+    int to_json(char *buff) const {
+       char temp[2][4*1024];
+       int len = known_trx.to_json_sha256(temp[0]);
+       known_blocks.to_json_sha256(temp[1]);
+       sprintf(buff, "{\"known_trx\":\"%s\", \"known_blocks\":\"%s\"}",temp[0], temp[1]);
+       return strlen(buff);
+    }
   };
 
   struct request_message {
     request_message () : req_trx(), req_blocks() {}
     ordered_txn_ids req_trx;
     ordered_blk_ids req_blocks;
+     int to_json(char *buff) const {
+        char temp[2][4*1024];
+        int len = req_trx.to_json_sha256(temp[0]);
+        req_blocks.to_json_sha256(temp[1]);
+        sprintf(buff, "{\"req_trx\":\"%s\", \"req_blocks\":\"%s\"}",temp[0], temp[1]);
+        return strlen(buff);
+     }
   };
 
    struct sync_request_message {

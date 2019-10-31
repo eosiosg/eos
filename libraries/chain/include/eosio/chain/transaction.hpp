@@ -110,7 +110,7 @@ namespace eosio { namespace chain {
 
       packed_transaction() = default;
       packed_transaction(packed_transaction&&) = default;
-      explicit packed_transaction(const packed_transaction&) = default;
+      packed_transaction(const packed_transaction&) = default;
       packed_transaction& operator=(const packed_transaction&) = delete;
       packed_transaction& operator=(packed_transaction&&) = default;
 
