@@ -1646,7 +1646,7 @@ struct controller_impl {
    }
 
    void pbft_commit_local( const block_id_type& id ) {
-   	  std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
+   	std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
       pending_pbft_lib.reset();
       pending_pbft_lib.emplace(id);
    }
@@ -1655,21 +1655,21 @@ struct controller_impl {
 
       if (!pbft_enabled) return;
 
-      if ( pending_pbft_lib ) {
 		 std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
-		 block_id_type pending_lib = *pending_pbft_lib;
-		 pending_pbft_lib.reset();
-		 lock.unlock();
-      	 fork_db.set_bft_irreversible(pending_lib);
+		 if ( pending_pbft_lib ) {
+		 	block_id_type pending_lib = *pending_pbft_lib;
+		 	pending_pbft_lib.reset();
+		 	lock.unlock();
+		 	fork_db.set_bft_irreversible(pending_lib);
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
          }
-      }
+		 }
    }
 
    void set_pbft_latest_checkpoint( const block_id_type& id ) {
-   	 std::lock_guard<std::mutex> lock(pending_pbft_checkpoint_mtx_);
+   	std::lock_guard<std::mutex> lock(pending_pbft_checkpoint_mtx_);
       pending_pbft_checkpoint.reset();
       pending_pbft_checkpoint.emplace(id);
    }
