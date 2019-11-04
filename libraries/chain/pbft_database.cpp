@@ -674,11 +674,11 @@ namespace eosio {
 
                 ppc.block_info = {psp->block_id};
                 ppc.prepares=valid_prepares;
-                ppc.pre_prepares.emplace_back(psp->block_id);
+                ppc.pre_prepares.emplace(psp->block_id);
                 for (const auto& p: valid_prepares) {
                     auto bid = p.block_info.block_id;
-                    while (bid != psp->block_id && std::find(ppc.pre_prepares.begin(), ppc.pre_prepares.end(), bid) == ppc.pre_prepares.end()) {
-                        ppc.pre_prepares.emplace_back(bid);
+                    while (bid != psp->block_id) {
+                        ppc.pre_prepares.emplace(bid);
                         bid = ctrl.fetch_block_state_by_id(bid)->prev();
                     }
                 }

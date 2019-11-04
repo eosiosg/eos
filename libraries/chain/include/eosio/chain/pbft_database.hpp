@@ -206,7 +206,7 @@ namespace eosio {
             explicit pbft_prepared_certificate() = default;
 
             block_info_type      block_info;
-            vector<block_id_type>   pre_prepares;
+            set<block_id_type>   pre_prepares;
             vector<pbft_prepare> prepares;
 
             bool operator<(const pbft_prepared_certificate& rhs) const {
@@ -527,11 +527,11 @@ namespace eosio {
             const pbft_view_type get_current_view() { return _current_view; }
             void set_current_view(pbft_view_type view) { _current_view = view; }
 
-			template<typename Signal, typename Arg>
-			void emit(const Signal& s, Arg&& a);
-			signal<void(const block_id_type&)> set_pbft_prepared;
-			signal<void(const block_id_type&)> set_pbft_my_prepare;
-			signal<void()> reset_pbft_my_prepare;
+				template<typename Signal, typename Arg>
+				void emit(const Signal& s, Arg&& a);
+				signal<void(const block_id_type&)> set_pbft_prepared;
+				signal<void(const block_id_type&)> set_pbft_my_prepare;
+				signal<void()> reset_pbft_my_prepare;
 
             //api related
             pbft_state_ptr get_pbft_state_by_id(const block_id_type& id) const;
@@ -545,7 +545,7 @@ namespace eosio {
             controller&                                 ctrl;
             pbft_state_multi_index_type                 pbft_state_index;
             pbft_view_state_multi_index_type            view_state_index;
-			pbft_checkpoint_state_multi_index_type      checkpoint_index;
+				pbft_checkpoint_state_multi_index_type      checkpoint_index;
             fc::path                                    pbft_db_dir;
             fc::path                                    checkpoints_dir;
             vector<block_num_type>                      prepare_watermarks;
