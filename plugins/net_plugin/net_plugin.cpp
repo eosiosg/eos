@@ -3223,6 +3223,11 @@ namespace eosio {
 
            auto sender_key = pmm.get_sender_key();
 
+			  ilog("pbft new view is ${v} sender key is: ${s} sender sig: ${sig} chain_id : ${c}",
+						 ("v", msg.new_view)("s", sender_key)("sig", msg.sender_signature)("c", chain_id));
+
+			  ilog("pbft new_view msg is ${v}", ("v", msg));
+
            if (sender_key != pcc.pbft_db.get_new_view_primary_key(pmm.msg.new_view)) return;
 
            bcast_pbft_msg(pmm.msg, 60 * pbft_message_TTL, c);
