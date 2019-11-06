@@ -108,14 +108,16 @@ namespace eosio {
                         curr_ps.block_num = current->block_num;
                         curr_ps.prepares = prepares;
                         auto curr_psp = std::make_shared<pbft_state>(move(curr_ps));
-                        pbft_state_index.insert(curr_psp);
+								std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
+								pbft_state_index.insert(curr_psp);
                     } catch (...) {
                         elog( "prepare insert failure: ${p}", ("p", p));
                     }
                 } else {
                     auto prepares = (*curr_itr)->prepares;
                     if (prepares.find(std::make_pair(p.view, pk)) == prepares.end()) {
-                        by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr& psp) {
+								std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
+								by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr& psp) {
                             psp->prepares[std::make_pair(p.view, pk)] = p;
                         });
                     } else {
@@ -161,7 +163,8 @@ namespace eosio {
                 ps.block_num = bnum;
                 ps.is_prepared = true;
                 auto psp = std::make_shared<pbft_state>(move(ps));
-                pbft_state_index.insert(psp);
+					 std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
+					 pbft_state_index.insert(psp);
                 return;
             }
             by_block_id_index.modify(itr, [&](const pbft_state_ptr& p) { p->is_prepared = true; });
@@ -232,7 +235,7 @@ namespace eosio {
                         new_p.block_info = {hwbs->id};
                         new_p.sender_signature = sp.second(new_p.digest(chain_id));
                         if (is_valid_prepare(new_p, sp.first)) {
-                            add_pbft_prepare(new_p, sp.first);
+									 add_pbft_prepare(new_p, sp.first);
                             sent = true;
                             prepares_to_be_cached.emplace_back(new_p);
                         }
@@ -285,14 +288,16 @@ namespace eosio {
                         curr_ps.block_num = current->block_num;
                         curr_ps.commits = commits;
                         auto curr_psp = std::make_shared<pbft_state>(move(curr_ps));
-                        pbft_state_index.insert(curr_psp);
+								std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
+								pbft_state_index.insert(curr_psp);
                     } catch (...) {
                         elog("commit insertion failure: ${c}", ("c", c));
                     }
                 } else {
                     auto commits = (*curr_itr)->commits;
                     if (commits.find(std::make_pair(c.view, pk)) == commits.end()) {
-                        by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr& psp) {
+								std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
+								by_block_id_index.modify(curr_itr, [&](const pbft_state_ptr& psp) {
                             psp->commits[std::make_pair(c.view, pk)] = c;
                             std::sort(psp->commits.begin(), psp->commits.end(), less<>());
                         });
@@ -377,7 +382,8 @@ namespace eosio {
             auto& by_block_id_index = pbft_state_index.get<by_block_id>();
             auto itr = by_block_id_index.find(bid);
             if (itr == by_block_id_index.end()) return;
-            by_block_id_index.modify(itr, [&](const pbft_state_ptr& p) { p->is_committed = true; });
+				std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
+				by_block_id_index.modify(itr, [&](const pbft_state_ptr& p) { p->is_committed = true; });
         }
 
         bool pbft_database::should_committed() {
@@ -1264,7 +1270,7 @@ namespace eosio {
                             cp.block_info = {bs->id};
                             cp.sender_signature = sp.second(cp.digest(chain_id));
                             if (is_valid_checkpoint(cp, sp.first)) {
-                                add_pbft_checkpoint(cp, sp.first);
+										  add_pbft_checkpoint(cp, sp.first);
                                 new_pc.emplace_back(cp);
                             }
                         }
@@ -1298,13 +1304,15 @@ namespace eosio {
                 cs.block_num = cp.block_info.block_num();
                 cs.checkpoints = checkpoints;
                 auto csp = std::make_shared<pbft_checkpoint_state>(move(cs));
-                checkpoint_index.insert(csp);
+					 std::lock_guard<std::mutex> lock_checkpoint(checkpoint_mtx_);
+					 checkpoint_index.insert(csp);
                 itr = by_block.find(cp.block_info.block_id);
             } else {
                 auto csp = (*itr);
                 auto checkpoints = csp->checkpoints;
                 if (checkpoints.find(pk) == checkpoints.end()) {
-                    by_block.modify(itr, [&](const pbft_checkpoint_state_ptr& pcp) {
+						  std::lock_guard<std::mutex> lock_checkpoint(checkpoint_mtx_);
+						  by_block.modify(itr, [&](const pbft_checkpoint_state_ptr& pcp) {
                         csp->checkpoints[pk] = cp;
                     });
                 } else {
@@ -1324,7 +1332,9 @@ namespace eosio {
                     }
                 }
                 if (cp_count >= threshold) {
-                    by_block.modify(itr, [&](const pbft_checkpoint_state_ptr& pcp) { csp->is_stable = true; });
+						  std::unique_lock<std::mutex> lock_checkpoint(checkpoint_mtx_);
+						  by_block.modify(itr, [&](const pbft_checkpoint_state_ptr& pcp) { csp->is_stable = true; });
+						  lock_checkpoint.unlock();
                     auto id = csp->block_id;
                     auto blk = ctrl.fetch_block_by_id(id);
 
@@ -1356,6 +1366,7 @@ namespace eosio {
                 if (ctrl.last_irreversible_block_num() < pending_num) ctrl.pbft_commit_local(pending_id);
                 auto& by_block_id_index = pbft_state_index.get<by_block_id>();
                 auto pitr = by_block_id_index.find(pending_id);
+					 std::lock_guard<std::mutex> lock_state(pbft_state_mtx_);
                 if (pitr != by_block_id_index.end()) {
                     prune(*pitr);
                 }
@@ -1365,6 +1376,7 @@ namespace eosio {
             while ( oldest != bni.end()
                  && (*oldest)->is_stable
                  && (*oldest)->block_num < lscb_num - oldest_stable_checkpoint ) {
+					 std::lock_guard<std::mutex> lock_checkpoint(checkpoint_mtx_);
                 prune(*oldest);
                 oldest = bni.begin();
             }

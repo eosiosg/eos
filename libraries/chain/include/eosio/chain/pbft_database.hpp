@@ -544,9 +544,11 @@ namespace eosio {
         private:
             controller&                                 ctrl;
             pbft_state_multi_index_type                 pbft_state_index;
-            pbft_view_state_multi_index_type            view_state_index;
+				std::mutex                     				  pbft_state_mtx_;
+				pbft_view_state_multi_index_type            view_state_index;
 				pbft_checkpoint_state_multi_index_type      checkpoint_index;
-            fc::path                                    pbft_db_dir;
+				std::mutex                     				  checkpoint_mtx_;
+				fc::path                                    pbft_db_dir;
             fc::path                                    checkpoints_dir;
             vector<block_num_type>                      prepare_watermarks;
             flat_map<public_key_type, block_num_type>   fork_schedules;
