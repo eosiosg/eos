@@ -1653,19 +1653,18 @@ struct controller_impl {
 
    void set_pbft_lib() {
 
-      if (!pbft_enabled) return;
+      if (!pbft_enabled || !pending_pbft_lib) return;
 
-		 std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
-		 if ( pending_pbft_lib ) {
+      std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
+      if ( pending_pbft_lib ) {
 		 	block_id_type pending_lib = *pending_pbft_lib;
 		 	pending_pbft_lib.reset();
-		 	lock.unlock();
 		 	fork_db.set_bft_irreversible(pending_lib);
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
          }
-		 }
+      }
    }
 
    void set_pbft_latest_checkpoint( const block_id_type& id ) {
@@ -2530,7 +2529,7 @@ void controller::set_pbft_prepared(const block_id_type& id) {
    if (bs) {
       my->pbft_prepared = bs;
       my->fork_db.mark_pbft_prepared_fork(bs);
-	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+      if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	   }
    }
@@ -2546,7 +2545,7 @@ void controller::set_pbft_my_prepare(const block_id_type& id) {
    	my->my_prepare = bs;
 	   lock.unlock();
 	   my->fork_db.mark_pbft_my_prepare_fork(bs);
-	   if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
 	   }
    }
@@ -2560,7 +2559,7 @@ block_id_type controller::get_pbft_prepared() const {
 
 block_id_type controller::get_pbft_my_prepare() const {
    block_id_type mp;
-	 boost::unique_lock<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
+	boost::unique_lock<boost::shared_mutex> my_prepare_lock(my->my_prepare_mtx_);
    if (my->my_prepare) mp = my->my_prepare->id;
    return mp;
 }
@@ -2576,7 +2575,7 @@ void controller::reset_pbft_my_prepare() {
 }
 
 void controller::reset_pbft_prepared() {
-    my->fork_db.remove_pbft_prepared_fork();
+   my->fork_db.remove_pbft_prepared_fork();
 	if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
 		my->maybe_switch_forks(controller::block_status::complete);
 	}

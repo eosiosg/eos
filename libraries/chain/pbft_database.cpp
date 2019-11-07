@@ -1373,10 +1373,10 @@ namespace eosio {
             }
             auto& bni = checkpoint_index.get<by_num>();
             auto oldest = bni.begin();
-            while ( oldest != bni.end()
+				std::lock_guard<std::mutex> lock_checkpoint(checkpoint_mtx_);
+				while ( oldest != bni.end()
                  && (*oldest)->is_stable
                  && (*oldest)->block_num < lscb_num - oldest_stable_checkpoint ) {
-					 std::lock_guard<std::mutex> lock_checkpoint(checkpoint_mtx_);
                 prune(*oldest);
                 oldest = bni.begin();
             }
