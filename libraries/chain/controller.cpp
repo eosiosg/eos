@@ -1655,11 +1655,12 @@ struct controller_impl {
 
       if (!pbft_enabled || !pending_pbft_lib) return;
 
-      std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
+      std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
       if ( pending_pbft_lib ) {
 		 	block_id_type pending_lib = *pending_pbft_lib;
 		 	pending_pbft_lib.reset();
 		 	fork_db.set_bft_irreversible(pending_lib);
+		 	lock.unlock();
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
@@ -1704,7 +1705,9 @@ struct controller_impl {
 
       if( new_head->header.previous == head->id ) {
          try {
-            apply_block( new_head->block, s );
+         	std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
+				apply_block( new_head->block, s );
+				lock.unlock();
             fork_db.mark_in_current_chain( new_head, true );
             fork_db.set_validity( new_head, true );
             head = new_head;
@@ -1723,8 +1726,8 @@ struct controller_impl {
          }
          EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
                      "loss of sync between fork_db and chainbase during fork switch" ); // _should_ never fail
-
-         for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr ) {
+			 std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
+			 for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr ) {
             optional<fc::exception> except;
             try {
                apply_block( (*ritr)->block, (*ritr)->validated ? controller::block_status::validated : controller::block_status::complete );
