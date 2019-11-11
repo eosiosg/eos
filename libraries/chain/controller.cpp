@@ -24,7 +24,6 @@
 #include <fc/scoped_exit.hpp>
 #include <fc/variant_object.hpp>
 #include <boost/thread/shared_mutex.hpp>
-#include <atomic>
 
 
 namespace eosio { namespace chain {
@@ -129,7 +128,6 @@ struct controller_impl {
    bool                           pbft_enabled = false;
    bool                           pbft_upgrading = false;
    optional<block_id_type>        pending_pbft_lib;
-   std::atomic<block_id_type>     pending_pbft_lib_atom{block_id_type("")};
    std::mutex                     pending_pbft_lib_mtx_;
    optional<block_id_type>        pending_pbft_checkpoint;
    std::mutex                     pending_pbft_checkpoint_mtx_;
@@ -1357,9 +1355,6 @@ struct controller_impl {
    {
       EOS_ASSERT( !pending, block_validate_exception, "pending block already exists" );
 
-      set_pbft_lib();
-      set_pbft_lscb();
-
       auto guard_pending = fc::make_scoped_exit([this](){
 		   pending.reset();
       });
@@ -1657,12 +1652,11 @@ struct controller_impl {
 
       if (!pbft_enabled || !pending_pbft_lib) return;
 
-      std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
+      std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
       if ( pending_pbft_lib ) {
 		 	block_id_type pending_lib = *pending_pbft_lib;
 		 	pending_pbft_lib.reset();
 		 	fork_db.set_bft_irreversible(pending_lib);
-		 	lock.unlock();
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
             maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
@@ -1702,14 +1696,12 @@ struct controller_impl {
        }
    }
 
-   void maybe_switch_forks( controller::block_status s, const char *caller = __FUNCTION__ ) {
+   void maybe_switch_forks( controller::block_status s, const char *caller = nullptr) {
 	   auto new_head = fork_db.head();
 
       if( new_head->header.previous == head->id ) {
          try {
-         	std::unique_lock<std::mutex> lock(pending_pbft_lib_mtx_);
 				apply_block( new_head->block, s );
-				lock.unlock();
             fork_db.mark_in_current_chain( new_head, true );
             fork_db.set_validity( new_head, true );
             head = new_head;
@@ -1728,7 +1720,6 @@ struct controller_impl {
          }
          EOS_ASSERT( self.head_block_id() == branches.second.back()->header.previous, fork_database_exception,
                      "loss of sync between fork_db and chainbase during fork switch" ); // _should_ never fail
-			 std::lock_guard<std::mutex> lock(pending_pbft_lib_mtx_);
 			 for( auto ritr = branches.first.rbegin(); ritr != branches.first.rend(); ++ritr ) {
             optional<fc::exception> except;
             try {
@@ -2757,6 +2748,13 @@ void controller::maybe_switch_forks() {
    if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
       my->maybe_switch_forks(controller::block_status::complete);
    }
+}
+
+void controller::set_pbft_lib(){
+	 my->set_pbft_lib();
+}
+void controller::set_pbft_lscb(){
+	 my->set_pbft_lscb();
 }
 
 // this will be used in unit_test only, should not be called anywhere else.
