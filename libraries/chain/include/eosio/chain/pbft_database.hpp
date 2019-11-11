@@ -548,6 +548,7 @@ namespace eosio {
 				pbft_view_state_multi_index_type            view_state_index;
 				pbft_checkpoint_state_multi_index_type      checkpoint_index;
 				std::mutex                     				  checkpoint_mtx_;
+				std::mutex                                  fork_schedule_mtx_;
 				fc::path                                    pbft_db_dir;
             fc::path                                    checkpoints_dir;
             vector<block_num_type>                      prepare_watermarks;

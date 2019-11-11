@@ -24,6 +24,7 @@
 #include <fc/scoped_exit.hpp>
 #include <fc/variant_object.hpp>
 #include <boost/thread/shared_mutex.hpp>
+#include <atomic>
 
 
 namespace eosio { namespace chain {
@@ -128,6 +129,7 @@ struct controller_impl {
    bool                           pbft_enabled = false;
    bool                           pbft_upgrading = false;
    optional<block_id_type>        pending_pbft_lib;
+   std::atomic<block_id_type>     pending_pbft_lib_atom{block_id_type("")};
    std::mutex                     pending_pbft_lib_mtx_;
    optional<block_id_type>        pending_pbft_checkpoint;
    std::mutex                     pending_pbft_checkpoint_mtx_;

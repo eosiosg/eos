@@ -1506,6 +1506,7 @@ namespace eosio {
                 return diff;
             };
 
+            std::lock_guard<std::mutex> lock(fork_schedule_mtx_);
             auto watermarks = ctrl.get_watermarks();
 
             if (watermarks != prepare_watermarks) {
