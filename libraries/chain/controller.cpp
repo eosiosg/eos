@@ -1594,7 +1594,7 @@ struct controller_impl {
          set_pbft_lib();
 
          if ( read_mode != db_read_mode::IRREVERSIBLE ) {
-             maybe_switch_forks( s );
+             maybe_switch_forks( s , __FUNCTION__);
          }
 
          set_pbft_lscb();
@@ -1622,7 +1622,7 @@ struct controller_impl {
          emit( self.accepted_block_header, new_header_state );
 
          if ( read_mode != db_read_mode::IRREVERSIBLE ) {
-            maybe_switch_forks( s );
+            maybe_switch_forks( s , __FUNCTION__);
          }
 
          // apply stable checkpoint when there is one
@@ -1655,7 +1655,7 @@ struct controller_impl {
          pending_pbft_lib.reset();
 
          if (!pending && read_mode != db_read_mode::IRREVERSIBLE) {
-            maybe_switch_forks(controller::block_status::complete);
+            maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
          }
       }
    }
@@ -1687,8 +1687,8 @@ struct controller_impl {
        }
    }
 
-   void maybe_switch_forks( controller::block_status s ) {
-      auto new_head = fork_db.head();
+   void maybe_switch_forks( controller::block_status s, const char *caller = __FUNCTION__ ) {
+	   auto new_head = fork_db.head();
 
       if( new_head->header.previous == head->id ) {
          try {
@@ -1701,8 +1701,8 @@ struct controller_impl {
             throw;
          }
       } else if( new_head->id != head->id ) {
-         ilog("switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num})",
-              ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num) );
+         ilog("caller ${func} switching forks from ${current_head_id} (block number ${current_head_num}) to ${new_head_id} (block number ${new_head_num}) ",
+              ("current_head_id", head->id)("current_head_num", head->block_num)("new_head_id", new_head->id)("new_head_num", new_head->block_num)("func", caller) );
          auto branches = fork_db.fetch_branch_from( new_head->id, head->id );
 
          for( auto itr = branches.second.begin(); itr != branches.second.end(); ++itr ) {
@@ -2515,7 +2515,9 @@ void controller::set_pbft_prepared(const block_id_type& id) {
    if (bs) {
       my->pbft_prepared = bs;
       my->fork_db.mark_pbft_prepared_fork(bs);
-      maybe_switch_forks();
+      if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		   my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
+	   }
    }
 }
 
@@ -2525,7 +2527,9 @@ void controller::set_pbft_my_prepare(const block_id_type& id) {
    if (bs) {
       my->my_prepare = bs;
       my->fork_db.mark_pbft_my_prepare_fork(bs);
-      maybe_switch_forks();
+		 if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+			  my->maybe_switch_forks(controller::block_status::complete, __FUNCTION__);
+		 }
    }
 }
 
@@ -2549,8 +2553,10 @@ void controller::reset_pbft_my_prepare() {
 
 void controller::reset_pbft_prepared() {
     my->fork_db.remove_pbft_prepared_fork();
-    maybe_switch_forks();
-    if (my->pbft_prepared) my->pbft_prepared.reset();
+	 if (!pending_block_state() && my->read_mode != db_read_mode::IRREVERSIBLE) {
+		  my->maybe_switch_forks(controller::block_status::complete);
+	 }
+	 if (my->pbft_prepared) my->pbft_prepared.reset();
 }
 
 db_read_mode controller::get_read_mode()const {
