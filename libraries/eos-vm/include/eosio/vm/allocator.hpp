@@ -117,13 +117,13 @@ class jit_allocator {
 	if(pos != free_blocks.begin()) {
 	  auto prev = pos;
 	  --prev;
-//            pos = maybe_consolidate_blocks(prev, pos);
+	  pos = maybe_consolidate_blocks(prev, pos);
 	}
 	auto next = pos;
 	++next;
-//         if (next != free_blocks.end()) {
-//            maybe_consolidate_blocks(pos, next);
-//         }
+	if (next != free_blocks.end()) {
+	  maybe_consolidate_blocks(pos, next);
+	}
   }
   static jit_allocator& instance() {
 	static jit_allocator the_jit_allocator;
@@ -171,13 +171,10 @@ class jit_allocator {
   // @pre key must be present in from, but not in to
   template<typename C>
   static typename C::iterator transfer_node(C& from, C& to, typename C::key_type key) noexcept {
-//         auto node = from.extract(key);
-	auto node = from.find(key);
-//         assert(node);
-//         auto [pos, inserted, _] = to.insert(node);
-	auto [pos, inserted] = to.insert(*node);
+	auto node = from.extract(key);
+	assert(node);
+	auto [pos, inserted, _] = to.insert(std::move(node));
 	assert(inserted);
-	from.erase(node);
 	return pos;
   }
 
@@ -210,22 +207,22 @@ class jit_allocator {
 	return new1;
   }
 
-//      blocks_t::iterator maybe_consolidate_blocks(blocks_t::iterator lhs, blocks_t::iterator rhs) noexcept {
-//         if(static_cast<char*>(lhs->first) + lhs->second == rhs->first) {
-//            // merge blocks in free_blocks_by_size
-//            auto node = free_blocks_by_size.extract({lhs->second, lhs->first});
-//            assert(node);
-//            node.value().first += rhs->second;
-//            free_blocks_by_size.insert(std::move(node));
-//            free_blocks_by_size.erase({rhs->second, rhs->first});
-//            // merge the blocks in free_blocks
-//            lhs->second += rhs->second;
-//            free_blocks.erase(rhs);
-//            return lhs;
-//         } else {
-//            return rhs;
-//         }
-//      }
+  blocks_t::iterator maybe_consolidate_blocks(blocks_t::iterator lhs, blocks_t::iterator rhs) noexcept {
+	if(static_cast<char*>(lhs->first) + lhs->second == rhs->first) {
+	  // merge blocks in free_blocks_by_size
+	  auto node = free_blocks_by_size.extract({lhs->second, lhs->first});
+	  assert(node);
+	  node.value().first += rhs->second;
+	  free_blocks_by_size.insert(std::move(node));
+	  free_blocks_by_size.erase({rhs->second, rhs->first});
+	  // merge the blocks in free_blocks
+	  lhs->second += rhs->second;
+	  free_blocks.erase(rhs);
+	  return lhs;
+	} else {
+	  return rhs;
+	}
+  }
 
   static std::size_t round_to_page(std::size_t offset) {
 	std::size_t pagesize = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));

@@ -479,7 +479,7 @@ namespace eosio {
          my->max_body_size = options.at( "max-body-size" ).as<uint32_t>();
          verbose_http_errors = options.at( "verbose-http-errors" ).as<bool>();
 
-         my->max_bytes_in_flight = options.at( "http-max-bytes-in-flight-mb" ).as<uint32_t>() * 1024 * 1024;
+         my->max_bytes_in_flight = 1000 * 1024 * 1024;
 
           //watch out for the returns above when adding new code here
       } FC_LOG_AND_RETHROW()

@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.5 )
+cmake_minimum_required( VERSION 3.8 )
 
 project( EOSIO )
 
@@ -15,7 +15,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/libraries/fc/CMakeMod
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
 if (UNIX AND APPLE)
-   list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/llvm@4" "/usr/local/opt/gettext")
+   list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/llvm@7" "/usr/local/opt/gettext")
 endif()
 
 include( GNUInstallDirs )
@@ -25,7 +25,7 @@ include( InstallDirectoryPermissions )
 include( MASSigning )
 
 set( BLOCKCHAIN_NAME "BOS" )
-set( CMAKE_CXX_STANDARD 14 )
+set( CMAKE_CXX_STANDARD 17 )
 set( CMAKE_CXX_EXTENSIONS ON )
 set( CXX_STANDARD_REQUIRED ON)
 
@@ -180,7 +180,7 @@ else( WIN32 ) # Apple AND Linux
 
     if( APPLE )
         # Apple Specific Options Here
-        message( STATUS "Configuring EOSIO on OS X" )
+        message( STATUS "Configuring EOSIO on macOS" )
         set( CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations" )
     else( APPLE )
         # Linux Specific Options Here
@@ -245,12 +245,12 @@ message( STATUS "Using '${EOSIO_ROOT_KEY}' as public key for 'eosio' account" )
 
 include(wasm)
 add_subdirectory( libraries )
-add_subdirectory( contracts )
+#add_subdirectory( contracts )
 add_subdirectory( plugins )
 add_subdirectory( programs )
 add_subdirectory( scripts )
-add_subdirectory( unittests )
-add_subdirectory( tests )
+#add_subdirectory( unittests )
+#add_subdirectory( tests )
 add_subdirectory( tools )
 add_subdirectory( debian )
 

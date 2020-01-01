@@ -146,16 +146,40 @@ namespace bacc = boost::accumulators;
    volatile sig_atomic_t deadline_timer::expired = 0;
    bool deadline_timer::initialized = false;
 
+  transaction_checktime_timer::transaction_checktime_timer(platform_timer& timer)
+	  : expired(timer.expired), _timer(timer) {
+	expired = 0;
+  }
+
+  void transaction_checktime_timer::start(fc::time_point tp) {
+	_timer.start(tp);
+  }
+
+  void transaction_checktime_timer::stop() {
+	_timer.stop();
+  }
+
+  void transaction_checktime_timer::set_expiration_callback(void(*func)(void*), void* user) {
+	_timer.set_expiration_callback(func, user);
+  }
+
+  transaction_checktime_timer::~transaction_checktime_timer() {
+	stop();
+	_timer.set_expiration_callback(nullptr, nullptr);
+  }
+
    transaction_context::transaction_context( controller& c,
                                              const signed_transaction& t,
                                              const transaction_id_type& trx_id,
-                                             fc::time_point s )
+											 transaction_checktime_timer&& tmr,
+											 fc::time_point s )
    :control(c)
    ,trx(t)
    ,id(trx_id)
    ,undo_session()
    ,trace(std::make_shared<transaction_trace>())
    ,start(s)
+   ,transaction_timer(std::move(tmr))
    ,net_usage(trace->net_usage)
    ,pseudo_start(s)
    {

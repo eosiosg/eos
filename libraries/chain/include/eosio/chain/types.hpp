@@ -95,6 +95,8 @@ namespace eosio { namespace chain {
    using shared_vector = boost::interprocess::vector<T, allocator<T>>;
    template<typename T>
    using shared_set = boost::interprocess::set<T, std::less<T>, allocator<T>>;
+   template<typename K, typename V>
+   using shared_flat_multimap = boost::interprocess::flat_multimap< K, V, std::less<K>, allocator< std::pair<K,V> > >;
 
    /**
     * For bugs in boost interprocess we moved our blob data to shared_string
@@ -189,6 +191,7 @@ namespace eosio { namespace chain {
       account_history_object_type,              ///< Defined by history_plugin
       action_history_object_type,               ///< Defined by history_plugin
       reversible_block_object_type,
+	 protocol_state_object_type,
       upgrade_property_object_type,
       global_property3_object_type,
       OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types

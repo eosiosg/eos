@@ -77,7 +77,7 @@ endif()
 
 if(NOT USE_EXISTING_BOOST)
    target_compile_definitions(eos-vm INTERFACE -DEOS_VM_USE_EXTERNAL_OUTCOME)
-#   add_subdirectory(external/outcome)
+   add_subdirectory(external/outcome)
 endif()
 
 if(ENABLE_MEMORY_OPS_ALIGNMENT)

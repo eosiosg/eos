@@ -53,7 +53,8 @@ class eos_vm_instantiated_module : public wasm_instantiated_module_interface {
          _instantiated_module(std::move(mod)) {}
 
       void apply(apply_context& context) override {
-         _instantiated_module->set_wasm_allocator(&context.control.get_wasm_allocator());
+		vm::wasm_allocator                 wasm_alloc;
+         _instantiated_module->set_wasm_allocator(&wasm_alloc);
          _runtime->_bkend = _instantiated_module.get();
          _runtime->_bkend->initialize(&context);
          // clamp WASM memory to maximum_linear_memory/wasm_page_size
@@ -66,9 +67,9 @@ class eos_vm_instantiated_module : public wasm_instantiated_module_interface {
          }
          auto fn = [&]() {
             const auto& res = _runtime->_bkend->call(
-                &context, "env", "apply", context.get_receiver().to_uint64_t(),
-                context.get_action().account.to_uint64_t(),
-                context.get_action().name.to_uint64_t());
+                &context, "env", "apply", uint64_t(context.receiver),
+				uint64_t(context.act.account),
+				uint64_t(context.act.name));
          };
          try {
             checktime_watchdog wd(context.trx_context.transaction_timer);

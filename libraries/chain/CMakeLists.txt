@@ -5,6 +5,17 @@ file(GLOB HEADERS "include/eosio/chain/*.hpp"
                   "include/eosio/chain/webassembly/*.hpp"
                   "${CMAKE_CURRENT_BINARY_DIR}/include/eosio/chain/core_symbol.hpp" )
 
+if(APPLE AND UNIX)
+    set(PLATFORM_TIMER_IMPL platform_timer_macos.cpp)
+else()
+    try_run(POSIX_TIMER_TEST_RUN_RESULT POSIX_TIMER_TEST_COMPILE_RESULT ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/platform_timer_posix_test.c)
+    if(POSIX_TIMER_TEST_RUN_RESULT EQUAL 0)
+        set(PLATFORM_TIMER_IMPL platform_timer_posix.cpp)
+    else()
+        set(PLATFORM_TIMER_IMPL platform_timer_asio_fallback.cpp)
+    endif()
+endif()
+
 if("eos-vm-oc" IN_LIST EOSIO_WASM_RUNTIMES)
     set(CHAIN_EOSVMOC_SOURCES webassembly/eos-vm-oc/code_cache.cpp
             webassembly/eos-vm-oc/executor.cpp
@@ -71,23 +82,26 @@ add_library( eosio_chain
               asset.cpp
               snapshot.cpp
 
-             webassembly/wavm.cpp
-             webassembly/wabt.cpp
-        ${CHAIN_EOSVMOC_SOURCES}
+#             webassembly/wavm.cpp
+#             webassembly/wabt.cpp
+#        ${CHAIN_EOSVMOC_SOURCES}
         ${CHAIN_EOSVM_SOURCES}
 
 #             get_config.cpp
 #             global_property_object.cpp
 #
 #             contracts/chain_initializer.cpp
-
-
-             transaction_metadata.cpp
+        protocol_state_object.cpp
+        genesis_intrinsics.cpp
+        whitelisted_intrinsics.cpp
+        transaction_metadata.cpp
+        platform_timer_accuracy.cpp
+        ${PLATFORM_TIMER_IMPL}
              ${HEADERS}
              )
 
 target_link_libraries( eosio_chain fc chainbase Logging IR WAST WASM Runtime
-                       softfloat builtins wabt
+                       softfloat builtins wabt ${CHAIN_EOSVM_LIBRARIES} ${LLVM_LIBS}
                      )
 target_include_directories( eosio_chain
                             PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include"
@@ -100,6 +114,12 @@ target_include_directories( eosio_chain
 if("eos-vm-oc" IN_LIST EOSIO_WASM_RUNTIMES)
     target_link_libraries(eosio_chain "-Wl,-wrap=main")
 endif()
+
+foreach(RUNTIME ${EOSIO_WASM_RUNTIMES})
+   string(TOUPPER "${RUNTIME}" RUNTIMEUC)
+   string(REPLACE "-" "_" RUNTIMEUC ${RUNTIMEUC})
+   target_compile_definitions(eosio_chain PUBLIC "EOSIO_${RUNTIMEUC}_RUNTIME_ENABLED")
+endforeach()
 
 install( TARGETS eosio_chain
    RUNTIME DESTINATION ${CMAKE_INSTALL_FULL_BINDIR}
@@ -114,7 +134,7 @@ endif()
 
 install( DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/eosio/chain/
       DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/eosio/chain
-      FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h" PATTERN "webassembly" EXCLUDE
+      FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h" EXCLUDE
 )
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/eosio/chain/core_symbol.hpp DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/eosio/chain)
 #if(MSVC)

@@ -37,11 +37,12 @@ namespace eosio { namespace chain {
    // *bos*
    class global_property2_object : public chainbase::object<global_property2_object_type, global_property2_object>
    {
-      OBJECT_CTOR(global_property2_object, (cfg))
+      OBJECT_CTOR(global_property2_object, (cfg)(whitelisted_intrinsics))
 
       id_type                       id;
       chain_config2                 cfg;
       guaranteed_minimum_resources    gmr;//guaranteed_minimum_resources
+	 whitelisted_intrinsics_type                whitelisted_intrinsics;
    };
 
    class upgrade_property_object : public chainbase::object<upgrade_property_object_type, upgrade_property_object>
@@ -144,7 +145,7 @@ FC_REFLECT(eosio::chain::global_property_object,
           )
 // *bos*
 FC_REFLECT(eosio::chain::global_property2_object,
-           (cfg)(gmr)
+           (cfg)(gmr)(whitelisted_intrinsics)
           )
 FC_REFLECT(eosio::chain::upgrade_property_object,
            (upgrade_target_block_num)(upgrade_complete_block_num)

@@ -8,9 +8,12 @@
 #include <eosio/chain/account_object.hpp>
 #include <eosio/chain/block_summary_object.hpp>
 #include <eosio/chain/eosio_contract.hpp>
+#include <eosio/chain/protocol_state_object.hpp>
 #include <eosio/chain/global_property_object.hpp>
 #include <eosio/chain/contract_table_objects.hpp>
 #include <eosio/chain/generated_transaction_object.hpp>
+#include <eosio/chain/genesis_intrinsics.hpp>
+#include <eosio/chain/whitelisted_intrinsics.hpp>
 #include <eosio/chain/transaction_object.hpp>
 #include <eosio/chain/reversible_block_object.hpp>
 
@@ -149,6 +152,12 @@ struct controller_impl {
 
    typedef pair<scope_name,action_name>                   handler_key;
    map< account_name, map<handler_key, apply_handler> >   apply_handlers;
+   platform_timer                 timer;
+
+//   vm::wasm_allocator                 wasm_alloc;
+//  #if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
+//  vm::wasm_allocator                 wasm_alloc;
+//  #endif
 
    /**
     *  Transactions that were undone by pop_block or abort_block, transactions
@@ -737,6 +746,13 @@ struct controller_impl {
       db.create<global_property_object>([&](auto& gpo ){
         gpo.configuration = conf.genesis.initial_configuration;
       });
+
+//      db.create<protocol_state_object>([&](auto& pso ){
+//         for( const auto& i : genesis_intrinsics ) {
+//            add_intrinsic_to_whitelist( pso.whitelisted_intrinsics, i );
+//         }
+//      });
+
       db.create<dynamic_global_property_object>([](auto&){});
 
       // *bos begin*
@@ -745,6 +761,9 @@ struct controller_impl {
          gpo.gmr.cpu_us = config::default_gmr_cpu_limit;
          gpo.gmr.net_byte = config::default_gmr_net_limit;
          gpo.gmr.ram_byte = config::default_gmr_ram_limit;
+         for( const auto& i : genesis_intrinsics ) {
+            add_intrinsic_to_whitelist( gpo.whitelisted_intrinsics, i );
+         }
       });
 
 
@@ -986,8 +1005,9 @@ struct controller_impl {
                                  onerror( gtrx.sender_id, gtrx.packed_trx.data(), gtrx.packed_trx.size() ) );
       etrx.expiration = self.pending_block_time() + fc::microseconds(999'999); // Round up to avoid appearing expired
       etrx.set_reference_block( self.head_block_id() );
+	 transaction_checktime_timer trx_timer(timer);
 
-      transaction_context trx_context( self, etrx, etrx.id(), start );
+      transaction_context trx_context( self, etrx, etrx.id(), std::move(trx_timer), start);
       trx_context.deadline = deadline;
       trx_context.explicit_billed_cpu_time = explicit_billed_cpu_time;
       trx_context.billed_cpu_time_us = billed_cpu_time_us;
@@ -1104,8 +1124,9 @@ struct controller_impl {
       in_trx_requiring_checks = true;
 
       uint32_t cpu_time_to_bill_us = billed_cpu_time_us;
+	   transaction_checktime_timer trx_timer(timer);
 
-      transaction_context trx_context( self, dtrx, gtrx.trx_id );
+      transaction_context trx_context( self, dtrx, gtrx.trx_id, std::move(trx_timer));
       trx_context.leeway =  fc::microseconds(0); // avoid stealing cpu resource
       trx_context.deadline = deadline;
       trx_context.explicit_billed_cpu_time = explicit_billed_cpu_time;
@@ -1254,7 +1275,8 @@ struct controller_impl {
          }
 
          const signed_transaction& trn = trx->packed_trx->get_signed_transaction();
-         transaction_context trx_context(self, trn, trx->id, start);
+		transaction_checktime_timer trx_timer(timer);
+		transaction_context trx_context(self, trn, trx->id, std::move(trx_timer), start);
          if ((bool)subjective_cpu_leeway && pending->_block_status == controller::block_status::incomplete) {
             trx_context.leeway = *subjective_cpu_leeway;
          }
@@ -2733,5 +2755,9 @@ void controller::set_upo(uint32_t target_block_num) {
         });
     }
 }
+
+//vm::wasm_allocator& controller::get_wasm_allocator() {
+//  return my->wasm_alloc;
+//}
 
 } } /// eosio::chain

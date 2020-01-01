@@ -296,6 +296,7 @@ namespace eosio { namespace chain {
          void reset_pbft_my_prepare();
          void reset_pbft_prepared();
          void maybe_switch_forks();
+//         vm::wasm_allocator&  get_wasm_allocator();
 
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;
