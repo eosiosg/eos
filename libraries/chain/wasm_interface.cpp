@@ -10,7 +10,6 @@
 #include <eosio/chain/wasm_interface_private.hpp>
 #include <eosio/chain/wasm_eosio_validation.hpp>
 #include <eosio/chain/wasm_eosio_injection.hpp>
-#include <eosio/chain/protocol_state_object.hpp>
 #include <eosio/chain/global_property_object.hpp>
 #include <eosio/chain/account_object.hpp>
 #include <fc/exception/exception.hpp>
@@ -2073,11 +2072,11 @@ REGISTER_INJECTED_INTRINSICS(softfloat_api,
 std::istream& operator>>(std::istream& in, wasm_interface::vm_type& runtime) {
   std::string s;
   in >> s;
-//  if (s == "wavm")
-//	runtime = eosio::chain::wasm_interface::vm_type::wavm;
-//  else if (s == "wabt")
-//	runtime = eosio::chain::wasm_interface::vm_type::wabt;
-  if (s == "eos-vm")
+  if (s == "wavm")
+	runtime = eosio::chain::wasm_interface::vm_type::wavm;
+  else if (s == "wabt")
+	runtime = eosio::chain::wasm_interface::vm_type::wabt;
+  else if (s == "eos-vm")
 	runtime = eosio::chain::wasm_interface::vm_type::eos_vm;
   else
 	in.setstate(std::ios_base::failbit);

@@ -2,7 +2,12 @@
 
 #include <eosio/chain/wasm_interface.hpp>
 #include <eosio/chain/webassembly/wavm.hpp>
-//#include <eosio/chain/webassembly/wabt.hpp>
+#include <eosio/chain/webassembly/wabt.hpp>
+#ifdef EOSIO_EOS_VM_OC_RUNTIME_ENABLED
+#include <eosio/chain/webassembly/eos-vm-oc.hpp>
+#else
+#define _REGISTER_EOSVMOC_INTRINSIC(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)
+#endif
 #include <eosio/chain/webassembly/eos-vm.hpp>
 #include <eosio/chain/webassembly/runtime_interface.hpp>
 #include <eosio/chain/wasm_eosio_injection.hpp>
@@ -16,6 +21,10 @@
 #include "WAST/WAST.h"
 #include "IR/Validate.h"
 
+#if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
+#include <eosio/vm/allocator.hpp>
+#endif
+
 using namespace fc;
 using namespace eosio::chain::webassembly;
 using namespace IR;
@@ -25,14 +34,14 @@ namespace eosio { namespace chain {
 
    struct wasm_interface_impl {
       wasm_interface_impl(wasm_interface::vm_type vm) {
-//         if(vm == wasm_interface::vm_type::wavm)
-//            runtime_interface = std::make_unique<webassembly::wavm::wavm_runtime>();
-//         else if(vm == wasm_interface::vm_type::wabt)
-//            runtime_interface = std::make_unique<webassembly::wabt_runtime::wabt_runtime>();
-//         else
-//            EOS_THROW(wasm_exception, "wasm_interface_impl fall through");
-		if(vm == wasm_interface::vm_type::eos_vm)
-		  runtime_interface = std::make_unique<webassembly::eos_vm_runtime::eos_vm_runtime<eosio::vm::interpreter>>();
+         if(vm == wasm_interface::vm_type::wavm)
+            runtime_interface = std::make_unique<webassembly::wavm::wavm_runtime>();
+         else if(vm == wasm_interface::vm_type::wabt)
+            runtime_interface = std::make_unique<webassembly::wabt_runtime::wabt_runtime>();
+         else if (vm == wasm_interface::vm_type::eos_vm)
+		    runtime_interface = std::make_unique<webassembly::eos_vm_runtime::eos_vm_runtime<eosio::vm::interpreter>>();
+		 else
+		    EOS_THROW(wasm_exception, "wasm_interface_impl fall through");
       }
 
       std::vector<uint8_t> parse_initial_memory(const Module& module) {
@@ -77,15 +86,15 @@ namespace eosio { namespace chain {
 			   (const U8*)code.data(),
 			   (const U8*)code.data() + code.size()};;
 		  if (runtime_interface->inject_module(module)) {
-//			try {
-//			  Serialization::ArrayOutputStream outstream;
-//			  WASM::serialize(outstream, module);
-//			  bytes = outstream.getBytes();
-//			} catch (const Serialization::FatalSerializationException &e) {
-//			  EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
-//			} catch (const IR::ValidationException &e) {
-//			  EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
-//			}
+			try {
+			  Serialization::ArrayOutputStream outstream;
+			  WASM::serialize(outstream, module);
+			  bytes = outstream.getBytes();
+			} catch (const Serialization::FatalSerializationException &e) {
+			  EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
+			} catch (const IR::ValidationException &e) {
+			  EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
+			}
 		  }
 		   it = instantiation_cache.emplace(code_id,
 											runtime_interface->instantiate_module((const char *) bytes.data(),
@@ -109,6 +118,8 @@ namespace eosio { namespace chain {
 #define _WRAPPED_SEQ(SEQ) BOOST_PP_CAT(_ADD_PAREN_1 SEQ, _END)
 
 #define _REGISTER_INTRINSIC_EXPLICIT(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)\
+   _REGISTER_WAVM_INTRINSIC(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)         \
+   _REGISTER_WABT_INTRINSIC(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)         \
    _REGISTER_EOS_VM_INTRINSIC(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)
 
 #define _REGISTER_INTRINSIC4(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)\

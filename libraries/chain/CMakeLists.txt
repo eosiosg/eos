@@ -82,21 +82,21 @@ add_library( eosio_chain
               asset.cpp
               snapshot.cpp
 
-#             webassembly/wavm.cpp
-#             webassembly/wabt.cpp
-#        ${CHAIN_EOSVMOC_SOURCES}
-        ${CHAIN_EOSVM_SOURCES}
+             webassembly/wavm.cpp
+             webassembly/wabt.cpp
+             ${CHAIN_EOSVMOC_SOURCES}
+             ${CHAIN_EOSVM_SOURCES}
 
 #             get_config.cpp
 #             global_property_object.cpp
 #
 #             contracts/chain_initializer.cpp
-        protocol_state_object.cpp
-        genesis_intrinsics.cpp
-        whitelisted_intrinsics.cpp
-        transaction_metadata.cpp
-        platform_timer_accuracy.cpp
-        ${PLATFORM_TIMER_IMPL}
+              protocol_state_object.cpp
+              genesis_intrinsics.cpp
+              whitelisted_intrinsics.cpp
+              transaction_metadata.cpp
+              platform_timer_accuracy.cpp
+              ${PLATFORM_TIMER_IMPL}
              ${HEADERS}
              )
 
