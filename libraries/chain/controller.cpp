@@ -37,6 +37,7 @@ using controller_index_set = index_set<
    account_sequence_index,
    global_property_multi_index,
    global_property2_multi_index,
+   protocol_state_multi_index,
    dynamic_global_property_multi_index,
    upgrade_property_multi_index,
    global_property3_multi_index,
@@ -747,11 +748,11 @@ struct controller_impl {
         gpo.configuration = conf.genesis.initial_configuration;
       });
 
-//      db.create<protocol_state_object>([&](auto& pso ){
-//         for( const auto& i : genesis_intrinsics ) {
-//            add_intrinsic_to_whitelist( pso.whitelisted_intrinsics, i );
-//         }
-//      });
+      db.create<protocol_state_object>([&](auto& pso ){
+         for( const auto& i : genesis_intrinsics ) {
+            add_intrinsic_to_whitelist( pso.whitelisted_intrinsics, i );
+         }
+      });
 
       db.create<dynamic_global_property_object>([](auto&){});
 
@@ -761,9 +762,6 @@ struct controller_impl {
          gpo.gmr.cpu_us = config::default_gmr_cpu_limit;
          gpo.gmr.net_byte = config::default_gmr_net_limit;
          gpo.gmr.ram_byte = config::default_gmr_ram_limit;
-         for( const auto& i : genesis_intrinsics ) {
-            add_intrinsic_to_whitelist( gpo.whitelisted_intrinsics, i );
-         }
       });
 
 

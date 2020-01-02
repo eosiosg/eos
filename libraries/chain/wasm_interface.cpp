@@ -11,6 +11,7 @@
 #include <eosio/chain/wasm_eosio_validation.hpp>
 #include <eosio/chain/wasm_eosio_injection.hpp>
 #include <eosio/chain/global_property_object.hpp>
+#include <eosio/chain/protocol_state_object.hpp>
 #include <eosio/chain/account_object.hpp>
 #include <fc/exception/exception.hpp>
 #include <fc/crypto/sha256.hpp>
@@ -46,9 +47,9 @@ namespace eosio { namespace chain {
       wasm_validations::wasm_binary_validation validator(control, module);
       validator.validate();
 
-      const auto& gpo = control.db().get<global_property2_object>();
+      const auto& pso = control.db().get<protocol_state_object>();
 
-      root_resolver resolver( gpo.whitelisted_intrinsics );
+      root_resolver resolver( pso.whitelisted_intrinsics );
       LinkResult link_result = linkModule(module, resolver);
 
       //there are a couple opportunties for improvement here--
@@ -1737,7 +1738,7 @@ public:
     action_seed_api(apply_context& ctx)
            : context_aware_api(ctx) {}
 
-   int bpsig_action_time_seed(array_ptr<char> sig, size_t siglen) {
+   int bpsig_action_time_seed(array_ptr<char> sig, uint32_t siglen) {
       auto data = action_timestamp();
       fc::sha256::encoder encoder;
       encoder.write(reinterpret_cast<const char*>(data.data()), data.size()* sizeof(uint32_t));
@@ -1803,6 +1804,9 @@ private:
    }
 };
 
+REGISTER_INTRINSICS(action_seed_api,
+   (bpsig_action_time_seed,  int(int, int)               )
+);
 
 REGISTER_INJECTED_INTRINSICS(call_depth_api,
    (call_depth_assert,  void() )
@@ -1862,6 +1866,8 @@ REGISTER_INTRINSICS(privileged_api,
    (set_proposed_producers,           int64_t(int,int)                      )
    (get_blockchain_parameters_packed, int(int, int)                         )
    (set_blockchain_parameters_packed, void(int,int)                         )
+   (set_name_list_packed,             void(int64_t,int64_t,int,int)         )
+   (set_guaranteed_minimum_resources,   void(int64_t,int64_t,int64_t)         )
    (is_privileged,                    int(int64_t)                          )
    (set_privileged,                   void(int64_t, int)                    )
    (set_upgrade_parameters_packed, void(int, int)                           )
@@ -1982,12 +1988,16 @@ REGISTER_INTRINSICS(console_api,
 );
 
 REGISTER_INTRINSICS(context_free_transaction_api,
-   (read_transaction,       int(int, int)           )
-   (transaction_size,       int()                   )
-   (expiration,             int()                   )
-   (tapos_block_prefix,     int()                   )
-   (tapos_block_num,        int()                   )
-   (get_action,             int(int, int, int, int) )
+   (read_transaction,       int(int, int)            )
+   (transaction_size,       int()                    )
+   (get_transaction_id,     void(int)                )
+   (get_action_sequence,    void(int)                )
+   (has_contract,           int(int64_t)             )
+   (get_contract_code,      void(int64_t, int)       )
+   (expiration,             int()                    )
+   (tapos_block_prefix,     int()                    )
+   (tapos_block_num,        int()                    )
+   (get_action,             int (int, int, int, int) )
 );
 
 REGISTER_INTRINSICS(transaction_api,
