@@ -30,7 +30,6 @@
 #endif
 
 namespace eosio { namespace chain {
-   using namespace webassembly;
    using namespace webassembly::common;
 
    wasm_interface::wasm_interface(vm_type vm, bool eosvmoc_tierup, const chainbase::database& d, const boost::filesystem::path data_dir, const eosvmoc::config& eosvmoc_config)

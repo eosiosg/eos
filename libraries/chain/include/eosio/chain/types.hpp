@@ -8,7 +8,7 @@
 
 #include <chainbase/chainbase.hpp>
 
-#include <fc/container/flat_fwd.hpp>
+#include <fc/interprocess/container.hpp>
 #include <fc/io/varint.hpp>
 #include <fc/io/enum_type.hpp>
 #include <fc/crypto/sha224.hpp>
@@ -77,6 +77,7 @@ namespace eosio { namespace chain {
    using                               fc::time_point;
    using                               fc::safe;
    using                               fc::flat_map;
+   using                               fc::flat_multimap;
    using                               fc::flat_set;
    using                               fc::static_variant;
    using                               fc::ecc::range_proof_type;
