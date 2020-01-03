@@ -29,12 +29,7 @@ if("eos-vm-oc" IN_LIST EOSIO_WASM_RUNTIMES)
             webassembly/eos-vm-oc/gs_seg_helpers.c
             webassembly/eos-vm-oc.cpp)
 
-    if(LLVM_VERSION VERSION_LESS 7.1 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        enable_language(ASM-LLVMWAR)
-        list(APPEND CHAIN_EOSVMOC_SOURCES webassembly/eos-vm-oc/llvmWARshim.llvmwar)
-    else()
         list(APPEND CHAIN_EOSVMOC_SOURCES webassembly/eos-vm-oc/llvmWARshim.cpp)
-    endif()
 
     llvm_map_components_to_libnames(LLVM_LIBS support core passes mcjit native orcjit)
     include_directories(${LLVM_INCLUDE_DIRS})

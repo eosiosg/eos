@@ -1,9 +1,4 @@
-if(LLVM_VERSION VERSION_LESS 7.1 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-	enable_language(ASM-LLVMWAR)
-	set(LLVM_SHIM_FILE llvmWARshim.llvmwar)
-else()
-	set(LLVM_SHIM_FILE llvmWARshim.cpp)
-endif()
+set(LLVM_SHIM_FILE llvmWARshim.cpp)
 
 set(Sources
 	Intrinsics.cpp
