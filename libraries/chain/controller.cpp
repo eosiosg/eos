@@ -34,7 +34,8 @@ using resource_limits::resource_limits_manager;
 
 using controller_index_set = index_set<
    account_index,
-   account_sequence_index,
+   account_metadata_index,
+   code_index,
    global_property_multi_index,
    global_property2_multi_index,
    protocol_state_multi_index,
@@ -706,15 +707,15 @@ struct controller_impl {
       db.create<account_object>([&](auto& a) {
          a.name = name;
          a.creation_date = conf.genesis.initial_timestamp;
-         a.privileged = is_privileged;
 
          if( name == config::system_account_name ) {
             a.set_abi(eosio_contract_abi(abi_def()));
          }
       });
-      db.create<account_sequence_object>([&](auto & a) {
+      db.create<account_metadata_object>([&](auto & a) {
         a.name = name;
-      });
+		a.set_privileged( is_privileged );
+	  });
 
       const auto& owner_permission  = authorization.create_permission(name, config::owner_name, 0,
                                                                       owner, conf.genesis.initial_timestamp );

@@ -25,6 +25,10 @@
 #include <fstream>
 #include <string.h>
 
+#if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
+#include <eosio/vm/allocator.hpp>
+#endif
+
 namespace eosio { namespace chain {
    using namespace webassembly;
    using namespace webassembly::common;
@@ -58,7 +62,19 @@ namespace eosio { namespace chain {
       //Hard: Kick off instantiation in a separate thread at this location
 	 }
 
-   void wasm_interface::apply( const digest_type& code_hash, const shared_string& code, const uint8_t& vm_type, const uint8_t& vm_version, apply_context& context ) {
+   void wasm_interface::indicate_shutting_down() {
+      my->is_shutting_down = true;
+   }
+
+   void wasm_interface::code_block_num_last_used(const digest_type& code_hash, const uint8_t& vm_type, const uint8_t& vm_version, const uint32_t& block_num) {
+      my->code_block_num_last_used(code_hash, vm_type, vm_version, block_num);
+   }
+
+   void wasm_interface::current_lib(const uint32_t lib) {
+      my->current_lib(lib);
+   }
+
+   void wasm_interface::apply( const digest_type& code_hash, const uint8_t& vm_type, const uint8_t& vm_version, apply_context& context ) {
 #ifdef EOSIO_EOS_VM_OC_RUNTIME_ENABLED
       if(my->eosvmoc) {
          const chain::eosvmoc::code_descriptor* cd = nullptr;
@@ -79,7 +95,7 @@ namespace eosio { namespace chain {
          }
       }
 #endif
-      my->get_instantiated_module(code_hash, code, vm_type, vm_version, context.trx_context)->apply(context);
+      my->get_instantiated_module(code_hash, vm_type, vm_version, context.trx_context)->apply(context);
    }
 
    void wasm_interface::exit() {
@@ -98,9 +114,8 @@ class context_aware_api {
       context_aware_api(apply_context& ctx, bool context_free = false )
       :context(ctx)
       {
-         if( context.context_free )
+         if( context.is_context_free() )
             EOS_ASSERT( context_free, unaccessible_api, "only context free api's can be used in this context" );
-         context.used_context_free_api |= !context_free;
       }
 
       void checktime() {
@@ -117,7 +132,7 @@ class context_free_api : public context_aware_api {
       context_free_api( apply_context& ctx )
       :context_aware_api(ctx, true) {
          /* the context_free_data is not available during normal application because it is prunable */
-         EOS_ASSERT( context.context_free, unaccessible_api, "this API may only be called from context_free apply" );
+         EOS_ASSERT( context.is_context_free(), unaccessible_api, "this API may only be called from context_free apply" );
       }
 
       int get_context_free_data( uint32_t index, array_ptr<char> buffer, uint32_t buffer_size )const {
@@ -281,14 +296,14 @@ class privileged_api : public context_aware_api {
 
       // *bos  end*
 
-      bool is_privileged( account_name n )const {
-         return context.db.get<account_object, by_name>( n ).privileged;
+	  bool is_privileged( account_name n )const {
+		return context.db.get<account_metadata_object, by_name>( n ).is_privileged();
       }
 
       void set_privileged( account_name n, bool is_priv ) {
-         const auto& a = context.db.get<account_object, by_name>( n );
+         const auto& a = context.db.get<account_metadata_object, by_name>( n );
          context.db.modify( a, [&]( auto& ma ){
-            ma.privileged = is_priv;
+            ma.set_privileged( is_priv );
          });
       }
 
@@ -1008,7 +1023,7 @@ public:
          const size_t sz = strnlen( msg, max_assert_message );
          std::string message( msg, sz );
          EOS_THROW( eosio_assert_message_exception, "assertion failure with message: ${s}", ("s",message) );
-          }
+      }
    }
 
    void eosio_assert_message( bool condition, array_ptr<const char> msg, uint32_t msg_len ) {
@@ -1038,21 +1053,21 @@ class action_api : public context_aware_api {
       :context_aware_api(ctx,true){}
 
       int read_action_data(array_ptr<char> memory, uint32_t buffer_size) {
-         auto s = context.act.data.size();
+         auto s = context.get_action().data.size();
          if( buffer_size == 0 ) return s;
 
          auto copy_size = std::min( static_cast<size_t>(buffer_size), s );
-         memcpy( memory, context.act.data.data(), copy_size );
+         memcpy( (char*)memory.value, context.get_action().data.data(), copy_size );
 
          return copy_size;
       }
 
       int action_data_size() {
-         return context.act.data.size();
+         return context.get_action().data.size();
       }
 
       name current_receiver() {
-         return context.receiver;
+         return context.get_receiver();
       }
 };
 
@@ -1455,17 +1470,21 @@ class context_free_transaction_api : public context_aware_api {
       }
 
       bool has_contract(account_name name){
-          const auto accnt  = context.db.find<account_object,by_name>( name );
+          const auto accnt  = context.db.find<account_metadata_object,by_name>( name );
           EOS_ASSERT( accnt != nullptr, action_validate_exception, "account '${account}' does not exist", ("account", name) );
-          return accnt->code.size() > 0;
+          return accnt->code_hash != digest_type();
       }
 
       void get_contract_code(account_name name, fc::sha256& code ) {
-          const auto accnt  = context.db.find<account_object,by_name>( name );
+          const auto accnt  = context.db.find<account_metadata_object,by_name>( name );
           EOS_ASSERT( accnt != nullptr, action_validate_exception, "account '${account}' does not exist", ("account", name) );
 
-          if( accnt->code.size() > 0) {
-              code = fc::sha256::hash( accnt->code.data(), accnt->code.size() );
+          auto vm_type = accnt->vm_type;
+          auto vm_version = accnt->vm_version;
+          auto code_hash = accnt->code_hash;
+		  const code_object *codeobject = &context.db.get<code_object,by_code_hash>(boost::make_tuple(code_hash, vm_type, vm_version));
+          if( codeobject->code_hash != digest_type()) {
+              code = fc::sha256::hash( codeobject->code.data(), codeobject->code.size() );
           } else {
               code = fc::sha256();
           }
