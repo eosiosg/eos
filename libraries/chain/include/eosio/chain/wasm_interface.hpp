@@ -13,6 +13,7 @@ namespace eosio { namespace chain {
    class apply_context;
    class wasm_runtime_interface;
    class controller;
+   namespace eosvmoc { struct config; }
 
    struct wasm_exit {
       int32_t code = 0;
@@ -76,17 +77,19 @@ namespace eosio { namespace chain {
          enum class vm_type {
             wavm,
             wabt,
-		    eos_vm
-		 };
+            eos_vm,
+            eos_vm_jit,
+            eos_vm_oc
+         };
 
-         wasm_interface(vm_type vm);
+         wasm_interface(vm_type vm, bool eosvmoc_tierup, const chainbase::database& d, const boost::filesystem::path data_dir, const eosvmoc::config& eosvmoc_config);
          ~wasm_interface();
 
          //validates code -- does a WASM validation pass and checks the wasm against EOSIO specific constraints
          static void validate(const controller& control, const bytes& code);
 
          //Calls apply or error on a given code
-         void apply(const digest_type& code_id, const shared_string& code, apply_context& context);
+		 void apply(const digest_type& code_hash, const shared_string& code, const uint8_t& vm_type, const uint8_t& vm_version, apply_context& context);
 
          //Immediately exits currently running wasm. UB is called when no wasm running
          void exit();
@@ -102,4 +105,4 @@ namespace eosio{ namespace chain {
    std::istream& operator>>(std::istream& in, wasm_interface::vm_type& runtime);
 }}
 
-FC_REFLECT_ENUM( eosio::chain::wasm_interface::vm_type, (wavm)(wabt)(eos_vm) )
+FC_REFLECT_ENUM( eosio::chain::wasm_interface::vm_type, (wavm)(wabt)(eos_vm)(eos_vm_jit)(eos_vm_oc) )

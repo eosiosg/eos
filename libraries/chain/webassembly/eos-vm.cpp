@@ -53,9 +53,8 @@ class eos_vm_instantiated_module : public wasm_instantiated_module_interface {
          _instantiated_module(std::move(mod)) {}
 
       void apply(apply_context& context) override {
-		vm::wasm_allocator                 wasm_alloc;
-         _instantiated_module->set_wasm_allocator(&wasm_alloc);
-         _runtime->_bkend = _instantiated_module.get();
+		 _instantiated_module->set_wasm_allocator(&context.control.get_wasm_allocator());
+		 _runtime->_bkend = _instantiated_module.get();
          _runtime->_bkend->initialize(&context);
          // clamp WASM memory to maximum_linear_memory/wasm_page_size
          auto& module = _runtime->_bkend->get_module();

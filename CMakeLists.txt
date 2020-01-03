@@ -243,7 +243,7 @@ endif()
 
 message( STATUS "Using '${EOSIO_ROOT_KEY}' as public key for 'eosio' account" )
 
-include(wasm)
+#include(wasm)
 add_subdirectory( libraries )
 #add_subdirectory( contracts )
 add_subdirectory( plugins )

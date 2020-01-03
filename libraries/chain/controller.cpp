@@ -155,10 +155,9 @@ struct controller_impl {
    map< account_name, map<handler_key, apply_handler> >   apply_handlers;
    platform_timer                 timer;
 
-//   vm::wasm_allocator                 wasm_alloc;
-//  #if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
-//  vm::wasm_allocator                 wasm_alloc;
-//  #endif
+#if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
+   vm::wasm_allocator                 wasm_alloc;
+#endif
 
    /**
     *  Transactions that were undone by pop_block or abort_block, transactions
@@ -201,7 +200,7 @@ struct controller_impl {
         cfg.reversible_cache_size ),
     blog( cfg.blocks_dir ),
     fork_db( cfg.state_dir ),
-    wasmif( cfg.wasm_runtime ),
+	wasmif( cfg.wasm_runtime, cfg.eosvmoc_tierup, db, cfg.state_dir, cfg.eosvmoc_config ),
     resource_limits( db ),
     authorization( s, db ),
     conf( cfg ),
@@ -2754,8 +2753,10 @@ void controller::set_upo(uint32_t target_block_num) {
     }
 }
 
-//vm::wasm_allocator& controller::get_wasm_allocator() {
-//  return my->wasm_alloc;
-//}
+#if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
+vm::wasm_allocator& controller::get_wasm_allocator() {
+  return my->wasm_alloc;
+}
+#endif
 
 } } /// eosio::chain

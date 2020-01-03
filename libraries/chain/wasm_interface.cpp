@@ -29,7 +29,8 @@ namespace eosio { namespace chain {
    using namespace webassembly;
    using namespace webassembly::common;
 
-   wasm_interface::wasm_interface(vm_type vm) : my( new wasm_interface_impl(vm) ) {}
+   wasm_interface::wasm_interface(vm_type vm, bool eosvmoc_tierup, const chainbase::database& d, const boost::filesystem::path data_dir, const eosvmoc::config& eosvmoc_config)
+     : my( new wasm_interface_impl(vm, eosvmoc_tierup, d, data_dir, eosvmoc_config) ) {}
 
    wasm_interface::~wasm_interface() {}
 
@@ -57,8 +58,28 @@ namespace eosio { namespace chain {
       //Hard: Kick off instantiation in a separate thread at this location
 	 }
 
-   void wasm_interface::apply( const digest_type& code_id, const shared_string& code, apply_context& context ) {
-      my->get_instantiated_module(code_id, code, context.trx_context)->apply(context);
+   void wasm_interface::apply( const digest_type& code_hash, const shared_string& code, const uint8_t& vm_type, const uint8_t& vm_version, apply_context& context ) {
+#ifdef EOSIO_EOS_VM_OC_RUNTIME_ENABLED
+      if(my->eosvmoc) {
+         const chain::eosvmoc::code_descriptor* cd = nullptr;
+         try {
+            cd = my->eosvmoc->cc.get_descriptor_for_code(code_hash, vm_version);
+         }
+         catch(...) {
+            //swallow errors here, if EOS VM OC has gone in to the weeds we shouldn't bail: continue to try and run baseline
+            //In the future, consider moving bits of EOS VM that can fire exceptions and such out of this call path
+            static bool once_is_enough;
+            if(!once_is_enough)
+               elog("EOS VM OC has encountered an unexpected failure");
+            once_is_enough = true;
+         }
+         if(cd) {
+            my->eosvmoc->exec.execute(*cd, my->eosvmoc->mem, context);
+            return;
+         }
+      }
+#endif
+      my->get_instantiated_module(code_hash, code, vm_type, vm_version, context.trx_context)->apply(context);
    }
 
    void wasm_interface::exit() {
@@ -2080,17 +2101,21 @@ REGISTER_INJECTED_INTRINSICS(softfloat_api,
 );
 
 std::istream& operator>>(std::istream& in, wasm_interface::vm_type& runtime) {
-  std::string s;
-  in >> s;
-  if (s == "wavm")
-	runtime = eosio::chain::wasm_interface::vm_type::wavm;
-  else if (s == "wabt")
-	runtime = eosio::chain::wasm_interface::vm_type::wabt;
-  else if (s == "eos-vm")
-	runtime = eosio::chain::wasm_interface::vm_type::eos_vm;
-  else
-	in.setstate(std::ios_base::failbit);
-  return in;
+   std::string s;
+   in >> s;
+   if (s == "wavm")
+      runtime = eosio::chain::wasm_interface::vm_type::wavm;
+   else if (s == "wabt")
+      runtime = eosio::chain::wasm_interface::vm_type::wabt;
+   else if (s == "eos-vm")
+      runtime = eosio::chain::wasm_interface::vm_type::eos_vm;
+   else if (s == "eos-vm-jit")
+      runtime = eosio::chain::wasm_interface::vm_type::eos_vm_jit;
+   else if (s == "eos-vm-oc")
+      runtime = eosio::chain::wasm_interface::vm_type::eos_vm_oc;
+   else
+      in.setstate(std::ios_base::failbit);
+   return in;
 }
 
 } } /// eosio::chain
