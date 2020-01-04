@@ -19,6 +19,7 @@ constexpr auto intrinsic_table = boost::hana::make_tuple(
    "eosvmoc_internal.depth_assert"_s,
    "eosio_injection.call_depth_assert"_s,  //these two are never used by EOS VM OC but all intrinsics
    "eosio_injection.checktime"_s,          //must be mapped
+   "env.bpsig_action_time_seed"_s,
    "env.__ashlti3"_s,
    "env.__ashrti3"_s,
    "env.__lshlti3"_s,
@@ -251,8 +252,7 @@ constexpr auto intrinsic_table = boost::hana::make_tuple(
    "eosio_injection._eosio_i32_to_f64"_s,
    "eosio_injection._eosio_i64_to_f64"_s,
    "eosio_injection._eosio_ui32_to_f64"_s,
-   "eosio_injection._eosio_ui64_to_f64"_s,
-   "env.bpsig_action_time_seed"_s
+   "eosio_injection._eosio_ui64_to_f64"_s
 );
 
 }}}
