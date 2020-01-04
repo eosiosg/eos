@@ -24,7 +24,7 @@ struct no_offset{};
 struct code_offset{ size_t offset; };    //relative to code_begin
 struct intrinsic_ordinal{ size_t ordinal; };
 
-using eosvmoc_optional_offset_or_import_t = fc::static_variant<no_offset, code_offset, intrinsic_ordinal>;
+using eosvmoc_optional_offset_or_import_t = fc::static_variant<eosvmoc::no_offset, eosvmoc::code_offset, eosvmoc::intrinsic_ordinal>;
 
 struct code_descriptor {
    digest_type code_hash;
