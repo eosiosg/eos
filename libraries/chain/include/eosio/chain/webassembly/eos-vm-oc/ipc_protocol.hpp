@@ -41,9 +41,9 @@ struct code_compilation_result_message {
 struct compilation_result_unknownfailure {};
 struct compilation_result_toofull {};
 
-using wasm_compilation_result = fc::static_variant<eosvmoc::code_descriptor,  //a successful compile
-                                                  eosvmoc::compilation_result_unknownfailure,
-                                                  eosvmoc::compilation_result_toofull>;
+using wasm_compilation_result = fc::static_variant<code_descriptor,  //a successful compile
+                                                  compilation_result_unknownfailure,
+                                                  compilation_result_toofull>;
 
 struct wasm_compilation_result_message {
    code_tuple code;
