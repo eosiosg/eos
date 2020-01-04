@@ -74,7 +74,7 @@ constexpr auto intrinsic_table = boost::hana::make_tuple(
    "env.set_guaranteed_minimum_resources"_s,
    "env.is_privileged"_s,
    "env.set_privileged"_s,
-   "env.set_upgrade_parameters_packed"_s,
+   "env.get_active_producers"_s,
    "env.db_store_i64"_s,
    "env.db_update_i64"_s,
    "env.db_remove_i64"_s,
