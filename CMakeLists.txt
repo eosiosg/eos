@@ -102,9 +102,9 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT WIN32)
 	   message(FATAL_ERROR "EOSIO requires an LLVM version 7.0 to 9.0")
    endif()
 
-#   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
       list(APPEND EOSIO_WASM_RUNTIMES eos-vm-oc)
-#   endif()
+   endif()
 endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT WIN32)
