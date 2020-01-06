@@ -40,7 +40,6 @@ void run_compile(wrapped_fd&& response_sock, wrapped_fd&& wasm_code) noexcept { 
    else if(module.startFunctionIndex < module.functions.imports.size()) {
       const auto& f = module.functions.imports[module.startFunctionIndex];
       const intrinsic_entry& ie = get_intrinsic_map().at(f.moduleName + "." + f.exportName);
-      ilog("intrisic map size: ", get_intrisic_map().size());
       result_message.start = intrinsic_ordinal{ie.ordinal};
    }
    else
