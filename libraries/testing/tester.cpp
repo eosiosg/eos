@@ -7,6 +7,8 @@
 
 #include <fstream>
 
+#include <contracts.hpp>
+
 eosio::chain::asset core_from_string(const std::string& s) {
   return eosio::chain::asset::from_string(s + " " CORE_SYMBOL_NAME);
 }
@@ -824,9 +826,9 @@ namespace eosio { namespace testing {
    }
 
    void base_tester::push_genesis_block() {
-      set_code(config::system_account_name, eosio_bios_wast);
+	 set_code(config::system_account_name, contracts::eosio_bios_wasm());
 
-      set_abi(config::system_account_name, eosio_bios_abi);
+	 set_abi(config::system_account_name, contracts::eosio_bios_abi().data());
       //produce_block();
    }
 

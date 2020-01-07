@@ -1,11 +1,12 @@
-FROM boscore/builder as builder
+FROM frank2018/eosbuilder:v1.0.2 as builder
 ARG branch=merge-eosvm
 ARG symbol=EOS
 
 ENV OPENSSL_ROOT_DIR /usr/include/openssl
 
 RUN git clone -b $branch https://github.com/eosiosg/eos.git --recursive \
-    && cd eos && sed '91d' libraries/eos-vm/CMakeLists.txt && echo "$branch:$(git rev-parse HEAD)" > /etc/eosio-version \
+    && cd eos && sed -i '/add_subdirectory(tools)/c\#add_subdirectory(tools).' libraries/eos-vm/CMakeLists.txt
+    && echo "$branch:$(git rev-parse HEAD)" > /etc/eosio-version \
     && cmake -H. -B"/tmp/build" -GNinja -DCMAKE_BUILD_TYPE=Release -DWASM_ROOT=/opt/wasm -DCMAKE_CXX_COMPILER=clang++ \
        -DCMAKE_C_COMPILER=clang -DCMAKE_INSTALL_PREFIX=/tmp/build -DBUILD_MONGO_DB_PLUGIN=true -DCORE_SYMBOL_NAME=$symbol \
        -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT_DIR}" -DCMAKE_CXX_STANDARD_LIBRARIES="-lpthread"  \
