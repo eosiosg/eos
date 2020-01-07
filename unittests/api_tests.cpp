@@ -39,13 +39,12 @@
 #include <WASM/WASM.h>
 #include <Runtime/Runtime.h>
 
-#include <test_api/test_api.wast.hpp>
-#include <test_api_mem/test_api_mem.wast.hpp>
-#include <test_api_db/test_api_db.wast.hpp>
-#include <test_api_multi_index/test_api_multi_index.wast.hpp>
+#include <contracts.hpp>
 
-#include <eosio.bios/eosio.bios.wast.hpp>
-#include <eosio.bios/eosio.bios.abi.hpp>
+#define DUMMY_ACTION_DEFAULT_A 0x45
+#define DUMMY_ACTION_DEFAULT_B 0xab11cd1244556677
+#define DUMMY_ACTION_DEFAULT_C 0x7451ae12
+
 
 #define DISABLE_EOSLIB_SERIALIZE
 #include <test_api/test_api_common.hpp>
@@ -242,50 +241,108 @@ struct MySink : public bio::sink
 };
 uint32_t last_fnc_err = 0;
 
-BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
-	produce_blocks(2);
-	create_account( N(testapi) );
-	create_account( N(testapi2) );
-	produce_blocks(10);
-	set_code( N(testapi), test_api_wast );
-	produce_blocks(1);
-
-	auto res = CALL_TEST_FUNCTION( *this, "test_action", "assert_true", {});
-   BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.code_sequence), 1);
-   BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.abi_sequence), 0);
-
-	set_code( N(testapi), test_api_db_wast );
-   set_code( config::system_account_name, test_api_db_wast );
-   res = CALL_TEST_FUNCTION( *this, "test_db", "primary_i64_general", {});
-   BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.code_sequence), 2);
-   BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.abi_sequence), 0);
-
-   {
-      signed_transaction trx;
-      auto pl = vector<permission_level>{{config::system_account_name, config::active_name}};
-      action act(pl, test_chain_action<TEST_METHOD("test_db", "primary_i64_general")>{});
-      act.authorization = {{config::system_account_name, config::active_name}};
-      trx.actions.push_back(act);
-      this->set_transaction_headers(trx, this->DEFAULT_EXPIRATION_DELTA);
-      trx.sign(this->get_private_key(config::system_account_name, "active"), control->get_chain_id());
-      flat_set<public_key_type> keys;
-      trx.get_signature_keys(control->get_chain_id(), fc::time_point::maximum(), keys);
-      auto res = this->push_transaction(trx);
-      BOOST_CHECK_EQUAL(res->receipt->status, transaction_receipt::executed);
-      this->produce_block();
-      BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.code_sequence), 2);
-      BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.abi_sequence), 1);
-   }
-   set_code( config::system_account_name, eosio_bios_wast );
-
-	set_code( N(testapi), eosio_bios_wast );
-   set_abi(N(testapi), eosio_bios_abi);
-	set_code( N(testapi), test_api_wast );
-	res = CALL_TEST_FUNCTION( *this, "test_action", "assert_true", {});
-   BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.code_sequence), 4);
-   BOOST_REQUIRE_EQUAL(uint32_t(res->action_traces[0].receipt.abi_sequence), 1);
-
-} FC_LOG_AND_RETHROW() }
+//BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
+//   produce_blocks(2);
+//   create_account( N(test) );
+//   set_code( N(test), contracts::payloadless_wasm() );
+//   produce_blocks(1);
+//
+//   auto call_doit_and_check = [&]( account_name contract, account_name signer, auto&& checker ) {
+//      signed_transaction trx;
+//      trx.actions.emplace_back( vector<permission_level>{{signer, config::active_name}}, contract, N(doit), bytes{} );
+//      this->set_transaction_headers( trx, this->DEFAULT_EXPIRATION_DELTA );
+//      trx.sign( this->get_private_key(signer, "active"), control->get_chain_id() );
+//      auto res = this->push_transaction(trx);
+//      checker( res );
+//   };
+//
+//   auto call_provereset_and_check = [&]( account_name contract, account_name signer, auto&& checker ) {
+//      signed_transaction trx;
+//      trx.actions.emplace_back( vector<permission_level>{{signer, config::active_name}}, contract, N(provereset), bytes{} );
+//      this->set_transaction_headers( trx, this->DEFAULT_EXPIRATION_DELTA );
+//      trx.sign( this->get_private_key(signer, "active"), control->get_chain_id() );
+//      auto res = this->push_transaction(trx);
+//      checker( res );
+//   };
+//
+//   auto result = push_reqauth( config::system_account_name, "active" );
+//   BOOST_REQUIRE_EQUAL( result->receipt->status, transaction_receipt::executed );
+//   BOOST_REQUIRE( result->action_traces[0].receipt->auth_sequence.find( config::system_account_name )
+//                     != result->action_traces[0].receipt->auth_sequence.end() );
+//   auto base_global_sequence_num = result->action_traces[0].receipt->global_sequence;
+//   auto base_system_recv_seq_num = result->action_traces[0].receipt->recv_sequence;
+//   auto base_system_auth_seq_num = result->action_traces[0].receipt->auth_sequence[config::system_account_name];
+//   auto base_system_code_seq_num = result->action_traces[0].receipt->code_sequence.value;
+//   auto base_system_abi_seq_num  = result->action_traces[0].receipt->abi_sequence.value;
+//
+//   uint64_t base_test_recv_seq_num = 0;
+//   uint64_t base_test_auth_seq_num = 0;
+//   call_doit_and_check( N(test), N(test), [&]( const transaction_trace_ptr& res ) {
+//      BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 1 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, 1 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, 0 );
+//      base_test_recv_seq_num = res->action_traces[0].receipt->recv_sequence;
+//      BOOST_CHECK( base_test_recv_seq_num > 0 );
+//      base_test_recv_seq_num--;
+//      const auto& m = res->action_traces[0].receipt->auth_sequence;
+//      BOOST_CHECK_EQUAL( m.size(), 1 );
+//      BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
+//      base_test_auth_seq_num = m.begin()->second;
+//      BOOST_CHECK( base_test_auth_seq_num > 0 );
+//      --base_test_auth_seq_num;
+//   } );
+//
+//   set_code( N(test), contracts::asserter_wasm() );
+//   set_code( config::system_account_name, contracts::payloadless_wasm() );
+//
+//   call_provereset_and_check( N(test), N(test), [&]( const transaction_trace_ptr& res ) {
+//      BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 4 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->recv_sequence, base_test_recv_seq_num + 2 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, 2 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, 0 );
+//      const auto& m = res->action_traces[0].receipt->auth_sequence;
+//      BOOST_CHECK_EQUAL( m.size(), 1 );
+//      BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
+//      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 3 );
+//   } );
+//
+//   produce_blocks(1); // Added to avoid the last doit transaction from being considered a duplicate.
+//   // Adding a block also retires an onblock action which increments both the global sequence number
+//   // and the recv and auth sequences numbers for the system account.
+//
+//   call_doit_and_check( config::system_account_name, N(test), [&]( const transaction_trace_ptr& res ) {
+//      BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 6 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->recv_sequence, base_system_recv_seq_num + 4 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, base_system_code_seq_num + 1 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, base_system_abi_seq_num );
+//      const auto& m = res->action_traces[0].receipt->auth_sequence;
+//      BOOST_CHECK_EQUAL( m.size(), 1 );
+//      BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
+//      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 4 );
+//   } );
+//
+//   set_code( config::system_account_name, contracts::eosio_bios_wasm() );
+//
+//   set_code( N(test), contracts::eosio_bios_wasm() );
+//   set_abi( N(test), contracts::eosio_bios_abi().data() );
+//	set_code( N(test), contracts::payloadless_wasm() );
+//
+//   call_doit_and_check( N(test), N(test), [&]( const transaction_trace_ptr& res ) {
+//      BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed);
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 11 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->recv_sequence, base_test_recv_seq_num + 3 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, 4 );
+//      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, 1 );
+//      const auto& m = res->action_traces[0].receipt->auth_sequence;
+//      BOOST_CHECK_EQUAL( m.size(), 1 );
+//      BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
+//      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 8 );
+//   } );
+//
+//} FC_LOG_AND_RETHROW() }
 
 /*************************************************************************************
  * action_tests test case
@@ -298,7 +355,7 @@ BOOST_FIXTURE_TEST_CASE(action_tests, TESTER) { try {
 	create_account( N(acc3) );
 	create_account( N(acc4) );
 	produce_blocks(10);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 	produce_blocks(1);
 
    // test assert_true
@@ -446,8 +503,8 @@ BOOST_FIXTURE_TEST_CASE(require_notice_tests, TESTER) { try {
       create_account( N(testapi) );
       create_account( N(acc5) );
       produce_blocks(1);
-      set_code( N(testapi), test_api_wast );
-      set_code( N(acc5), test_api_wast );
+      set_code( N(testapi), contracts::test_api_wasm() );
+      set_code( N(acc5), contracts::test_api_wasm() );
       produce_blocks(1);
 
       // test require_notice
@@ -469,9 +526,9 @@ BOOST_FIXTURE_TEST_CASE(ram_billing_in_notify_tests, TESTER) { try {
    create_account( N(testapi) );
    create_account( N(testapi2) );
    produce_blocks(10);
-   set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
    produce_blocks(1);
-   set_code( N(testapi2), test_api_wast );
+	set_code( N(testapi2), contracts::test_api_wasm() );
    produce_blocks(1);
 
    BOOST_CHECK_EXCEPTION( CALL_TEST_FUNCTION( *this, "test_action", "test_ram_billing_in_notify", fc::raw::pack( ((unsigned __int128)N(testapi2) << 64) | N(testapi) ) ),
@@ -493,7 +550,7 @@ BOOST_FIXTURE_TEST_CASE(cf_action_tests, TESTER) { try {
       create_account( N(testapi) );
       create_account( N(dummy) );
       produce_blocks(10);
-      set_code( N(testapi), test_api_wast );
+      set_code( N(testapi), contracts::test_api_wasm() );
       produce_blocks(1);
       cf_action cfa;
       signed_transaction trx;
@@ -621,7 +678,7 @@ BOOST_FIXTURE_TEST_CASE(cfa_stateful_api, TESTER)  try {
 
    create_account( N(testapi) );
 	produce_blocks(1);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 
    account_name a = N(testapi2);
    account_name creator = config::system_account_name;
@@ -651,7 +708,7 @@ BOOST_FIXTURE_TEST_CASE(deferred_cfa_failed, TESTER)  try {
 
    create_account( N(testapi) );
 	produce_blocks(1);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 
    account_name a = N(testapi2);
    account_name creator = config::system_account_name;
@@ -687,7 +744,7 @@ BOOST_FIXTURE_TEST_CASE(deferred_cfa_success, TESTER)  try {
 
    create_account( N(testapi) );
 	produce_blocks(1);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 
    account_name a = N(testapi2);
    account_name creator = config::system_account_name;
@@ -728,7 +785,7 @@ BOOST_FIXTURE_TEST_CASE(checktime_pass_tests, TESTER) { try {
 	produce_blocks(2);
 	create_account( N(testapi) );
 	produce_blocks(10);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 	produce_blocks(1);
 
    // test checktime_pass
@@ -762,7 +819,7 @@ BOOST_AUTO_TEST_CASE(checktime_fail_tests) { try {
    ilog( "create account" );
    t.create_account( N(testapi) );
    ilog( "set code" );
-   t.set_code( N(testapi), test_api_wast );
+   t.set_code( N(testapi), contracts::test_api_wasm() );
    ilog( "produce block" );
    t.produce_blocks(1);
 
@@ -858,7 +915,7 @@ BOOST_FIXTURE_TEST_CASE(checktime_hashing_fail, TESTER) { try {
 	produce_blocks(2);
 	create_account( N(testapi) );
 	produce_blocks(10);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 	produce_blocks(1);
 
         //hit deadline exception, but cache the contract
@@ -911,7 +968,7 @@ BOOST_FIXTURE_TEST_CASE(compiler_builtins_tests, TESTER) { try {
 	produce_blocks(2);
 	create_account( N(testapi) );
 	produce_blocks(10);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm()  );
 	produce_blocks(1);
 
    // test test_multi3
@@ -970,7 +1027,7 @@ BOOST_FIXTURE_TEST_CASE(transaction_tests, TESTER) { try {
    produce_blocks(2);
    create_account( N(testapi) );
    produce_blocks(100);
-   set_code( N(testapi), test_api_wast );
+   set_code( N(testapi), contracts::test_api_wasm() );
    produce_blocks(1);
 
    // test for zero auth
@@ -1056,8 +1113,8 @@ BOOST_FIXTURE_TEST_CASE(transaction_tests, TESTER) { try {
 BOOST_FIXTURE_TEST_CASE(deferred_transaction_tests, TESTER) { try {
    produce_blocks(2);
    create_accounts( {N(testapi), N(testapi2), N(alice)} );
-   set_code( N(testapi), test_api_wast );
-   set_code( N(testapi2), test_api_wast );
+   set_code( N(testapi), contracts::test_api_wasm() );
+   set_code( N(testapi2), contracts::test_api_wasm() );
    produce_blocks(1);
 
    //schedule
@@ -1277,7 +1334,7 @@ BOOST_FIXTURE_TEST_CASE(chain_tests, TESTER) { try {
    create_accounts( producers );
    set_producers (producers );
 
-   set_code( N(testapi), test_api_wast );
+   set_code( N(testapi), contracts::test_api_wasm() );
    produce_blocks(100);
 
    vector<account_name> prods( control->active_producers().producers.size() );
@@ -1298,8 +1355,10 @@ BOOST_FIXTURE_TEST_CASE(db_tests, TESTER) { try {
    create_account( N(testapi) );
    create_account( N(testapi2) );
    produce_blocks(10);
-   set_code( N(testapi), test_api_db_wast );
-   set_code( N(testapi2), test_api_db_wast );
+   set_code( N(testapi), contracts::test_api_db_wasm() );
+   set_abi(  N(testapi), contracts::test_api_db_abi().data() );
+   set_code( N(testapi2), contracts::test_api_db_wasm() );
+   set_abi(  N(testapi2), contracts::test_api_db_abi().data() );
    produce_blocks(1);
 
    CALL_TEST_FUNCTION( *this, "test_db", "primary_i64_general", {});
@@ -1385,7 +1444,8 @@ BOOST_FIXTURE_TEST_CASE(multi_index_tests, TESTER) { try {
    produce_blocks(1);
    create_account( N(testapi) );
    produce_blocks(1);
-   set_code( N(testapi), test_api_multi_index_wast );
+   set_code( N(testapi), contracts::test_api_multi_index_wasm() );
+   set_abi( N(testapi), contracts::test_api_multi_index_abi().data() );
    produce_blocks(1);
 
    CALL_TEST_FUNCTION( *this, "test_multi_index", "idx64_general", {});
@@ -1443,203 +1503,6 @@ BOOST_FIXTURE_TEST_CASE(multi_index_tests, TESTER) { try {
 } FC_LOG_AND_RETHROW() }
 
 /*************************************************************************************
- * fixedpoint_tests test case
- *************************************************************************************/
-BOOST_FIXTURE_TEST_CASE(fixedpoint_tests, TESTER) { try {
-	produce_blocks(2);
-	create_account( N(testapi) );
-	produce_blocks(10);
-	set_code( N(testapi), test_api_wast );
-	produce_blocks(10);
-
-	CALL_TEST_FUNCTION( *this, "test_fixedpoint", "create_instances", {});
-	CALL_TEST_FUNCTION( *this, "test_fixedpoint", "test_addition", {});
-	CALL_TEST_FUNCTION( *this, "test_fixedpoint", "test_subtraction", {});
-	CALL_TEST_FUNCTION( *this, "test_fixedpoint", "test_multiplication", {});
-	CALL_TEST_FUNCTION( *this, "test_fixedpoint", "test_division", {});
-	CALL_TEST_FUNCTION_AND_CHECK_EXCEPTION( *this, "test_fixedpoint", "test_division_by_0", {},
-                                          eosio_assert_message_exception, "divide by zero"     );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-/*************************************************************************************
- * crypto_tests test cases
- *************************************************************************************/
-BOOST_FIXTURE_TEST_CASE(crypto_tests, TESTER) { try {
-   produce_blocks(1000);
-   create_account(N(testapi) );
-   produce_blocks(1000);
-   set_code(N(testapi), test_api_wast);
-   produce_blocks(1000);
-	{
-		signed_transaction trx;
-
-      auto pl = vector<permission_level>{{N(testapi), config::active_name}};
-
-      action act(pl, test_api_action<TEST_METHOD("test_crypto", "test_recover_key")>{});
-		auto signatures = trx.sign(get_private_key(N(testapi), "active"), control->get_chain_id());
-
-		produce_block();
-
-      auto payload   = fc::raw::pack( trx.sig_digest( control->get_chain_id() ) );
-      auto pk     = fc::raw::pack( get_public_key( N(testapi), "active" ) );
-      auto sigs   = fc::raw::pack( signatures );
-      payload.insert( payload.end(), pk.begin(), pk.end() );
-      payload.insert( payload.end(), sigs.begin(), sigs.end() );
-
-      CALL_TEST_FUNCTION( *this, "test_crypto", "test_recover_key", payload );
-      CALL_TEST_FUNCTION( *this, "test_crypto", "test_recover_key_assert_true", payload );
-      payload[payload.size()-1] = 0;
-      BOOST_CHECK_EXCEPTION( CALL_TEST_FUNCTION( *this, "test_crypto", "test_recover_key_assert_false", payload ),
-                             crypto_api_exception, fc_exception_message_is("Error expected key different than recovered key") );
-	}
-
-   CALL_TEST_FUNCTION( *this, "test_crypto", "test_sha1", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "test_sha256", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "test_sha512", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "test_ripemd160", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "sha1_no_data", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "sha256_no_data", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "sha512_no_data", {} );
-   CALL_TEST_FUNCTION( *this, "test_crypto", "ripemd160_no_data", {} );
-
-   CALL_TEST_FUNCTION_AND_CHECK_EXCEPTION( *this, "test_crypto", "assert_sha256_false", {},
-                                           crypto_api_exception, "hash mismatch" );
-
-   CALL_TEST_FUNCTION( *this, "test_crypto", "assert_sha256_true", {} );
-
-   CALL_TEST_FUNCTION_AND_CHECK_EXCEPTION( *this, "test_crypto", "assert_sha1_false", {},
-                                           crypto_api_exception, "hash mismatch" );
-
-   CALL_TEST_FUNCTION( *this, "test_crypto", "assert_sha1_true", {} );
-
-   CALL_TEST_FUNCTION_AND_CHECK_EXCEPTION( *this, "test_crypto", "assert_sha512_false", {},
-                                           crypto_api_exception, "hash mismatch" );
-
-   CALL_TEST_FUNCTION( *this, "test_crypto", "assert_sha512_true", {} );
-
-   CALL_TEST_FUNCTION_AND_CHECK_EXCEPTION( *this, "test_crypto", "assert_ripemd160_false", {},
-                                           crypto_api_exception, "hash mismatch" );
-
-   CALL_TEST_FUNCTION( *this, "test_crypto", "assert_ripemd160_true", {} );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-
-/*************************************************************************************
- * memory_tests test cases
- *************************************************************************************/
-BOOST_FIXTURE_TEST_CASE(memory_tests, TESTER) { try {
-   produce_blocks(1000);
-   create_account(N(testapi) );
-   produce_blocks(1000);
-   set_code(N(testapi), test_api_mem_wast);
-   produce_blocks(1000);
-
-   CALL_TEST_FUNCTION( *this, "test_memory", "test_memory_allocs", {} );
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_memory", "test_memory_hunk", {} );
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_memory", "test_memory_hunks", {} );
-   produce_blocks(1000);
-   //Disabling this for now as it fails due to malloc changes for variable wasm max memory sizes
-#if 0
-   CALL_TEST_FUNCTION( *this, "test_memory", "test_memory_hunks_disjoint", {} );
-   produce_blocks(1000);
-#endif
-   CALL_TEST_FUNCTION( *this, "test_memory", "test_memset_memcpy", {} );
-   produce_blocks(1000);
-   BOOST_CHECK_THROW( CALL_TEST_FUNCTION( *this, "test_memory", "test_memcpy_overlap_start", {} ), overlapping_memory_error );
-   produce_blocks(1000);
-   BOOST_CHECK_THROW( CALL_TEST_FUNCTION( *this, "test_memory", "test_memcpy_overlap_end", {} ), overlapping_memory_error );
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_memory", "test_memcmp", {} );
-   produce_blocks(1000);
-
-#define test_memory_oob(func) \
-   try { \
-      CALL_TEST_FUNCTION( *this, "test_memory", func, {} ); \
-      BOOST_FAIL("assert failed in test out of bound memory in " func); \
-   } catch (...) { \
-      BOOST_REQUIRE_EQUAL(true, true); \
-   }
-
-#define test_memory_oob2(func) \
-   try { \
-      CALL_TEST_FUNCTION( *this, "test_memory", func, {} );\
-   } catch (const fc::exception& e) {\
-     if (!expect_assert_message(e, "access violation")) throw; \
-   }
-
-   test_memory_oob("test_outofbound_0");
-   test_memory_oob("test_outofbound_1");
-   test_memory_oob("test_outofbound_2");
-   test_memory_oob("test_outofbound_3");
-   test_memory_oob("test_outofbound_4");
-   test_memory_oob("test_outofbound_5");
-   test_memory_oob("test_outofbound_6");
-   test_memory_oob("test_outofbound_7");
-   test_memory_oob("test_outofbound_8");
-   test_memory_oob("test_outofbound_9");
-   test_memory_oob("test_outofbound_10");
-   test_memory_oob("test_outofbound_11");
-   test_memory_oob("test_outofbound_12");
-   test_memory_oob("test_outofbound_13");
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-
-/*************************************************************************************
- * extended_memory_tests test cases
- *************************************************************************************/
-BOOST_FIXTURE_TEST_CASE(extended_memory_test_initial_memory, TESTER) { try {
-   produce_blocks(1000);
-   create_account(N(testapi) );
-   produce_blocks(1000);
-   set_code(N(testapi), test_api_mem_wast);
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_extended_memory", "test_initial_buffer", {} );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-BOOST_FIXTURE_TEST_CASE(extended_memory_test_page_memory, TESTER) { try {
-   produce_blocks(1000);
-   create_account(N(testapi) );
-   produce_blocks(1000);
-   set_code(N(testapi), test_api_mem_wast);
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_extended_memory", "test_page_memory", {} );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-BOOST_FIXTURE_TEST_CASE(extended_memory_test_page_memory_exceeded, TESTER) { try {
-   produce_blocks(1000);
-   create_account(N(testapi) );
-   produce_blocks(1000);
-   set_code(N(testapi), test_api_mem_wast);
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_extended_memory", "test_page_memory_exceeded", {} );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-BOOST_FIXTURE_TEST_CASE(extended_memory_test_page_memory_negative_bytes, TESTER) { try {
-   produce_blocks(1000);
-   create_account(N(testapi) );
-   produce_blocks(1000);
-   set_code(N(testapi), test_api_mem_wast);
-   produce_blocks(1000);
-   CALL_TEST_FUNCTION( *this, "test_extended_memory", "test_page_memory_negative_bytes", {} );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-/*************************************************************************************
  * print_tests test case
  *************************************************************************************/
 BOOST_FIXTURE_TEST_CASE(print_tests, TESTER) { try {
@@ -1647,7 +1510,7 @@ BOOST_FIXTURE_TEST_CASE(print_tests, TESTER) { try {
 	create_account(N(testapi) );
 	produce_blocks(1000);
 
-	set_code(N(testapi), test_api_wast);
+	set_code(N(testapi), contracts::test_api_wasm() );
 	produce_blocks(1000);
 	string captured = "";
 
@@ -1761,7 +1624,7 @@ BOOST_FIXTURE_TEST_CASE(types_tests, TESTER) { try {
 	create_account( N(testapi) );
 
 	produce_blocks(1000);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 	produce_blocks(1000);
 
 	CALL_TEST_FUNCTION( *this, "test_types", "types_size", {});
@@ -1780,7 +1643,7 @@ BOOST_FIXTURE_TEST_CASE(permission_tests, TESTER) { try {
    create_account( N(testapi) );
 
    produce_blocks(1);
-   set_code( N(testapi), test_api_wast );
+   set_code( N(testapi), contracts::test_api_wasm() );
    produce_blocks(1);
 
    auto get_result_int64 = [&]() -> int64_t {
@@ -1888,7 +1751,7 @@ BOOST_FIXTURE_TEST_CASE(privileged_tests, tester) { try {
 	create_account( N(testapi) );
 	create_account( N(acc1) );
 	produce_blocks(100);
-	set_code( N(testapi), test_api_wast );
+	set_code( N(testapi), contracts::test_api_wasm() );
 	produce_blocks(1);
 
    {
@@ -1950,49 +1813,10 @@ BOOST_FIXTURE_TEST_CASE(datastream_tests, TESTER) { try {
    produce_blocks(1000);
    create_account(N(testapi) );
    produce_blocks(1000);
-   set_code(N(testapi), test_api_wast);
+   set_code(N(testapi), contracts::test_api_wasm() );
    produce_blocks(1000);
 
    CALL_TEST_FUNCTION( *this, "test_datastream", "test_basic", {} );
-
-   BOOST_REQUIRE_EQUAL( validate(), true );
-} FC_LOG_AND_RETHROW() }
-
-/*************************************************************************************
- * new api feature test
- *************************************************************************************/
-BOOST_FIXTURE_TEST_CASE(new_api_feature_tests, TESTER) { try {
-
-   produce_blocks(1);
-   create_account(N(testapi) );
-   produce_blocks(1);
-   set_code(N(testapi), test_api_wast);
-   produce_blocks(1);
-
-   BOOST_CHECK_EXCEPTION( CALL_TEST_FUNCTION( *this, "test_transaction", "new_feature", {} ),
-      unaccessible_api,
-      [](const fc::exception& e) {
-         return expect_assert_message(e, "testapi does not have permission to call this API");
-      });
-
-   BOOST_CHECK_EXCEPTION( CALL_TEST_FUNCTION( *this, "test_transaction", "active_new_feature", {} ),
-      unaccessible_api,
-      [](const fc::exception& e) {
-         return expect_assert_message(e, "testapi does not have permission to call this API");
-      });
-
-   // change privilege
-   push_action(config::system_account_name, N(setpriv), config::system_account_name,  mutable_variant_object()
-                                                       ("account", "testapi")
-                                                       ("is_priv", 1));
-
-   CALL_TEST_FUNCTION( *this, "test_transaction", "new_feature", {} );
-
-   BOOST_CHECK_EXCEPTION( CALL_TEST_FUNCTION( *this, "test_transaction", "active_new_feature", {} ),
-      unsupported_feature,
-      [](const fc::exception& e) {
-         return expect_assert_message(e, "Unsupported Hardfork Detected");
-      });
 
    BOOST_REQUIRE_EQUAL( validate(), true );
 } FC_LOG_AND_RETHROW() }
@@ -2004,7 +1828,7 @@ BOOST_FIXTURE_TEST_CASE(permission_usage_tests, TESTER) { try {
    produce_block();
    create_accounts( {N(testapi), N(alice), N(bob)} );
    produce_block();
-   set_code(N(testapi), test_api_wast);
+   set_code(N(testapi), contracts::test_api_wasm() );
    produce_block();
 
    push_reqauth( N(alice), {{N(alice), config::active_name}}, {get_private_key(N(alice), "active")} );
@@ -2085,7 +1909,7 @@ BOOST_FIXTURE_TEST_CASE(account_creation_time_tests, TESTER) { try {
    produce_block();
    create_account( N(testapi) );
    produce_block();
-   set_code(N(testapi), test_api_wast);
+   set_code(N(testapi), contracts::test_api_wasm());
    produce_block();
 
    create_account( N(alice) );
@@ -2112,7 +1936,7 @@ BOOST_FIXTURE_TEST_CASE(eosio_assert_code_tests, TESTER) { try {
    produce_block();
    create_account( N(testapi) );
    produce_block();
-   set_code(N(testapi), test_api_wast);
+   set_code(N(testapi), contracts::test_api_wasm() );
 
    const char* abi_string = R"=====(
 {

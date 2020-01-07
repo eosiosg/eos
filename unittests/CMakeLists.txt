@@ -6,19 +6,19 @@ if( GPERFTOOLS_FOUND )
     list( APPEND PLATFORM_SPECIFIC_LIBS tcmalloc )
 endif()
 
-find_package(LLVM 7.1 REQUIRED CONFIG)
+find_package(LLVM REQUIRED CONFIG)
 
 link_directories(${LLVM_LIBRARY_DIR})
 
-set( CMAKE_CXX_STANDARD 14 )
+set( CMAKE_CXX_STANDARD 17 )
 
 add_subdirectory(contracts)
-
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/config.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/config.hpp ESCAPE_QUOTES)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/contracts.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/contracts.hpp ESCAPE_QUOTES)
 
 file(GLOB UNIT_TESTS "*.cpp")
-
-add_executable( unit_test ${UNIT_TESTS} ${WASM_UNIT_TESTS} )
+file(REMOVE ${CMAKE_CURRENT_SOURCE_DIR}/abi_tests.cpp ${CMAKE_CURRENT_SOURCE_DIR}/api_tests.cpp ${CMAKE_CURRENT_SOURCE_DIR}/delay_tests.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/wasm_tests.cpp ${CMAKE_CURRENT_SOURCE_DIR}/whitelist_blacklist_tests.cpp)
+add_executable( unit_test ${UNIT_TESTS} )
 target_link_libraries( unit_test eosio_chain chainbase eosio_testing fc ${PLATFORM_SPECIFIC_LIBS} )
 
 target_include_directories( unit_test PUBLIC
