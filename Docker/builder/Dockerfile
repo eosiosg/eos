@@ -13,11 +13,11 @@ RUN echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" >> /etc/ap
   && apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y git-core automake autoconf libtool build-essential pkg-config libtool \
      mpi-default-dev libicu-dev python-dev python3-dev libbz2-dev zlib1g-dev libssl-dev libgmp-dev \
-     clang-6.0 lldb-6.0 lld-6.0 llvm-6.0-dev libclang-6.0-dev ninja-build libusb-1.0-0-dev curl libcurl4-gnutls-dev \
+     clang-7 lld-7.0 llvm-7-dev libclang-7-dev ninja-build libusb-1.0-0-dev curl libcurl4-gnutls-dev \
   && rm -rf /var/lib/apt/lists/*
 
-RUN update-alternatives --install /usr/bin/clang clang /usr/lib/llvm-6.0/bin/clang 600 \
-  && update-alternatives --install /usr/bin/clang++ clang++ /usr/lib/llvm-6.0/bin/clang++ 600
+RUN update-alternatives --install /usr/bin/clang clang /usr/lib/llvm-7/bin/clang 700 \
+  && update-alternatives --install /usr/bin/clang++ clang++ /usr/lib/llvm-7/bin/clang++ 700
 
 RUN wget https://cmake.org/files/v3.9/cmake-3.9.6-Linux-x86_64.sh \
     && bash cmake-3.9.6-Linux-x86_64.sh --prefix=/usr/local --exclude-subdir --skip-license \
@@ -29,7 +29,7 @@ ENV CXX clang++
 RUN wget https://dl.bintray.com/boostorg/release/1.71.0/source/boost_1_71_0.tar.bz2 -O - | tar -xj \
     && cd boost_1_71_0 \
     && ./bootstrap.sh --prefix=/usr/local \
-    && echo 'using clang : 6.0 : clang++-6.0 ;' >> project-config.jam \
+    && echo 'using clang : 7 : clang++-7 ;' >> project-config.jam \
     && ./b2 -d0 -j$(nproc) --with-thread --with-date_time --with-system --with-filesystem --with-program_options \
        --with-serialization --with-chrono --with-test --with-context --with-locale --with-coroutine --with-iostreams toolset=clang link=static install \
     && cd .. && rm -rf boost_1_71_0
