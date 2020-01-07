@@ -58,9 +58,6 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
         message(FATAL_ERROR "Clang version must be at least 6.0!")
     endif()
-    if ("${CMAKE_GENERATOR}" STREQUAL "Ninja")
-       add_compile_options(-fcolor-diagnostics)
-    endif()
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "ON")
