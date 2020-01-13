@@ -214,7 +214,7 @@ struct txn_test_gen_plugin_impl {
               signed_transaction trx;
 
 //            vector<uint8_t> wasm = contracts::eosio_token_wasm();
-              string wasm = app().get_plugin<chain_plugin>().get_read_only_api().get_code({N(eosio.token)}).wasm;
+              string wasm = app().get_plugin<chain_plugin>().get_read_only_api().get_code({N(eosio.token), true}).wasm;
 
               setcode handler;
               handler.account = newaccountC;
