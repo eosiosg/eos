@@ -457,15 +457,14 @@ struct controller_impl {
 	    });
 
 		// read db account sequence index
-//		const auto& db_accounts_sequence = db.get_index<account_sequence_index, by_id>();
-//	    auto db_account_seq_obj = db.find<account_sequence_object, by_id>(account_ptr->id);
+		const auto* db_account_seq_obj = db.find<account_sequence_object, by_name>(account_ptr->name);
 		// write db account metadata index
 		db.create<account_metadata_object>([&](auto &amo) {
-	      amo.name = account_ptr->name;
-	      amo.recv_sequence = 0;
-		  amo.auth_sequence = 0;
-		  amo.code_sequence = 0;
-		  amo.abi_sequence = 0;
+		  amo.name = account_ptr->name;
+		  amo.recv_sequence = db_account_seq_obj->recv_sequence;
+		  amo.auth_sequence = db_account_seq_obj->auth_sequence;
+		  amo.code_sequence = db_account_seq_obj->code_sequence;
+		  amo.abi_sequence = db_account_seq_obj->abi_sequence;
 		  amo.code_hash = account_ptr->code_version;
 		  amo.last_code_update = account_ptr->last_code_update;
 		  amo.vm_type = account_ptr->vm_type;
