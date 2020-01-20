@@ -99,8 +99,8 @@ namespace eosio { namespace chain {
 
             genesis_state            genesis;
             wasm_interface::vm_type  wasm_runtime = chain::config::default_wasm_runtime;
-//           eosvmoc::config          eosvmoc_config;
-//           bool                     eosvmoc_tierup         = false;
+            eosvmoc::config          eosvmoc_config;
+            bool                     eosvmoc_tierup         = false;
 
 
             db_read_mode             read_mode              = db_read_mode::SPECULATIVE;
@@ -112,11 +112,6 @@ namespace eosio { namespace chain {
 
              std::map<chain::public_key_type, signature_provider_type> my_signature_providers;
              std::set<chain::account_name>                             my_producers;
-         };
-
-         struct eosvmocconfig {
-           eosvmoc::config          eosvmoc_config;
-           bool                     eosvmoc_tierup =  false;
          };
 
          enum class block_status {
