@@ -150,7 +150,7 @@ void apply_context::exec( action_trace& trace )
 } /// exec()
 
 bool apply_context::is_account( const account_name& account )const {
-   return nullptr != db.find<account_object,by_name>( account );
+   return nullptr != db.find<account_object2,by_name>( account );
 }
 
 void apply_context::require_authorization( const account_name& account ) {
@@ -213,7 +213,7 @@ void apply_context::require_recipient( account_name recipient ) {
  *   can better understand the security risk.
  */
 void apply_context::execute_inline( action&& a ) {
-   auto* code = control.db().find<account_object, by_name>(a.account);
+   auto* code = control.db().find<account_object2, by_name>(a.account);
    EOS_ASSERT( code != nullptr, action_validate_exception,
                "inline action's code account ${account} does not exist", ("account", a.account) );
 
@@ -230,7 +230,7 @@ void apply_context::execute_inline( action&& a ) {
    }
 
    for( const auto& auth : a.authorization ) {
-      auto* actor = control.db().find<account_object, by_name>(auth.actor);
+      auto* actor = control.db().find<account_object2, by_name>(auth.actor);
       EOS_ASSERT( actor != nullptr, action_validate_exception,
                   "inline action's authorizing actor ${account} does not exist", ("account", auth.actor) );
       EOS_ASSERT( control.get_authorization_manager().find_permission(auth) != nullptr, action_validate_exception,
@@ -287,7 +287,7 @@ void apply_context::execute_inline( action&& a ) {
 }
 
 void apply_context::execute_context_free_inline( action&& a ) {
-   auto* code = control.db().find<account_object, by_name>(a.account);
+   auto* code = control.db().find<account_object2, by_name>(a.account);
    EOS_ASSERT( code != nullptr, action_validate_exception,
                "inline action's code account ${account} does not exist", ("account", a.account) );
 

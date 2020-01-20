@@ -35,7 +35,7 @@ uint128_t transaction_id_to_sender_id( const transaction_id_type& tid ) {
 
 void validate_authority_precondition( const apply_context& context, const authority& auth ) {
    for(const auto& a : auth.accounts) {
-      auto* acct = context.db.find<account_object, by_name>(a.permission.actor);
+      auto* acct = context.db.find<account_object2, by_name>(a.permission.actor);
       EOS_ASSERT( acct != nullptr, action_validate_exception,
                   "account '${account}' does not exist",
                   ("account", a.permission.actor)
@@ -91,12 +91,12 @@ void apply_eosio_newaccount(apply_context& context) {
                   "only privileged accounts can have names that start with 'eosio.'" );
    }
 
-   auto existing_account = db.find<account_object, by_name>(create.name);
+   auto existing_account = db.find<account_object2, by_name>(create.name);
    EOS_ASSERT(existing_account == nullptr, account_name_exists_exception,
               "Cannot create account named ${name}, as that name is already taken",
               ("name", create.name));
 
-   const auto& new_account = db.create<account_object>([&](auto& a) {
+   const auto& new_account = db.create<account_object2>([&](auto& a) {
       a.name = create.name;
       a.creation_date = context.control.pending_block_time();
    });
@@ -205,7 +205,7 @@ void apply_eosio_setabi(apply_context& context) {
 
    context.require_authorization(act.account);
 
-   const auto& account = db.get<account_object,by_name>(act.account);
+   const auto& account = db.get<account_object2,by_name>(act.account);
 
    int64_t abi_size = act.abi.size();
 
@@ -242,7 +242,7 @@ void apply_eosio_updateauth(apply_context& context) {
    EOS_ASSERT( update.permission.to_string().find( "eosio." ) != 0, action_validate_exception,
                "Permission names that start with 'eosio.' are reserved" );
    EOS_ASSERT(update.permission != update.parent, action_validate_exception, "Cannot set an authority as its own parent");
-   db.get<account_object, by_name>(update.account);
+   db.get<account_object2, by_name>(update.account);
    EOS_ASSERT(validate(update.auth), action_validate_exception,
               "Invalid authority: ${auth}", ("auth", update.auth));
    if( update.permission == config::active_name )
@@ -335,10 +335,10 @@ void apply_eosio_linkauth(apply_context& context) {
       context.require_authorization(requirement.account); // only here to mark the single authority on this action as used
 
       auto& db = context.db;
-      const auto *account = db.find<account_object, by_name>(requirement.account);
+      const auto *account = db.find<account_object2, by_name>(requirement.account);
       EOS_ASSERT(account != nullptr, account_query_exception,
                  "Failed to retrieve account: ${account}", ("account", requirement.account)); // Redundant?
-      const auto *code = db.find<account_object, by_name>(requirement.code);
+      const auto *code = db.find<account_object2, by_name>(requirement.code);
       EOS_ASSERT(code != nullptr, account_query_exception,
                  "Failed to retrieve code for account: ${account}", ("account", requirement.code));
       if( requirement.requirement != config::eosio_any_name ) {

@@ -1338,7 +1338,7 @@ double convert_to_type(const string& str, const string& desc) {
 
 abi_def get_abi( const controller& db, const name& account ) {
    const auto &d = db.db();
-   const account_object *code_accnt = d.find<account_object, by_name>(account);
+   const account_object2 *code_accnt = d.find<account_object2, by_name>(account);
    EOS_ASSERT(code_accnt != nullptr, chain::account_query_exception, "Fail to retrieve account for ${account}", ("account", account) );
    abi_def abi;
    abi_serializer::to_abi(code_accnt->abi, abi);
@@ -1600,7 +1600,7 @@ template<typename Api>
 struct resolver_factory {
    static auto make(const Api* api, const fc::microseconds& max_serialization_time) {
       return [api, max_serialization_time](const account_name &name) -> optional<abi_serializer> {
-         const auto* accnt = api->db.db().template find<account_object, by_name>(name);
+         const auto* accnt = api->db.db().template find<account_object2, by_name>(name);
          if (accnt != nullptr) {
             abi_def abi;
             if (abi_serializer::to_abi(accnt->abi, abi)) {
@@ -1832,7 +1832,7 @@ read_only::get_abi_results read_only::get_abi( const get_abi_params& params )con
    get_abi_results result;
    result.account_name = params.account_name;
    const auto& d = db.db();
-   const auto& accnt  = d.get<account_object,by_name>( params.account_name );
+   const auto& accnt  = d.get<account_object2,by_name>( params.account_name );
 
    abi_def abi;
    if( abi_serializer::to_abi(accnt.abi, abi) ) {
@@ -1846,7 +1846,7 @@ read_only::get_code_results read_only::get_code( const get_code_params& params )
    get_code_results result;
    result.account_name = params.account_name;
    const auto& d = db.db();
-   const auto& accnt_obj          = d.get<account_object,by_name>( params.account_name );
+   const auto& accnt_obj          = d.get<account_object2,by_name>( params.account_name );
    const auto& accnt_metadata_obj = d.get<account_metadata_object,by_name>( params.account_name );
 
    EOS_ASSERT( params.code_as_wasm, unsupported_feature, "Returning WAST from get_code is no longer supported" );
@@ -1882,7 +1882,7 @@ read_only::get_raw_code_and_abi_results read_only::get_raw_code_and_abi( const g
    result.account_name = params.account_name;
 
    const auto& d = db.db();
-   const auto& accnt_obj          = d.get<account_object,by_name>(params.account_name);
+   const auto& accnt_obj          = d.get<account_object2,by_name>(params.account_name);
    const auto& accnt_metadata_obj = d.get<account_metadata_object,by_name>(params.account_name);
    if( accnt_metadata_obj.code_hash != digest_type() ) {
       const auto& code_obj = d.get<code_object, by_code_hash>(accnt_metadata_obj.code_hash);
@@ -1898,7 +1898,7 @@ read_only::get_raw_abi_results read_only::get_raw_abi( const get_raw_abi_params&
    result.account_name = params.account_name;
 
    const auto& d = db.db();
-   const auto& accnt_obj          = d.get<account_object,by_name>(params.account_name);
+   const auto& accnt_obj          = d.get<account_object2,by_name>(params.account_name);
    const auto& accnt_metadata_obj = d.get<account_metadata_object,by_name>(params.account_name);
    result.abi_hash = fc::sha256::hash( accnt_obj.abi.data(), accnt_obj.abi.size() );
    if( accnt_metadata_obj.code_hash != digest_type() )
@@ -1952,7 +1952,7 @@ read_only::get_account_results read_only::get_account( const get_account_params&
       ++perm;
    }
 
-   const auto& code_account = db.db().get<account_object,by_name>( config::system_account_name );
+   const auto& code_account = db.db().get<account_object2,by_name>( config::system_account_name );
 
    abi_def abi;
    if( abi_serializer::to_abi(code_account.abi, abi) ) {
@@ -2026,8 +2026,8 @@ read_only::get_account_results read_only::get_account( const get_account_params&
    }
 
    //get homepage
-   if(nullptr != db.db().find<account_object,by_name>(N(personal.bos))){
-      const auto& personal_account = db.db().get<account_object,by_name>( N(personal.bos) );
+   if(nullptr != db.db().find<account_object2,by_name>(N(personal.bos))){
+      const auto& personal_account = db.db().get<account_object2,by_name>( N(personal.bos) );
       abi_def abi_personal;
       if( abi_serializer::to_abi(personal_account.abi, abi_personal) ) {
          abi_serializer abis_personal( abi_personal, abi_serializer_max_time );
@@ -2059,7 +2059,7 @@ static variant action_abi_to_variant( const abi_def& abi, type_name action_type 
 
 read_only::abi_json_to_bin_result read_only::abi_json_to_bin( const read_only::abi_json_to_bin_params& params )const try {
    abi_json_to_bin_result result;
-   const auto code_account = db.db().find<account_object,by_name>( params.code );
+   const auto code_account = db.db().find<account_object2,by_name>( params.code );
    EOS_ASSERT(code_account != nullptr, contract_query_exception, "Contract can't be found ${contract}", ("contract", params.code));
 
    abi_def abi;
@@ -2081,7 +2081,7 @@ read_only::abi_json_to_bin_result read_only::abi_json_to_bin( const read_only::a
 
 read_only::abi_bin_to_json_result read_only::abi_bin_to_json( const read_only::abi_bin_to_json_params& params )const {
    abi_bin_to_json_result result;
-   const auto& code_account = db.db().get<account_object,by_name>( params.code );
+   const auto& code_account = db.db().get<account_object2,by_name>( params.code );
    abi_def abi;
    if( abi_serializer::to_abi(code_account.abi, abi) ) {
       abi_serializer abis( abi, abi_serializer_max_time );

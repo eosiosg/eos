@@ -34,18 +34,20 @@ using resource_limits::resource_limits_manager;
 
 using controller_index_set = index_set<
    account_index,
-   account_metadata_index,
-   code_index,
+   account_sequence_index,
    global_property_multi_index,
    global_property2_multi_index,
-   protocol_state_multi_index,
    dynamic_global_property_multi_index,
    upgrade_property_multi_index,
    global_property3_multi_index,
    block_summary_multi_index,
    transaction_multi_index,
    generated_transaction_multi_index,
-   table_id_multi_index
+   table_id_multi_index,
+   code_index,
+   account_index2,
+   account_metadata_index,
+   protocol_state_multi_index
 >;
 
 using contract_database_index_set = index_set<
@@ -201,7 +203,7 @@ struct controller_impl {
         cfg.reversible_cache_size ),
     blog( cfg.blocks_dir ),
     fork_db( cfg.state_dir ),
-	wasmif( cfg.wasm_runtime, cfg.eosvmoc_tierup, db, cfg.state_dir, cfg.eosvmoc_config ),
+	wasmif( cfg.wasm_runtime, false, db, cfg.state_dir, eosio::chain::eosvmoc::config{} ),
     resource_limits( db ),
     authorization( s, db ),
     conf( cfg ),
@@ -432,8 +434,85 @@ struct controller_impl {
       }
 
       //*bos begin*
-      merge_msig_blacklist_into_conf();
-      //*bos end*
+	  merge_msig_blacklist_into_conf();
+	  //*bos end*
+
+      // if new version need to do account_index code to code_index migration
+      const auto& db_code_index = db.get_index<code_index, by_id>();
+	  ilog("before migrate code object size : ${s}", ("s", db_code_index.size()));
+
+      // read db account index
+      const auto& db_accounts_index = db.get_index<account_index, by_id>();
+      // check if account index or code index empty
+	  if (!db_accounts_index.empty() || !db_code_index.empty()) return;
+
+	  ilog("start migrating account index code to code index ...");
+      size_t accounts_size = db_accounts_index.size();
+      auto account_ptr = db_accounts_index.begin();
+	  while( account_ptr != db_accounts_index.end()) {
+	    db.create<account_object2>([&](auto &a2) {
+		  a2.name = account_ptr->name;
+		  a2.creation_date = account_ptr->creation_date;
+		  a2.abi = account_ptr->abi;
+	    });
+
+		// read db account sequence index
+//		const auto& db_accounts_sequence = db.get_index<account_sequence_index, by_id>();
+//	    auto db_account_seq_obj = db.find<account_sequence_object, by_id>(account_ptr->id);
+		// write db account metadata index
+		db.create<account_metadata_object>([&](auto &amo) {
+	      amo.name = account_ptr->name;
+	      amo.recv_sequence = 0;
+		  amo.auth_sequence = 0;
+		  amo.code_sequence = 0;
+		  amo.abi_sequence = 0;
+		  amo.code_hash = account_ptr->code_version;
+		  amo.last_code_update = account_ptr->last_code_update;
+		  amo.vm_type = account_ptr->vm_type;
+		  amo.vm_version = account_ptr->vm_version;
+		});
+
+		// write db code index
+		const code_object* new_code_entry = db.find<code_object, by_code_hash>(
+			boost::make_tuple(account_ptr->code_version, account_ptr->vm_type, account_ptr->vm_version) );
+		int64_t code_size = (int64_t)account_ptr->code.size();
+
+		if (new_code_entry) {
+		  db.modify(*new_code_entry, [&](code_object& o) {
+			++o.code_ref_count;
+		  });
+		} else {
+		  db.create<code_object>([&](code_object& o) {
+			o.code_hash = account_ptr->code_version;
+			o.code.assign(account_ptr->code.data(), code_size);
+			o.code_ref_count = 1;
+			o.first_block_used = 1;
+			o.vm_type = account_ptr->vm_type;
+			o.vm_version = account_ptr->vm_version;
+		  });
+		}
+	    account_ptr++;
+	  }
+
+	  // after migrate size
+	  const auto& db_accounts_index2 = db.get_index<account_index2, by_id>();
+	  const auto& db_account_metadata_index = db.get_index<account_metadata_index, by_id>();
+	  const auto& db_code_index_migrate = db.get_index<code_index, by_id>();
+	  // check if migrate success
+	  ilog("account object size : ${s}", ("s", accounts_size));
+	  ilog("migrate account object size : ${s}", ("s", db_accounts_index2.size()));
+	  ilog("migrate account metadata object size : ${s}", ("s", db_account_metadata_index.size()));
+	  ilog("migrate code object size : ${s}", ("s", db_code_index_migrate.size()));
+
+	  // remove all account objects and all account sequence
+
+
+      // write db protocol index
+      db.create<protocol_state_object>([&](auto& pso ){
+        for( const auto& i : genesis_intrinsics ) {
+          add_intrinsic_to_whitelist( pso.whitelisted_intrinsics, i );
+        }
+      });
    }
 
    void update_pbft_status() {
@@ -704,7 +783,7 @@ struct controller_impl {
    }
 
    void create_native_account( account_name name, const authority& owner, const authority& active, bool is_privileged = false ) {
-      db.create<account_object>([&](auto& a) {
+      db.create<account_object2>([&](auto& a) {
          a.name = name;
          a.creation_date = conf.genesis.initial_timestamp;
 
@@ -2592,9 +2671,9 @@ wasm_interface& controller::get_wasm_interface() {
    return my->wasmif;
 }
 
-const account_object& controller::get_account( account_name name )const
+const account_object2& controller::get_account( account_name name )const
 { try {
-   return my->db.get<account_object, by_name>(name);
+   return my->db.get<account_object2, by_name>(name);
 } FC_CAPTURE_AND_RETHROW( (name) ) }
 
 unapplied_transactions_type& controller::get_unapplied_transactions() {

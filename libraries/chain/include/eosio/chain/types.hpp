@@ -154,7 +154,7 @@ namespace eosio { namespace chain {
    {
       null_object_type = 0,
       account_object_type,
-      account_metadata_object_type,
+	  account_sequence_object_type,
       permission_object_type,
       permission_usage_object_type,
       permission_link_object_type,
@@ -192,11 +192,13 @@ namespace eosio { namespace chain {
       account_history_object_type,              ///< Defined by history_plugin
       action_history_object_type,               ///< Defined by history_plugin
       reversible_block_object_type,
-	  protocol_state_object_type,
-	  code_object_type,
 	  upgrade_property_object_type,
       global_property3_object_type,
-      OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types
+	  account_object2_type,
+	  account_metadata_object_type,
+	  code_object_type,
+	  protocol_state_object_type,
+	  OBJECT_TYPE_COUNT ///< Sentry value which contains the number of different object types
    };
 
    /**
@@ -246,7 +248,7 @@ namespace eosio { namespace chain {
     *     + When modifying a chainbase object, the modifier lambda should never mutate any fields in the restricted field set.
     */
 
-   class account_object;
+   class account_object2;
    class producer_object;
 
    using block_id_type       = fc::sha256;

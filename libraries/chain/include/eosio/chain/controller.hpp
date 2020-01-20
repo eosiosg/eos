@@ -34,7 +34,7 @@ namespace eosio { namespace chain {
    class upgrade_property_object;
    class global_property3_object;     // *bos*
    class permission_object;
-   class account_object;
+   class account_object2;
    using resource_limits::resource_limits_manager;
    using apply_handler = std::function<void(apply_context&)>;
    using unapplied_transactions_type = map<transaction_id_type, transaction_metadata_ptr>;
@@ -99,8 +99,8 @@ namespace eosio { namespace chain {
 
             genesis_state            genesis;
             wasm_interface::vm_type  wasm_runtime = chain::config::default_wasm_runtime;
-           eosvmoc::config          eosvmoc_config;
-           bool                     eosvmoc_tierup         = false;
+//           eosvmoc::config          eosvmoc_config;
+//           bool                     eosvmoc_tierup         = false;
 
 
             db_read_mode             read_mode              = db_read_mode::SPECULATIVE;
@@ -112,6 +112,11 @@ namespace eosio { namespace chain {
 
              std::map<chain::public_key_type, signature_provider_type> my_signature_providers;
              std::set<chain::account_name>                             my_producers;
+         };
+
+         struct eosvmocconfig {
+           eosvmoc::config          eosvmoc_config;
+           bool                     eosvmoc_tierup =  false;
          };
 
          enum class block_status {
@@ -186,7 +191,7 @@ namespace eosio { namespace chain {
          void set_my_signature_providers(std::map<chain::public_key_type, signature_provider_type> msp);
 
 
-         const account_object&                 get_account( account_name n )const;
+         const account_object2&                 get_account( account_name n )const;
          const global_property_object&         get_global_properties()const;
          const dynamic_global_property_object& get_dynamic_global_properties()const;
          const resource_limits_manager&        get_resource_limits_manager()const;
