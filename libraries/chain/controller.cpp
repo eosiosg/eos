@@ -453,7 +453,7 @@ struct controller_impl {
 	    db.create<account_object2>([&](auto &a2) {
 		  a2.name = account_ptr->name;
 		  a2.creation_date = account_ptr->creation_date;
-		  a2.abi = account_ptr->abi;
+		  a2.abi.assign(account_ptr->abi.data(), account_ptr->abi.size());
 	    });
 
 		// read db account sequence index
