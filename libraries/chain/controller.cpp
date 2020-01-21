@@ -444,7 +444,7 @@ struct controller_impl {
       // read db account index
       const auto& db_accounts_index = db.get_index<account_index, by_id>();
       // check if account index or code index empty
-	  if (!db_accounts_index.empty() || !db_code_index.empty()) return;
+	  if (!db_code_index.empty()) return;
 
 	  ilog("start migrating account index code to code index ...");
       size_t accounts_size = db_accounts_index.size();
