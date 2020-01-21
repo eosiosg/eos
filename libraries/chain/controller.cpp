@@ -203,7 +203,7 @@ struct controller_impl {
         cfg.reversible_cache_size ),
     blog( cfg.blocks_dir ),
     fork_db( cfg.state_dir ),
-	wasmif( cfg.wasm_runtime, false, db, cfg.state_dir, eosio::chain::eosvmoc::config{} ),
+	wasmif( cfg.wasm_runtime, cfg.eosvmoc_tierup, db, cfg.state_dir, cfg.eosvmoc_config ),
     resource_limits( db ),
     authorization( s, db ),
     conf( cfg ),

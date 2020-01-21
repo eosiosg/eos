@@ -71,7 +71,6 @@ void apply_context::exec_one( action_trace& trace )
                control.check_action_list( act.account, act.name );
             }
             try {
-               ilog("vm_type: ${v} , vm_version ${s}", ("v", receiver_account->vm_type)("s", receiver_account->vm_version));
                control.get_wasm_interface().apply( receiver_account->code_hash, receiver_account->vm_type, receiver_account->vm_version, *this );
             } catch( const wasm_exit& ) {}
          }
