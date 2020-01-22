@@ -1869,7 +1869,6 @@ struct controller_impl {
          action_digests.emplace_back( a.digest() );
 
       pending->_pending_block_state->header.action_mroot = merkle( move(action_digests) );
-      ilog("action mroot is ${b} ${m}", ("b", pending->_pending_block_state->block_num)("m", pending->_pending_block_state->header.action_mroot));
    }
 
    void set_trx_merkle() {
@@ -1880,7 +1879,6 @@ struct controller_impl {
          trx_digests.emplace_back( a.digest() );
 
       pending->_pending_block_state->header.transaction_mroot = merkle( move(trx_digests) );
-	  ilog("trx mroot is ${b} ${m}", ("b", pending->_pending_block_state->block_num)("m", pending->_pending_block_state->header.transaction_mroot ));
    }
 
     void set_ext_merkle() {
@@ -1899,7 +1897,6 @@ struct controller_impl {
 
         auto mroot = merkle( move(ext_digests));
         pending->_pending_block_state->header.set_block_extensions_mroot(mroot);
-	    ilog("ext mroot is ${b} ${m}", ("b", pending->_pending_block_state->block_num)("m", mroot ));
     }
 
 
@@ -1948,7 +1945,6 @@ struct controller_impl {
       auto p = pending->_pending_block_state;
       p->id = p->header.id();
 
-      ilog("finalize block id is ${b} ${m}", ("b", pending->_pending_block_state->block_num)("m", p->id));
       create_block_summary(p->id);
 
    } FC_CAPTURE_AND_RETHROW() }
