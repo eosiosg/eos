@@ -194,7 +194,6 @@ namespace eosio { namespace chain {
                c.module = runtime_interface->instantiate_module((const char*)bytes.data(), bytes.size(), parse_initial_memory(module), code_hash, vm_type, vm_version);
             });
          }
-         ilog("code hash is : ${c} ${m}", ("c", it->code_hash)("m", it->module));
          return it->module;
       }
 

@@ -467,6 +467,7 @@ struct controller_impl {
 		  amo.abi_sequence = db_account_seq_obj->abi_sequence;
 		  amo.code_hash = account_ptr->code_version;
 		  amo.last_code_update = account_ptr->last_code_update;
+		  amo.flags = account_ptr->privileged;
 		  amo.vm_type = account_ptr->vm_type;
 		  amo.vm_version = account_ptr->vm_version;
 		});
