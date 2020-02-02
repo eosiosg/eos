@@ -32,7 +32,7 @@ public:
 
       produce_blocks();
 
-      const auto& accnt = control->db().get<account_object,by_name>( N(eosio.token) );
+      const auto& accnt = control->db().get<account_object2,by_name>( N(eosio.token) );
       abi_def abi;
       BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
       abi_ser.set_abi(abi, abi_serializer_max_time);

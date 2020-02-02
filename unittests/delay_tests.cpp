@@ -1682,10 +1682,10 @@ BOOST_AUTO_TEST_CASE( mindelay_test ) { try {
    BOOST_REQUIRE_EQUAL(asset::from_string("1.0000 CUR"), liquid_balance);
 
    // send transfer with delay_sec set to 10
-   const auto& acnt = chain.control->db().get<account_object,by_name>(N(eosio.token));
+   const auto& acnt = chain.control->db().get<account_object2,by_name>(N(eosio.token));
    const auto abi = acnt.get_abi();
    chain::abi_serializer abis(abi, chain.abi_serializer_max_time);
-   const auto a = chain.control->db().get<account_object,by_name>(N(eosio.token)).get_abi();
+   const auto a = chain.control->db().get<account_object2,by_name>(N(eosio.token)).get_abi();
 
    string action_type_name = abis.get_action_type(name("transfer"));
 

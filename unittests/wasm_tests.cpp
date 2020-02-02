@@ -169,18 +169,18 @@ BOOST_FIXTURE_TEST_CASE( abi_from_variant, TESTER ) try {
    set_abi(N(asserter), contracts::asserter_abi().data());
    produce_blocks(1);
 
-   auto resolver = [&,this]( const account_name& name ) -> optional<abi_serializer> {
+   auto resolver = [&,this]( const account_name& name ) -> fc::optional<abi_serializer> {
       try {
-         const auto& accnt  = this->control->db().get<account_object,by_name>( name );
+         const auto& accnt  = this->control->db().get<account_object2,by_name>( name );
          abi_def abi;
          if (abi_serializer::to_abi(accnt.abi, abi)) {
             return abi_serializer(abi, abi_serializer_max_time);
          }
-         return optional<abi_serializer>();
+         return fc::optional<abi_serializer>();
       } FC_RETHROW_EXCEPTIONS(error, "Failed to find or parse ABI for ${name}", ("name", name))
    };
 
-   variant pretty_trx = mutable_variant_object()
+   fc::variant pretty_trx = mutable_variant_object()
       ("actions", variants({
          mutable_variant_object()
             ("account", "asserter")
@@ -925,7 +925,7 @@ BOOST_FIXTURE_TEST_CASE(noop, TESTER) try {
    set_code(N(noop), contracts::noop_wasm());
 
    set_abi(N(noop), contracts::noop_abi().data());
-   const auto& accnt  = control->db().get<account_object,by_name>(N(noop));
+   const auto& accnt  = control->db().get<account_object2,by_name>(N(noop));
    abi_def abi;
    BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
    abi_serializer abi_ser(abi, abi_serializer_max_time);
@@ -988,7 +988,7 @@ BOOST_FIXTURE_TEST_CASE(noop, TESTER) try {
 BOOST_FIXTURE_TEST_CASE(eosio_abi, TESTER) try {
    produce_blocks(2);
 
-   const auto& accnt  = control->db().get<account_object,by_name>(config::system_account_name);
+   const auto& accnt  = control->db().get<account_object2,by_name>(config::system_account_name);
    abi_def abi;
    BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
    abi_serializer abi_ser(abi, abi_serializer_max_time);
