@@ -1547,7 +1547,6 @@ BOOST_FIXTURE_TEST_CASE(crypto_tests, TESTER) { try {
                              crypto_api_exception, fc_exception_message_is("Error expected key different than recovered key") );
 	}
 
-	//TODO Need to fix the crypto api test case
    CALL_TEST_FUNCTION( *this, "test_crypto", "test_sha1", {} );
    CALL_TEST_FUNCTION( *this, "test_crypto", "test_sha256", {} );
    CALL_TEST_FUNCTION( *this, "test_crypto", "test_sha512", {} );
