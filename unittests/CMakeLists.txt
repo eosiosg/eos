@@ -1,6 +1,31 @@
 #file(GLOB COMMON_SOURCES "common/*.cpp")
 
 find_package( Gperftools QUIET )
+
+### Build contracts with cdt if available ###
+include(ExternalProject)
+
+if( EOSIO_COMPILE_TEST_CONTRACTS )
+   set(EOSIO_WASM_OLD_BEHAVIOR "Off")
+   find_package(eosio.cdt REQUIRED)
+
+   message( STATUS "Building contracts in directory `eos/unittests/test-contracts/`" )
+   ExternalProject_Add(
+      test_contracts_project
+      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test-contracts
+      BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/test-contracts
+      CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${EOSIO_CDT_ROOT}/lib/cmake/eosio.cdt/EosioWasmToolchain.cmake -DEOSIO_COMPILE_TEST_CONTRACTS=${EOSIO_COMPILE_TEST_CONTRACTS}
+      UPDATE_COMMAND ""
+      PATCH_COMMAND ""
+      TEST_COMMAND ""
+      INSTALL_COMMAND ""
+      BUILD_ALWAYS 1
+   )
+else()
+  message( STATUS "Not building contracts in directory `eos/unittests/test-contracts/`" )
+  add_subdirectory(test-contracts)
+endif()
+
 if( GPERFTOOLS_FOUND )
     message( STATUS "Found gperftools; compiling tests with TCMalloc")
     list( APPEND PLATFORM_SPECIFIC_LIBS tcmalloc )
@@ -16,13 +41,12 @@ add_subdirectory(contracts)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/contracts.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/include/contracts.hpp ESCAPE_QUOTES)
 
 file(GLOB UNIT_TESTS "*.cpp")
-list(REMOVE_ITEM UNIT_TESTS  ${CMAKE_CURRENT_SOURCE_DIR}/api_tests.cpp)
 add_executable( unit_test ${UNIT_TESTS} )
 target_link_libraries( unit_test eosio_chain chainbase eosio_testing fc ${PLATFORM_SPECIFIC_LIBS} )
 
 target_include_directories( unit_test PUBLIC
                             ${CMAKE_SOURCE_DIR}/libraries/testing/include
-                            ${CMAKE_SOURCE_DIR}/contracts
+                            ${CMAKE_SOURCE_DIR}/test-contracts
                             ${CMAKE_BINARY_DIR}/contracts
                             ${CMAKE_CURRENT_SOURCE_DIR}/contracts
                             ${CMAKE_CURRENT_BINARY_DIR}/contracts
