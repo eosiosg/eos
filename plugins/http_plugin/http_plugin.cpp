@@ -402,6 +402,8 @@ namespace eosio {
              })->default_value(false),
              "Specify if Access-Control-Allow-Credentials: true should be returned on each request.")
             ("max-body-size", bpo::value<uint32_t>()->default_value(1024*1024), "The maximum body size in bytes allowed for incoming RPC requests")
+		    ("http-max-bytes-in-flight-mb", bpo::value<uint32_t>()->default_value(500),
+		    "Maximum size in megabytes http_plugin should use for processing http requests. 503 error response when exceeded." )
             ("verbose-http-errors", bpo::bool_switch()->default_value(false), "Append the error log to HTTP responses")
             ("http-validate-host", boost::program_options::value<bool>()->default_value(true), "If set to false, then any incoming \"Host\" header is considered valid")
             ("http-alias", bpo::value<std::vector<string>>()->composing(), "Additionaly acceptable values for the \"Host\" header of incoming HTTP requests, can be specified multiple times.  Includes http/s_server_address by default.")
@@ -479,7 +481,7 @@ namespace eosio {
          my->max_body_size = options.at( "max-body-size" ).as<uint32_t>();
          verbose_http_errors = options.at( "verbose-http-errors" ).as<bool>();
 
-         my->max_bytes_in_flight = 1000 * 1024 * 1024;
+         my->max_bytes_in_flight = options.at( "http-max-bytes-in-flight-mb" ).as<uint32_t>() * 1024 * 1024;
 
           //watch out for the returns above when adding new code here
       } FC_LOG_AND_RETHROW()
