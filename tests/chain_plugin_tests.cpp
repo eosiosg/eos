@@ -45,14 +45,14 @@ BOOST_FIXTURE_TEST_CASE( get_block_with_invalid_abi, TESTER ) try {
    set_abi( N(asserter), contracts::asserter_abi().data() );
    produce_blocks(1);
 
-   auto resolver = [&,this]( const account_name& name ) -> optional<abi_serializer> {
+   auto resolver = [&,this]( const account_name& name ) -> fc::optional<abi_serializer> {
       try {
          const auto& accnt  = this->control->db().get<account_object,by_name>( name );
          abi_def abi;
          if (abi_serializer::to_abi(accnt.abi, abi)) {
             return abi_serializer(abi, abi_serializer_max_time);
          }
-         return optional<abi_serializer>();
+         return fc::optional<abi_serializer>();
       } FC_RETHROW_EXCEPTIONS(error, "resolver failed at chain_plugin_tests::abi_invalid_type");
    };
 
@@ -60,7 +60,7 @@ BOOST_FIXTURE_TEST_CASE( get_block_with_invalid_abi, TESTER ) try {
    BOOST_REQUIRE_EQUAL(true, resolver(N(asserter)).valid());
 
    // make an action using the valid contract & abi
-   variant pretty_trx = mutable_variant_object()
+   variant pretty_trx = fc::mutable_variant_object()
       ("actions", variants({
          mutable_variant_object()
             ("account", "asserter")
@@ -119,3 +119,4 @@ BOOST_FIXTURE_TEST_CASE( get_block_with_invalid_abi, TESTER ) try {
 } FC_LOG_AND_RETHROW() /// get_block_with_invalid_abi
 
 BOOST_AUTO_TEST_SUITE_END()
+
