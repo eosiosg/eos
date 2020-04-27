@@ -7,11 +7,14 @@
 #include <eosio/chain/abi_serializer.hpp>
 #include <eosio/chain/account_object.hpp>
 #include <eosio/chain/snapshot.hpp>
+#include <eosio/chain/webassembly/eos-vm-oc/config.hpp>
 
 namespace chainbase {
    class database;
 }
-
+namespace boost { namespace asio {
+   class thread_pool;
+}}
 
 namespace eosio { namespace chain {
 
@@ -27,10 +30,14 @@ namespace eosio { namespace chain {
 
    class dynamic_global_property_object;
    class global_property_object;
+   class global_property2_object;     // *bos*
+   class upgrade_property_object;
+   class global_property3_object;     // *bos*
    class permission_object;
-   class account_object;
+   class account_object2;
    using resource_limits::resource_limits_manager;
    using apply_handler = std::function<void(apply_context&)>;
+   using unapplied_transactions_type = map<transaction_id_type, transaction_metadata_ptr>;
 
    class fork_database;
 
@@ -45,11 +52,29 @@ namespace eosio { namespace chain {
       FULL,
       LIGHT
    };
+   // *bos begin*
+    enum  class list_type:int64_t {
+      actor_blacklist_type=1,
+      contract_blacklist_type,
+      resource_greylist_type,
+      list_type_count
+   };
+   enum  class list_action_type:int64_t
+   {
+      insert_type = 1,
+      remove_type,
+      list_action_type_count
+   };
+
+   // *bos end*
+
+   using signature_provider_type = std::function<chain::signature_type(chain::digest_type)>;
 
    class controller {
       public:
 
          struct config {
+            flat_set<account_name>   sender_bypass_whiteblacklist;
             flat_set<account_name>   actor_whitelist;
             flat_set<account_name>   actor_blacklist;
             flat_set<account_name>   contract_whitelist;
@@ -62,6 +87,10 @@ namespace eosio { namespace chain {
             uint64_t                 state_guard_size       =  chain::config::default_state_guard_size;
             uint64_t                 reversible_cache_size  =  chain::config::default_reversible_cache_size;
             uint64_t                 reversible_guard_size  =  chain::config::default_reversible_guard_size;
+            path                     checkpoints_dir        =  blocks_dir;
+
+            uint32_t                 sig_cpu_bill_pct       =  chain::config::default_sig_cpu_bill_pct;
+            uint16_t                 thread_pool_size       =  chain::config::default_controller_thread_pool_size;
             bool                     read_only              =  false;
             bool                     force_all_checks       =  false;
             bool                     disable_replay_opts    =  false;
@@ -70,12 +99,19 @@ namespace eosio { namespace chain {
 
             genesis_state            genesis;
             wasm_interface::vm_type  wasm_runtime = chain::config::default_wasm_runtime;
+            eosvmoc::config          eosvmoc_config;
+            bool                     eosvmoc_tierup         = false;
+
 
             db_read_mode             read_mode              = db_read_mode::SPECULATIVE;
             validation_mode          block_validation_mode  = validation_mode::FULL;
 
             flat_set<account_name>   resource_greylist;
             flat_set<account_name>   trusted_producers;
+
+
+             std::map<chain::public_key_type, signature_provider_type> my_signature_providers;
+             std::set<chain::account_name>                             my_producers;
          };
 
          enum class block_status {
@@ -85,17 +121,17 @@ namespace eosio { namespace chain {
             incomplete  = 3, ///< this is an incomplete block (either being produced by a producer or speculatively produced by a node)
          };
 
-         controller( const config& cfg );
+         explicit controller( const config& cfg );
          ~controller();
 
          void add_indices();
-         void startup( const snapshot_reader_ptr& snapshot = nullptr );
+         void startup( std::function<bool()> shutdown, const snapshot_reader_ptr& snapshot = nullptr );
 
          /**
           * Starts a new pending block session upon which new transactions can
           * be pushed.
           */
-         void start_block( block_timestamp_type time = block_timestamp_type(), uint16_t confirm_block_count = 0 );
+         void start_block( block_timestamp_type time = block_timestamp_type(), uint16_t confirm_block_count = 0, std::function<signature_type(digest_type)> signer = nullptr );
 
          void abort_block();
 
@@ -106,22 +142,9 @@ namespace eosio { namespace chain {
           *  The caller is responsible for calling drop_unapplied_transaction on a failing transaction that
           *  they never intend to retry
           *
-          *  @return vector of transactions which have been unapplied
+          *  @return map of transactions which have been unapplied
           */
-         vector<transaction_metadata_ptr> get_unapplied_transactions() const;
-         void drop_unapplied_transaction(const transaction_metadata_ptr& trx);
-         void drop_all_unapplied_transactions();
-
-         /**
-          * These transaction IDs represent transactions available in the head chain state as scheduled
-          * or otherwise generated transactions.
-          *
-          * calling push_scheduled_transaction with these IDs will remove the associated transaction from
-          * the chain state IFF it succeeds or objectively fails
-          *
-          * @return
-          */
-         vector<transaction_id_type> get_scheduled_transactions() const;
+         unapplied_transactions_type& get_unapplied_transactions();
 
          /**
           *
@@ -139,19 +162,31 @@ namespace eosio { namespace chain {
          void commit_block();
          void pop_block();
 
-         void push_block( const signed_block_ptr& b, block_status s = block_status::complete );
+         std::future<block_state_ptr> create_block_state_future( const signed_block_ptr& b );
+         void push_block( std::future<block_state_ptr>& block_state_future );
 
-         /**
-          * Call this method when a producer confirmation is received, this might update
-          * the last bft irreversible block and/or cause a switch of forks
-          */
-         void push_confirmation( const header_confirmation& c );
+         boost::asio::thread_pool& get_thread_pool();
 
          const chainbase::database& db()const;
 
+         void pbft_commit_local( const block_id_type& id );
+
+         bool pending_pbft_lib();
+
+         vector<uint32_t> get_watermarks() const;
+
+         void set_pbft_latest_checkpoint( const block_id_type& id );
+         uint32_t last_stable_checkpoint_block_num()const;
+         block_id_type last_stable_checkpoint_block_id()const;
+
+
          const fork_database& fork_db()const;
 
-         const account_object&                 get_account( account_name n )const;
+         std::map<chain::public_key_type, signature_provider_type> my_signature_providers()const;
+         void set_my_signature_providers(std::map<chain::public_key_type, signature_provider_type> msp);
+
+
+         const account_object2&                 get_account( account_name n )const;
          const global_property_object&         get_global_properties()const;
          const dynamic_global_property_object& get_dynamic_global_properties()const;
          const resource_limits_manager&        get_resource_limits_manager()const;
@@ -190,6 +225,7 @@ namespace eosio { namespace chain {
          optional<block_id_type> pending_producer_block_id()const;
 
          const producer_schedule_type&    active_producers()const;
+         std::function<signature_type(digest_type)> pending_producer_signer()const;
          const producer_schedule_type&    pending_producers()const;
          optional<producer_schedule_type> proposed_producers()const;
 
@@ -207,6 +243,8 @@ namespace eosio { namespace chain {
          sha256 calculate_integrity_hash()const;
          void write_snapshot( const snapshot_writer_ptr& snapshot )const;
 
+         bool sender_avoids_whitelist_blacklist_enforcement( account_name sender )const;
+         void check_actor_list( const flat_set<account_name>& actors )const;
          void check_contract_list( account_name code )const;
          void check_action_list( account_name code, action_name action )const;
          void check_key_list( const public_key_type& key )const;
@@ -216,10 +254,16 @@ namespace eosio { namespace chain {
 
          void add_resource_greylist(const account_name &name);
          void remove_resource_greylist(const account_name &name);
+
+         // *bos begin*
+         const global_property2_object&        get_global_properties2()const;  // *bos*
+         void set_name_list(int64_t list, int64_t action, std::vector<account_name> name_list);
+
+         // *bos end*
+
          bool is_resource_greylisted(const account_name &name) const;
          const flat_set<account_name> &get_resource_greylist() const;
 
-         void validate_referenced_accounts( const transaction& t )const;
          void validate_expiration( const transaction& t )const;
          void validate_tapos( const transaction& t )const;
          void validate_db_available_size() const;
@@ -244,14 +288,37 @@ namespace eosio { namespace chain {
 
          void set_subjective_cpu_leeway(fc::microseconds leeway);
 
+         path state_dir()const;
+         path blocks_dir()const;
+         producer_schedule_type initial_schedule()const;
+         bool is_replaying()const;
+
+         void set_pbft_prepared(const block_id_type& id);
+         void set_pbft_my_prepare(const block_id_type& id);
+         block_id_type get_pbft_prepared()const;
+         block_id_type get_pbft_my_prepare()const;
+         void reset_pbft_my_prepare();
+         void reset_pbft_prepared();
+         void maybe_switch_forks();
+#if defined(EOSIO_EOS_VM_RUNTIME_ENABLED) || defined(EOSIO_EOS_VM_JIT_RUNTIME_ENABLED)
+         vm::wasm_allocator&  get_wasm_allocator();
+#endif
+
          signal<void(const signed_block_ptr&)>         pre_accepted_block;
          signal<void(const block_state_ptr&)>          accepted_block_header;
          signal<void(const block_state_ptr&)>          accepted_block;
          signal<void(const block_state_ptr&)>          irreversible_block;
+         signal<void(const block_state_ptr&)>          new_irreversible_block;
          signal<void(const transaction_metadata_ptr&)> accepted_transaction;
          signal<void(const transaction_trace_ptr&)>    applied_transaction;
          signal<void(const header_confirmation&)>      accepted_confirmation;
          signal<void(const int&)>                      bad_alloc;
+
+         const upgrade_property_object& get_upgrade_properties()const;
+         const global_property3_object& get_pbft_properties()const;
+         bool is_pbft_enabled()const;
+         bool under_maintenance()const;
+         void set_upo(uint32_t target_block_num);
 
          /*
          signal<void()>                                  pre_apply_block;
@@ -309,6 +376,7 @@ FC_REFLECT( eosio::chain::controller::config,
             (state_dir)
             (state_size)
             (reversible_cache_size)
+            (checkpoints_dir)
             (read_only)
             (force_all_checks)
             (disable_replay_opts)

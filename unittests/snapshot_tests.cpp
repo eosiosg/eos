@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 
 #include <boost/test/unit_test.hpp>
@@ -9,8 +9,7 @@
 
 #include <eosio/chain/snapshot.hpp>
 
-#include <snapshot_test/snapshot_test.wast.hpp>
-#include <snapshot_test/snapshot_test.abi.hpp>
+#include <contracts.hpp>
 
 #include <sstream>
 
@@ -58,6 +57,10 @@ public:
    signed_block_ptr produce_empty_block( fc::microseconds skip_time = fc::milliseconds(config::block_interval_ms), uint32_t skip_flag = 0/*skip_missed_block_penalty*/ )override {
       control->abort_block();
       return _produce_block(skip_time, true, skip_flag);
+   }
+
+   signed_block_ptr finish_block()override {
+      return _finish_block();
    }
 
    bool validate() { return true; }
@@ -155,8 +158,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_exhaustive_snapshot, SNAPSHOT_SUITE, snapshot
 
    chain.create_account(N(snapshot));
    chain.produce_blocks(1);
-   chain.set_code(N(snapshot), snapshot_test_wast);
-   chain.set_abi(N(snapshot), snapshot_test_abi);
+   chain.set_code(N(snapshot), contracts::snapshot_test_wasm());
+   chain.set_abi(N(snapshot), contracts::snapshot_test_abi().data());
    chain.produce_blocks(1);
    chain.control->abort_block();
 
@@ -199,8 +202,8 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(test_replay_over_snapshot, SNAPSHOT_SUITE, snapsho
 
    chain.create_account(N(snapshot));
    chain.produce_blocks(1);
-   chain.set_code(N(snapshot), snapshot_test_wast);
-   chain.set_abi(N(snapshot), snapshot_test_abi);
+   chain.set_code(N(snapshot), contracts::snapshot_test_wasm());
+   chain.set_abi(N(snapshot), contracts::snapshot_test_abi().data());
    chain.produce_blocks(1);
    chain.control->abort_block();
 

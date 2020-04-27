@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 #include <fc/uint128.hpp>
@@ -34,6 +34,33 @@ namespace eosio { namespace chain {
       chain_config                      configuration;
    };
 
+   // *bos*
+   class global_property2_object : public chainbase::object<global_property2_object_type, global_property2_object>
+   {
+      OBJECT_CTOR(global_property2_object, (cfg))
+
+      id_type                       id;
+      chain_config2                 cfg;
+      guaranteed_minimum_resources    gmr;//guaranteed_minimum_resources
+   };
+
+   class upgrade_property_object : public chainbase::object<upgrade_property_object_type, upgrade_property_object>
+   {
+      OBJECT_CTOR(upgrade_property_object)
+      //TODO: should use a more complicated struct to include id, digest and status of every single upgrade.
+
+      id_type                       id;
+      block_num_type                upgrade_target_block_num = 0;
+      block_num_type                upgrade_complete_block_num = 0;
+   };
+
+   class global_property3_object : public chainbase::object<global_property3_object_type, global_property3_object>
+   {
+      OBJECT_CTOR(global_property3_object)
+
+      id_type                       id;
+      chain_config3                 configuration;
+   };
 
 
    /**
@@ -71,11 +98,42 @@ namespace eosio { namespace chain {
       >
    >;
 
+   // *bos*
+   using global_property2_multi_index = chainbase::shared_multi_index_container<
+      global_property2_object,
+      indexed_by<
+         ordered_unique<tag<by_id>,
+            BOOST_MULTI_INDEX_MEMBER(global_property2_object, global_property2_object::id_type, id)
+         >
+      >
+   >;
+
+   using upgrade_property_multi_index = chainbase::shared_multi_index_container<
+      upgrade_property_object,
+      indexed_by<
+         ordered_unique<tag<by_id>,
+            BOOST_MULTI_INDEX_MEMBER(upgrade_property_object, upgrade_property_object::id_type, id)
+         >
+      >
+   >;
+
+   using global_property3_multi_index = chainbase::shared_multi_index_container<
+      global_property3_object,
+      indexed_by<
+         ordered_unique<tag<by_id>,
+            BOOST_MULTI_INDEX_MEMBER(global_property3_object, global_property3_object::id_type, id)
+         >
+      >
+   >;
 }}
 
 CHAINBASE_SET_INDEX_TYPE(eosio::chain::global_property_object, eosio::chain::global_property_multi_index)
 CHAINBASE_SET_INDEX_TYPE(eosio::chain::dynamic_global_property_object,
                          eosio::chain::dynamic_global_property_multi_index)
+// *bos*
+CHAINBASE_SET_INDEX_TYPE(eosio::chain::global_property2_object, eosio::chain::global_property2_multi_index)
+CHAINBASE_SET_INDEX_TYPE(eosio::chain::upgrade_property_object, eosio::chain::upgrade_property_multi_index)
+CHAINBASE_SET_INDEX_TYPE(eosio::chain::global_property3_object, eosio::chain::global_property3_multi_index)
 
 FC_REFLECT(eosio::chain::dynamic_global_property_object,
            (global_action_sequence)
@@ -84,3 +142,13 @@ FC_REFLECT(eosio::chain::dynamic_global_property_object,
 FC_REFLECT(eosio::chain::global_property_object,
            (proposed_schedule_block_num)(proposed_schedule)(configuration)
           )
+// *bos*
+FC_REFLECT(eosio::chain::global_property2_object,
+           (cfg)(gmr)
+          )
+FC_REFLECT(eosio::chain::upgrade_property_object,
+           (upgrade_target_block_num)(upgrade_complete_block_num)
+          )
+FC_REFLECT(eosio::chain::global_property3_object,
+           (configuration)
+)

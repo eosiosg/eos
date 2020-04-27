@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 #include <appbase/application.hpp>
@@ -36,10 +36,13 @@ namespace eosio {
         string                       disconnect( const string& endpoint );
         optional<connection_status>  status( const string& endpoint )const;
         vector<connection_status>    connections()const;
+        bool is_syncing()const;
+
+        void maybe_sync_stable_checkpoints();
 
         size_t num_peers() const;
       private:
-        std::unique_ptr<class net_plugin_impl> my;
+        std::shared_ptr<class net_plugin_impl> my;
    };
 
 }

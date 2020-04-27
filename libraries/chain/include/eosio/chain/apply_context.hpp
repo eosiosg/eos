@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 #include <eosio/chain/controller.hpp>
@@ -62,7 +62,7 @@ class apply_context {
             const T& get( int iterator ) {
                EOS_ASSERT( iterator != -1, invalid_table_iterator, "invalid iterator" );
                EOS_ASSERT( iterator >= 0, table_operation_not_permitted, "dereference of end iterator" );
-               EOS_ASSERT( iterator < _iterator_to_object.size(), invalid_table_iterator, "iterator out of range" );
+               EOS_ASSERT( (size_t)iterator < _iterator_to_object.size(), invalid_table_iterator, "iterator out of range" );
                auto result = _iterator_to_object[iterator];
                EOS_ASSERT( result, table_operation_not_permitted, "dereference of deleted object" );
                return *result;
@@ -575,11 +575,10 @@ class apply_context {
       void add_ram_usage( account_name account, int64_t ram_delta );
       void finalize_trace( action_trace& trace, const fc::time_point& start );
 
-   private:
-
-      void validate_referenced_accounts( const transaction& t )const;
-      void validate_expiration( const transaction& t )const;
-
+      bool is_context_free()const { return context_free; }
+      bool is_privileged()const { return privileged; }
+      action_name get_receiver()const { return receiver; }
+      const action& get_action()const { return act; }
 
    /// Fields:
    public:
@@ -594,6 +593,7 @@ class apply_context {
       bool                          privileged   = false;
       bool                          context_free = false;
       bool                          used_context_free_api = false;
+      uint64_t                      global_action_sequence = 0;
 
       generic_index<index64_object>                                  idx64;
       generic_index<index128_object>                                 idx128;

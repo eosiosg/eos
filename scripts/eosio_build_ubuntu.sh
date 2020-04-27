@@ -60,7 +60,7 @@
 		exit 1
 	fi
 
-	DEP_ARRAY=(clang-4.0 lldb-4.0 libclang-4.0-dev cmake make automake libbz2-dev libssl-dev \
+	DEP_ARRAY=(clang-9 lldb-9 libclang-9-dev cmake make automake libbz2-dev libssl-dev \
 	libgmp3-dev autotools-dev build-essential libicu-dev python2.7-dev python3-dev \
     autoconf libtool curl zlib1g-dev doxygen graphviz)
 	COUNT=1
@@ -91,6 +91,7 @@
 		printf "\\n\\tThe following dependencies are required to install EOSIO.\\n"
 		printf "\\n\\t${DISPLAY}\\n\\n" 
 		printf "\\tDo you wish to install these packages?\\n"
+		if is_noninteractive; then exec <<< "1"; fi
 		select yn in "Yes" "No"; do
 			case $yn in
 				[Yy]* ) 
@@ -113,10 +114,10 @@
 		printf "\\n\\tNo required dpkg dependencies to install.\\n"
 	fi
 
-	if [ -d "${HOME}/opt/boost_1_67_0" ]; then
-		if ! mv "${HOME}/opt/boost_1_67_0" "$BOOST_ROOT"
+	if [ -d "${HOME}/opt/boost_1_71_0" ]; then
+		if ! mv "${HOME}/opt/boost_1_71_0" "$BOOST_ROOT"
 		then
-			printf "\\n\\tUnable to move directory %s/opt/boost_1_67_0 to %s.\\n" "${HOME}" "${BOOST_ROOT}"
+			printf "\\n\\tUnable to move directory %s/opt/boost_1_71_0 to %s.\\n" "${HOME}" "${BOOST_ROOT}"
 			printf "\\n\\tExiting now.\\n"
 			exit 1
 		fi
@@ -133,7 +134,7 @@
 	printf "\\n\\tChecking boost library installation.\\n"
 	BVERSION=$( grep BOOST_LIB_VERSION "${BOOST_ROOT}/include/boost/version.hpp" 2>/dev/null \
 	| tail -1 | tr -s ' ' | cut -d\  -f3 | sed 's/[^0-9\._]//gI')
-	if [ "${BVERSION}" != "1_67" ]; then
+	if [ "${BVERSION}" != "1_71" ]; then
 		printf "\\tRemoving existing boost libraries in %s/opt/boost* .\\n" "${HOME}"
 		if ! rm -rf "${HOME}"/opt/boost*
 		then
@@ -148,27 +149,27 @@
 			printf "\\n\\tExiting now.\\n\\n"
 			exit 1;
 		fi
-		STATUS=$(curl -LO -w '%{http_code}' --connect-timeout 30 https://dl.bintray.com/boostorg/release/1.67.0/source/boost_1_67_0.tar.bz2)
+		STATUS=$(curl -LO -w '%{http_code}' --connect-timeout 30 https://dl.bintray.com/boostorg/release/1.71.0/source/boost_1_71_0.tar.bz2)
 		if [ "${STATUS}" -ne 200 ]; then
 			printf "\\tUnable to download Boost libraries at this time.\\n"
 			printf "\\tExiting now.\\n\\n"
 			exit 1;
 		fi
-		if ! tar xf "${TEMP_DIR}/boost_1_67_0.tar.bz2"
+		if ! tar xf "${TEMP_DIR}/boost_1_71_0.tar.bz2"
 		then
-			printf "\\n\\tUnable to unarchive file %s/boost_1_67_0.tar.bz2.\\n" "${TEMP_DIR}"
+			printf "\\n\\tUnable to unarchive file %s/boost_1_71_0.tar.bz2.\\n" "${TEMP_DIR}"
 			printf "\\n\\tExiting now.\\n\\n"
 			exit 1;
 		fi
-		if ! rm -f "${TEMP_DIR}/boost_1_67_0.tar.bz2"
+		if ! rm -f "${TEMP_DIR}/boost_1_71_0.tar.bz2"
 		then
-			printf "\\n\\tUnable to remove file %s/boost_1_67_0.tar.bz2.\\n" "${TEMP_DIR}"
+			printf "\\n\\tUnable to remove file %s/boost_1_71_0.tar.bz2.\\n" "${TEMP_DIR}"
 			printf "\\n\\tExiting now.\\n\\n"
 			exit 1;
 		fi
-		if ! cd "${TEMP_DIR}/boost_1_67_0/"
+		if ! cd "${TEMP_DIR}/boost_1_71_0/"
 		then
-			printf "\\n\\tUnable to enter directory %s/boost_1_67_0.\\n" "${TEMP_DIR}"
+			printf "\\n\\tUnable to enter directory %s/boost_1_71_0.\\n" "${TEMP_DIR}"
 			printf "\\n\\tExiting now.\\n\\n"
 			exit 1;
 		fi
@@ -184,9 +185,9 @@
 			printf "\\n\\tExiting now.\\n\\n"
 			exit 1
 		fi
-		if ! rm -rf "${TEMP_DIR}"/boost_1_67_0
+		if ! rm -rf "${TEMP_DIR}"/boost_1_71_0
 		then
-			printf "\\n\\tUnable to remove %s/boost_1_67_0.\\n" "${TEMP_DIR}"
+			printf "\\n\\tUnable to remove %s/boost_1_71_0.\\n" "${TEMP_DIR}"
 			printf "\\n\\tExiting now.\\n\\n"
 			exit 1
 		fi
@@ -443,7 +444,7 @@ mongodconf
 			printf "\\n\\tExiting now.\\n"
 			exit 1;
 		fi
-		if ! git clone --depth 1 --single-branch --branch release_40 https://github.com/llvm-mirror/llvm.git
+		if ! git clone --depth 1 --single-branch --branch release_90 https://github.com/llvm-mirror/llvm.git
 		then
 			printf "\\tUnable to clone llvm repo @ https://github.com/llvm-mirror/llvm.git.\\n"
 			printf "\\n\\tExiting now.\\n"
@@ -455,7 +456,7 @@ mongodconf
 			printf "\\n\\tExiting now.\\n"
 			exit 1;
 		fi
-		if ! git clone --depth 1 --single-branch --branch release_40 https://github.com/llvm-mirror/clang.git
+		if ! git clone --depth 1 --single-branch --branch release_90 https://github.com/llvm-mirror/clang.git
 		then
 			printf "\\tUnable to clone clang repo @ https://github.com/llvm-mirror/clang.git.\\n"
 			printf "\\n\\tExiting now.\\n"
@@ -501,6 +502,126 @@ mongodconf
 		printf "\\n\\tWASM successffully installed @ %s/opt/wasm/bin.\\n\\n" "${HOME}"
 	else
 		printf "\\tWASM found at %s/opt/wasm/bin.\\n" "${HOME}"
+	fi
+
+	printf "\\n\\tChecking for librdkafka with  support.\\n"
+	RDKAFKA_DIR=/usr/local/include/librdkafka
+	if [ ! -d "${RDKAFKA_DIR}" ]; then
+		# Build librdkafka support:
+		printf "\\tInstalling librdkafka\\n"
+		if ! cd "${TEMP_DIR}"
+		then
+			printf "\\n\\tUnable to cd into directory %s.\\n" "${TEMP_DIR}"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if [ -d "${TEMP_DIR}/librdkafka" ]; then
+			if ! rm -rf "${TEMP_DIR}/librdkafka"
+			then
+			printf "\\tUnable to remove directory %s. Please remove this directory and run this script %s again. 0\\n" "${TEMP_DIR}/librdkafka/" "${BASH_SOURCE[0]}"
+			printf "\\tExiting now.\\n\\n"
+			exit 1;
+			fi
+		fi
+		if ! git clone --depth 1 -b v0.11.6 https://github.com/boscore/librdkafka.git
+		then
+			printf "\\tUnable to clone librdkafka repo.\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cd "${TEMP_DIR}/librdkafka/"
+		then
+			printf "\\tUnable to enter directory %s/librdkafka/.\\n" "${TEMP_DIR}"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cmake -H. -B_cmake_build
+		then
+			printf "\\tError cmake_build librdkafka.\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cmake -DRDKAFKA_BUILD_STATIC=1 --build _cmake_build
+		then
+			printf "\\tError compiling cmake -DRDKAFKA_BUILD_STATIC=1 --build _cmake_build , librdkafka.1\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cd "${TEMP_DIR}/librdkafka/_cmake_build"
+		then
+			printf "\\tUnable to enter directory %s/librdkafka/_cmake_build.\\n" "${TEMP_DIR}"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! sudo make install
+		then
+			printf "\\tUnable to make install librdkafka.\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		printf "\\n\\tlibrdkafka successffully installed @ %s.\\n\\n" "${RDKAFKA_DIR}"
+	else
+		printf "\\t librdkafka found at %s.\\n" "${RDKAFKA_DIR}"
+	fi
+
+	printf "\\n\\tChecking for cppkafka with  support.\\n"
+	CPPKAFKA_DIR=/usr/local/include/cppkafka
+	if [ ! -d "${CPPKAFKA_DIR}" ]; then
+		# Build cppkafka support:
+		printf "\\tInstalling cppkafka\\n"
+		if ! cd "${TEMP_DIR}"
+		then
+			printf "\\n\\tUnable to cd into directory %s.\\n" "${TEMP_DIR}"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if [ -d "${TEMP_DIR}/cppkafka" ]; then
+			if ! rm -rf "${TEMP_DIR}/cppkafka"
+			then
+			printf "\\tUnable to remove directory %s. Please remove this directory and run this script %s again. 0\\n" "${TEMP_DIR}/cppkafka/" "${BASH_SOURCE[0]}"
+			printf "\\tExiting now.\\n\\n"
+			exit 1;
+			fi
+		fi
+		if ! git clone --depth 1 -b 0.2 https://github.com/boscore/cppkafka.git
+		then
+			printf "\\tUnable to clone cppkafka repo.\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cd "${TEMP_DIR}/cppkafka/"
+		then
+			printf "\\tUnable to enter directory %s/cppkafka/.\\n" "${TEMP_DIR}"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! mkdir build
+		then
+			printf "\\tUnable to remove directory build.\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cd "${TEMP_DIR}/cppkafka/build"
+		then
+			printf "\\tUnable to enter directory  %s/cppkafka/build.\\n" "${TEMP_DIR}"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! cmake -DCPPKAFKA_RDKAFKA_STATIC_LIB=1 -DCPPKAFKA_BUILD_SHARED=0 ..
+		then
+			printf "\\tError compiling cmake -DCPPKAFKA_RDKAFKA_STATIC_LIB=1 -DCPPKAFKA_BUILD_SHARED=0 ..  , cppkafka.1\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		if ! sudo make install
+		then
+			printf "\\tUnable to make install cppkafka.\\n"
+			printf "\\n\\tExiting now.\\n"
+			exit 1;
+		fi
+		printf "\\n\\tcppkafka successffully installed @ %s.\\n\\n" "${CPPKAFKA_DIR}"
+	else
+		printf "\\t cppkafka found at %s.\\n" "${CPPKAFKA_DIR}"
 	fi
 
 	function print_instructions()

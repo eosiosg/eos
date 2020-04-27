@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 
@@ -29,6 +29,11 @@ struct chain_snapshot_header {
    }
 };
 
+struct batch_pbft_snapshot_migrated{};
+
+struct batch_pbft_enabled{};
+
+struct batch_pbft_lscb_branch{};
 } }
 
 FC_REFLECT(eosio::chain::chain_snapshot_header,(version))

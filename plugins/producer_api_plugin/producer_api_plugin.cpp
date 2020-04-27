@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #include <eosio/producer_api_plugin/producer_api_plugin.hpp>
 #include <eosio/chain/exceptions.hpp>
@@ -30,7 +30,7 @@ using namespace eosio;
           try { \
              if (body.empty()) body = "{}"; \
              INVOKE \
-             cb(http_response_code, fc::json::to_string(result)); \
+             cb(http_response_code, fc::variant(result)); \
           } catch (...) { \
              http_plugin::handle_exception(#api_name, #call_name, body, cb); \
           } \
@@ -38,6 +38,9 @@ using namespace eosio;
 
 #define INVOKE_R_R(api_handle, call_name, in_param) \
      auto result = api_handle.call_name(fc::json::from_string(body).as<in_param>());
+
+#define INVOKE_R_R_O(api_handle, call_name, in_param) \
+     auto result = (body == "{}" ? api_handle.call_name() : api_handle.call_name(fc::json::from_string(body).as<in_param>()));
 
 #define INVOKE_R_R_R_R(api_handle, call_name, in_param0, in_param1, in_param2) \
      const auto& vs = fc::json::json::from_string(body).as<fc::variants>(); \
@@ -89,7 +92,7 @@ void producer_api_plugin::plugin_startup() {
        CALL(producer, producer, get_integrity_hash,
             INVOKE_R_V(producer, get_integrity_hash), 201),
        CALL(producer, producer, create_snapshot,
-            INVOKE_R_V(producer, create_snapshot), 201),
+            INVOKE_R_R_O(producer, create_snapshot, producer_plugin::export_snapshot_type), 201),
    });
 }
 

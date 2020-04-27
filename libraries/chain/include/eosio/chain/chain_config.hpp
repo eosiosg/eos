@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 
@@ -60,11 +60,77 @@ struct chain_config {
                  << "Max Inline Action Depth: " << c.max_inline_action_depth << ", "
                  << "Max Authority Depth: " << c.max_authority_depth << "\n";
    }
+
+   friend inline bool operator ==( const chain_config& lhs, const chain_config& rhs ) {
+      return   std::tie(   lhs.max_block_net_usage,
+                           lhs.target_block_net_usage_pct,
+                           lhs.max_transaction_net_usage,
+                           lhs.base_per_transaction_net_usage,
+                           lhs.net_usage_leeway,
+                           lhs.context_free_discount_net_usage_num,
+                           lhs.context_free_discount_net_usage_den,
+                           lhs.max_block_cpu_usage,
+                           lhs.target_block_cpu_usage_pct,
+                           lhs.max_transaction_cpu_usage,
+                           lhs.max_transaction_cpu_usage,
+                           lhs.max_transaction_lifetime,
+                           lhs.deferred_trx_expiration_window,
+                           lhs.max_transaction_delay,
+                           lhs.max_inline_action_size,
+                           lhs.max_inline_action_depth,
+                           lhs.max_authority_depth
+                        )
+               ==
+               std::tie(   rhs.max_block_net_usage,
+                           rhs.target_block_net_usage_pct,
+                           rhs.max_transaction_net_usage,
+                           rhs.base_per_transaction_net_usage,
+                           rhs.net_usage_leeway,
+                           rhs.context_free_discount_net_usage_num,
+                           rhs.context_free_discount_net_usage_den,
+                           rhs.max_block_cpu_usage,
+                           rhs.target_block_cpu_usage_pct,
+                           rhs.max_transaction_cpu_usage,
+                           rhs.max_transaction_cpu_usage,
+                           rhs.max_transaction_lifetime,
+                           rhs.deferred_trx_expiration_window,
+                           rhs.max_transaction_delay,
+                           rhs.max_inline_action_size,
+                           rhs.max_inline_action_depth,
+                           rhs.max_authority_depth
+                        );
+   };
+
+   friend inline bool operator !=( const chain_config& lhs, const chain_config& rhs ) { return !(lhs == rhs); }
+
 };
 
-       bool operator==(const chain_config& a, const chain_config& b);
-inline bool operator!=(const chain_config& a, const chain_config& b) { return !(a == b); }
+// *bos*
+struct chain_config2 {
+   chain_config2( chainbase::allocator<char> alloc )
+      :actor_blacklist(alloc),contract_blacklist(alloc),resource_greylist(alloc){}
 
+   shared_vector<name>  actor_blacklist;
+   shared_vector<name>  contract_blacklist;
+   shared_vector<name>  resource_greylist;
+
+   void validate()const;
+};
+
+struct chain_config3 {
+
+    uint16_t             view_change_timeout = 6; /// the actual wait time will be `num * 5`
+    uint16_t             pbft_checkpoint_granularity = 100; /// the interval of normal checkpoints must be a multiple of 100 * n;
+
+    void validate()const;
+};
+
+// *bos*
+struct guaranteed_minimum_resources {
+   uint64_t ram_byte;
+   uint64_t cpu_us;
+   uint64_t net_byte;
+};
 } } // namespace eosio::chain
 
 FC_REFLECT(eosio::chain::chain_config,
@@ -79,3 +145,8 @@ FC_REFLECT(eosio::chain::chain_config,
            (max_inline_action_size)(max_inline_action_depth)(max_authority_depth)
 
 )
+// *bos*
+FC_REFLECT( eosio::chain::chain_config2, (actor_blacklist)(contract_blacklist)(resource_greylist) )
+FC_REFLECT( eosio::chain::guaranteed_minimum_resources, (ram_byte)(cpu_us)(net_byte) )
+
+FC_REFLECT( eosio::chain::chain_config3, (view_change_timeout) )

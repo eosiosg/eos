@@ -126,6 +126,9 @@ class Cluster(object):
         if len(self.nodes) > 0:
             raise RuntimeError("Cluster already running.")
 
+        if pnodes > totalNodes:
+            raise RuntimeError("totalNodes (%d) must be equal to or greater than pnodes(%d)." % (totalNodes, pnodes))
+
         if self.walletMgr is None:
             self.walletMgr=WalletMgr(True)
 
@@ -893,7 +896,7 @@ class Cluster(object):
         contract="eosio.token"
         action="transfer"
         for name, keys in producerKeys.items():
-            data="{\"from\":\"eosio\",\"to\":\"%s\",\"quantity\":\"%s\",\"memo\":\"%s\"}" % (name, initialFunds, "init transfer")
+            data="{\"from\":\"eosio\",\"to\":\"%s\",\"quantity\":\"%s\",\"memo\":\"%s\"}" % (name, initialFunds, "init eosio transfer")
             opts="--permission eosio@active"
             if name != "eosio":
                 trans=biosNode.pushMessage(contract, action, data, opts)
@@ -1020,7 +1023,7 @@ class Cluster(object):
                     else:
                         setProdsStr += ','
 
-                    setProdsStr += ' { "producer_name": "%s", "block_signing_key": "%s" }' % (keys["name"], keys["public"])
+                    setProdsStr += ' { "producer_name": "%s", "block_signing_key": "%s","url":"xxxx","location":"0" }' % (keys["name"], keys["public"])
                     prodNames.append(keys["name"])
                     counts[keys["node"]] += 1
 

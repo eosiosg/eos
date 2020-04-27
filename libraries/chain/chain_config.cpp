@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 
 #include <eosio/chain/chain_config.hpp>
@@ -41,6 +41,17 @@ namespace eosio { namespace chain {
 
       EOS_ASSERT( 1 <= max_authority_depth, action_validate_exception,
                   "max authority depth should be at least 1" );
+}
+
+void chain_config2::validate() const{
+   EOS_ASSERT(std::numeric_limits<decltype(actor_blacklist.size())>::max() > actor_blacklist.size(), action_validate_exception, "Overflow in blacklist when adding actor blacklist!");
+   EOS_ASSERT(std::numeric_limits<decltype(contract_blacklist.size())>::max() > contract_blacklist.size(), action_validate_exception, "Overflow in blacklist when adding contract blacklist!");
+   EOS_ASSERT(std::numeric_limits<decltype(resource_greylist.size())>::max() > resource_greylist.size(), action_validate_exception, "Overflow in greylistwhen adding resource greylist!");
+}
+
+void chain_config3::validate() const{
+   EOS_ASSERT( view_change_timeout >= 1, action_validate_exception, "view change timeout must be at least 1");
+   EOS_ASSERT( pbft_checkpoint_granularity >= 100 && pbft_checkpoint_granularity % 100 == 0, action_validate_exception, "pbft checkpoint granularity must be multiple of 100 blocks");
 }
 
 } } // namespace eosio::chain

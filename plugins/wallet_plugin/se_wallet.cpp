@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #include <eosio/wallet_plugin/se_wallet.hpp>
 #include <eosio/wallet_plugin/macos_user_auth.h>
@@ -186,10 +186,10 @@ struct se_wallet_impl {
       return pub;
    }
 
-   optional<signature_type> try_sign_digest(const digest_type d, const public_key_type public_key) {
+   fc::optional<signature_type> try_sign_digest(const digest_type d, const public_key_type public_key) {
       auto it = _keys.find(public_key);
       if(it == _keys.end())
-         return optional<signature_type>{};
+         return fc::optional<signature_type>{};
 
       fc::ecdsa_sig sig = ECDSA_SIG_new();
       CFErrorRef error = nullptr;
@@ -305,6 +305,14 @@ se_wallet::se_wallet() : my(new detail::se_wallet_impl()) {
             return;
          }
       }
+      if(sscanf(model, "Macmini%u", &major) == 1 && major >= 8) {
+         my->populate_existing_keys();
+         return;
+      }
+      if(sscanf(model, "MacBookAir%u", &major) == 1 && major >= 8) {
+         my->populate_existing_keys();
+         return;
+      }
    }
 
    EOS_THROW(secure_enclave_exception, "Secure Enclave not supported on this hardware");
@@ -362,7 +370,7 @@ bool se_wallet::remove_key(string key) {
    return my->remove_key(key);
 }
 
-optional<signature_type> se_wallet::try_sign_digest(const digest_type digest, const public_key_type public_key) {
+fc::optional<signature_type> se_wallet::try_sign_digest(const digest_type digest, const public_key_type public_key) {
    return my->try_sign_digest(digest, public_key);
 }
 

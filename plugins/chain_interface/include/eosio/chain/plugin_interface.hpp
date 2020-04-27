@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 
@@ -11,6 +11,7 @@
 #include <eosio/chain/block_state.hpp>
 #include <eosio/chain/transaction_metadata.hpp>
 #include <eosio/chain/trace.hpp>
+#include <eosio/chain/pbft_database.hpp>
 
 namespace eosio { namespace chain { namespace plugin_interface {
    using namespace eosio::chain;
@@ -27,6 +28,7 @@ namespace eosio { namespace chain { namespace plugin_interface {
       using accepted_block_header  = channel_decl<struct accepted_block_header_tag, block_state_ptr>;
       using accepted_block         = channel_decl<struct accepted_block_tag,        block_state_ptr>;
       using irreversible_block     = channel_decl<struct irreversible_block_tag,    block_state_ptr>;
+      using new_irreversible_block = channel_decl<struct new_irreversible_block_tag,block_state_ptr>;
       using accepted_transaction   = channel_decl<struct accepted_transaction_tag,  transaction_metadata_ptr>;
       using applied_transaction    = channel_decl<struct applied_transaction_tag,   transaction_trace_ptr>;
       using accepted_confirmation  = channel_decl<struct accepted_confirmation_tag, header_confirmation>;
@@ -45,20 +47,43 @@ namespace eosio { namespace chain { namespace plugin_interface {
    namespace incoming {
       namespace channels {
          using block                 = channel_decl<struct block_tag, signed_block_ptr>;
-         using transaction           = channel_decl<struct transaction_tag, packed_transaction_ptr>;
+         using transaction           = channel_decl<struct transaction_tag, transaction_metadata_ptr>;
       }
 
       namespace methods {
          // synchronously push a block/trx to a single provider
          using block_sync            = method_decl<chain_plugin_interface, void(const signed_block_ptr&), first_provider_policy>;
-         using transaction_async     = method_decl<chain_plugin_interface, void(const packed_transaction_ptr&, bool, next_function<transaction_trace_ptr>), first_provider_policy>;
+         using transaction_async     = method_decl<chain_plugin_interface, void(const transaction_metadata_ptr&, bool, next_function<transaction_trace_ptr>), first_provider_policy>;
       }
    }
 
    namespace compat {
       namespace channels {
-         using transaction_ack       = channel_decl<struct accepted_transaction_tag, std::pair<fc::exception_ptr, packed_transaction_ptr>>;
+         using transaction_ack       = channel_decl<struct accepted_transaction_tag, std::pair<fc::exception_ptr, transaction_metadata_ptr>>;
       }
+   }
+
+   namespace pbft {
+       namespace incoming {
+           using prepare_channel = channel_decl<struct pbft_prepare_tag, pbft_metadata_ptr<pbft_prepare>>;
+           using commit_channel = channel_decl<struct pbft_commit_tag, pbft_metadata_ptr<pbft_commit>>;
+           using view_change_channel = channel_decl<struct pbft_view_change_tag, pbft_metadata_ptr<pbft_view_change>>;
+           using new_view_channel = channel_decl<struct pbft_new_view_tag, pbft_metadata_ptr<pbft_new_view>>;
+           using checkpoint_channel = channel_decl<struct pbft_checkpoint_tag, pbft_metadata_ptr<pbft_checkpoint>>;
+
+       }
+
+       namespace outgoing {
+           using prepare_channel = channel_decl<struct pbft_prepare_tag, pbft_prepare_ptr>;
+           using commit_channel = channel_decl<struct pbft_commit_tag, pbft_commit_ptr>;
+           using view_change_channel = channel_decl<struct pbft_view_change_tag, pbft_view_change_ptr>;
+           using new_view_channel = channel_decl<struct pbft_new_view_tag, pbft_new_view_ptr>;
+           using checkpoint_channel = channel_decl<struct pbft_checkpoint_tag, pbft_checkpoint_ptr>;
+
+       }
+
+       using committed_transition_channel = channel_decl<struct pbft_comitted_tag, bool>;
+       using prepared_transition_channel = channel_decl<struct pbft_prepared_tag, bool>;
    }
 
 } } }

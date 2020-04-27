@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  *  @brief launch testnet nodes
  **/
 #include <string>
@@ -293,6 +293,8 @@ struct testnet_def {
 struct prodkey_def {
   string producer_name;
   public_key_type block_signing_key;
+  string url;
+  string location;
 };
 
 struct producer_set_def {
@@ -324,12 +326,6 @@ struct node_rt_info {
 
 struct last_run_def {
   vector <node_rt_info> running_nodes;
-};
-
-
-enum class p2p_plugin {
-   NET,
-   BNET
 };
 
 enum launch_modes {
@@ -394,7 +390,6 @@ struct launcher_def {
    size_t producers;
    size_t next_node;
    string shape;
-   p2p_plugin p2p;
    allowed_connection allowed_connections = PC_NONE;
    bfs::path genesis;
    bfs::path output;
@@ -484,7 +479,6 @@ launcher_def::set_options (bpo::options_description &cfg) {
     ("producers",bpo::value<size_t>(&producers)->default_value(21),"total number of non-bios producer instances in this network")
     ("mode,m",bpo::value<vector<string>>()->multitoken()->default_value({"any"}, "any"),"connection mode, combination of \"any\", \"producers\", \"specified\", \"none\"")
     ("shape,s",bpo::value<string>(&shape)->default_value("star"),"network topology, use \"star\" \"mesh\" or give a filename for custom")
-    ("p2p-plugin", bpo::value<string>()->default_value("net"),"select a p2p plugin to use (either net or bnet). Defaults to net.")
     ("genesis,g",bpo::value<string>()->default_value("./genesis.json"),"set the path to genesis.json")
     ("skip-signature", bpo::bool_switch(&skip_transaction_signatures)->default_value(false), "nodeos does not require transaction signatures.")
     ("nodeos", bpo::value<string>(&eosd_extra_args), "forward nodeos command line argument(s) to each instance of nodeos, enclose arg(s) in quotes")
@@ -583,20 +577,6 @@ launcher_def::initialize (const variables_map &vmap) {
        host_map_file.empty()) {
     bfs::path src = shape;
     host_map_file = src.stem().string() + "_hosts.json";
-  }
-
-  string nc = vmap["p2p-plugin"].as<string>();
-  if ( !nc.empty() ) {
-     if (boost::iequals(nc,"net"))
-        p2p = p2p_plugin::NET;
-     else if (boost::iequals(nc,"bnet"))
-        p2p = p2p_plugin::BNET;
-     else {
-        p2p = p2p_plugin::NET;
-     }
-  }
-  else {
-     p2p = p2p_plugin::NET;
   }
 
   if( !host_map_file.empty() ) {
@@ -869,7 +849,7 @@ launcher_def::bind_nodes () {
          if (is_bios) {
             string prodname = "eosio";
             node.producers.push_back(prodname);
-            producer_set.schedule.push_back({prodname,pubkey});
+            producer_set.schedule.push_back({prodname,pubkey,"xxx","0"});
          }
         else {
            if (i < non_bios) {
@@ -881,7 +861,7 @@ launcher_def::bind_nodes () {
               while (count--) {
                  const auto prodname = producer_names::producer_name(producer_number);
                  node.producers.push_back(prodname);
-                 producer_set.schedule.push_back({prodname,pubkey});
+                 producer_set.schedule.push_back({prodname,pubkey,"xxx","0"});
                  ++producer_number;
               }
            }
@@ -1068,14 +1048,9 @@ launcher_def::write_config_file (tn_node_def &node) {
    cfg << "blocks-dir = " << block_dir << "\n";
    cfg << "http-server-address = " << host->host_name << ":" << instance.http_port << "\n";
    cfg << "http-validate-host = false\n";
-   if (p2p == p2p_plugin::NET) {
-      cfg << "p2p-listen-endpoint = " << host->listen_addr << ":" << instance.p2p_port << "\n";
-      cfg << "p2p-server-address = " << host->public_name << ":" << instance.p2p_port << "\n";
-   } else {
-      cfg << "bnet-endpoint = " << host->listen_addr << ":" << instance.p2p_port << "\n";
-      // Include the net_plugin endpoint, because the plugin is always loaded (even if not used).
-      cfg << "p2p-listen-endpoint = " << host->listen_addr << ":" << instance.p2p_port + 1000 << "\n";
-   }
+   cfg << "p2p-listen-endpoint = " << host->listen_addr << ":" << instance.p2p_port << "\n";
+   cfg << "p2p-server-address = " << host->public_name << ":" << instance.p2p_port << "\n";
+
 
    if (is_bios) {
     cfg << "enable-stale-production = true\n";
@@ -1101,18 +1076,10 @@ launcher_def::write_config_file (tn_node_def &node) {
 
   if(!is_bios) {
      auto &bios_node = network.nodes["bios"];
-     if (p2p == p2p_plugin::NET) {
-        cfg << "p2p-peer-address = " << bios_node.instance->p2p_endpoint<< "\n";
-     } else {
-        cfg << "bnet-connect = " << bios_node.instance->p2p_endpoint<< "\n";
-     }
+     cfg << "p2p-peer-address = " << bios_node.instance->p2p_endpoint<< "\n";
   }
   for (const auto &p : node.peers) {
-     if (p2p == p2p_plugin::NET) {
-        cfg << "p2p-peer-address = " << network.nodes.find(p)->second.instance->p2p_endpoint << "\n";
-     } else {
-        cfg << "bnet-connect = " << network.nodes.find(p)->second.instance->p2p_endpoint << "\n";
-     }
+     cfg << "p2p-peer-address = " << network.nodes.find(p)->second.instance->p2p_endpoint << "\n";
   }
   if (instance.has_db || node.producers.size()) {
     for (const auto &kp : node.keys ) {
@@ -1127,11 +1094,7 @@ launcher_def::write_config_file (tn_node_def &node) {
   if( instance.has_db ) {
     cfg << "plugin = eosio::mongo_db_plugin\n";
   }
-  if ( p2p == p2p_plugin::NET ) {
-    cfg << "plugin = eosio::net_plugin\n";
-  } else {
-    cfg << "plugin = eosio::bnet_plugin\n";
-  }
+  cfg << "plugin = eosio::net_plugin\n";
   cfg << "plugin = eosio::chain_api_plugin\n"
       << "plugin = eosio::history_api_plugin\n";
   cfg.close();
@@ -1263,7 +1226,7 @@ launcher_def::write_bios_boot () {
                   continue;
                }
                brb << "cacmd " << p.producer_name
-                   << " " << string(p.block_signing_key) << " " << string(p.block_signing_key) << "\n";
+                   << " " << string(p.block_signing_key) << " " << string(p.block_signing_key) <<" "<< string("xxxx") << " "<< string("0") << "\n";
             }
          }
       }
@@ -1613,20 +1576,35 @@ launcher_def::kill (launch_modes mode, string sig_opt) {
   case LM_LOCAL:
   case LM_REMOTE : {
     bfs::path source = "last_run.json";
-    fc::json::from_file(source).as<last_run_def>(last_run);
-    for (auto &info : last_run.running_nodes) {
-      if (mode == LM_ALL || (info.remote && mode == LM_REMOTE) ||
-          (!info.remote && mode == LM_LOCAL)) {
-        if (info.pid_file.length()) {
-          string pid;
-          fc::json::from_file(info.pid_file).as<string>(pid);
-          string kill_cmd = "kill " + sig_opt + " " + pid;
-          boost::process::system (kill_cmd);
-        }
-        else {
-          boost::process::system (info.kill_cmd);
-        }
-      }
+    try {
+       fc::json::from_file( source ).as<last_run_def>( last_run );
+       for( auto& info : last_run.running_nodes ) {
+          if( mode == LM_ALL || (info.remote && mode == LM_REMOTE) ||
+              (!info.remote && mode == LM_LOCAL) ) {
+             try {
+                if( info.pid_file.length() ) {
+                   string pid;
+                   fc::json::from_file( info.pid_file ).as<string>( pid );
+                   string kill_cmd = "kill " + sig_opt + " " + pid;
+                   boost::process::system( kill_cmd );
+                } else {
+                   boost::process::system( info.kill_cmd );
+                }
+             } catch( fc::exception& fce ) {
+                cerr << "unable to kill fc::exception=" << fce.to_detail_string() << endl;
+             } catch( std::exception& stde ) {
+                cerr << "unable to kill std::exception=" << stde.what() << endl;
+             } catch( ... ) {
+                cerr << "Unable to kill" << endl;
+             }
+          }
+       }
+    } catch( fc::exception& fce ) {
+       cerr << "unable to open " << source << " fc::exception=" << fce.to_detail_string() << endl;
+    } catch( std::exception& stde ) {
+       cerr << "unable to open " << source << " std::exception=" << stde.what() << endl;
+    } catch( ... ) {
+       cerr << "Unable to open " << source << endl;
     }
   }
   }

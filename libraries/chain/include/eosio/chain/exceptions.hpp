@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #pragma once
 
@@ -136,6 +136,8 @@ namespace eosio { namespace chain {
       FC_DECLARE_DERIVED_EXCEPTION( fork_db_block_not_found, fork_database_exception,
                                     3020001, "Block can not be found" )
 
+   FC_DECLARE_DERIVED_EXCEPTION( pbft_exception, chain_exception,
+                                 4010000, "PBFT exception" )
 
    FC_DECLARE_DERIVED_EXCEPTION( block_validate_exception, chain_exception,
                                  3030000, "Block exception" )
@@ -228,6 +230,8 @@ namespace eosio { namespace chain {
                                     3060003, "Contract Table Query Exception" )
       FC_DECLARE_DERIVED_EXCEPTION( contract_query_exception,       database_exception,
                                     3060004, "Contract Query Exception" )
+      FC_DECLARE_DERIVED_EXCEPTION( bad_database_version_exception, database_exception,
+                                    3060005, "Database is an unknown or unsupported version" )
 
    FC_DECLARE_DERIVED_EXCEPTION( guard_exception, database_exception,
                                  3060100, "Guard Exception" )
@@ -270,6 +274,7 @@ namespace eosio { namespace chain {
                                     3080007, "Transaction exceeded the current greylisted account network usage limit" )
       FC_DECLARE_DERIVED_EXCEPTION( greylist_cpu_usage_exceeded, resource_exhausted_exception,
                                     3080008, "Transaction exceeded the current greylisted account CPU usage limit" )
+
       FC_DECLARE_DERIVED_EXCEPTION( leeway_deadline_exception, deadline_exception,
                                     3081001, "Transaction reached the deadline set due to leeway on account CPU limits" )
 
@@ -439,8 +444,8 @@ namespace eosio { namespace chain {
                                     3160007, "Invalid contract vm version" )
       FC_DECLARE_DERIVED_EXCEPTION( set_exact_code,          contract_exception,
                                     3160008, "Contract is already running this version of code" )
-      FC_DECLARE_DERIVED_EXCEPTION( wast_file_not_found,          contract_exception,
-                                    3160009, "No wast file found" )
+      FC_DECLARE_DERIVED_EXCEPTION( wasm_file_not_found,          contract_exception,
+                                    3160009, "No wasm file found" )
       FC_DECLARE_DERIVED_EXCEPTION( abi_file_not_found,          contract_exception,
                                     3160010, "No abi file found" )
 
@@ -480,6 +485,8 @@ namespace eosio { namespace chain {
                                     3190003, "block log can not be found" )
       FC_DECLARE_DERIVED_EXCEPTION( block_log_backup_dir_exist, block_log_exception,
                                     3190004, "block log backup dir already exists" )
+      FC_DECLARE_DERIVED_EXCEPTION( block_index_not_found, block_log_exception,
+                                    3190005, "block index can not be found"  )
 
    FC_DECLARE_DERIVED_EXCEPTION( http_exception, chain_exception,
                                  3200000, "http exception" )

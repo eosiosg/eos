@@ -26,7 +26,7 @@ namespace bacc = boost::accumulators;
    struct deadline_timer_verify {
       deadline_timer_verify() {
          //keep longest first in list. You're effectively going to take test_intervals[0]*sizeof(test_intervals[0])
-         //time to do the the "calibration" 
+         //time to do the the "calibration"
          int test_intervals[] = {50000, 10000, 5000, 1000, 500, 100, 50, 10};
 
          struct sigaction act;
@@ -124,7 +124,8 @@ namespace bacc = boost::accumulators;
       else {
          struct itimerval enable = {{0, 0}, {0, (int)x.count()-deadline_timer_verification.timer_overhead}};
          expired = 0;
-         expired |= !!setitimer(ITIMER_REAL, &enable, NULL);
+         if(setitimer(ITIMER_REAL, &enable, NULL))
+            expired = 1;
       }
    }
 
@@ -145,16 +146,40 @@ namespace bacc = boost::accumulators;
    volatile sig_atomic_t deadline_timer::expired = 0;
    bool deadline_timer::initialized = false;
 
+  transaction_checktime_timer::transaction_checktime_timer(platform_timer& timer)
+	  : expired(timer.expired), _timer(timer) {
+	expired = 0;
+  }
+
+  void transaction_checktime_timer::start(fc::time_point tp) {
+	_timer.start(tp);
+  }
+
+  void transaction_checktime_timer::stop() {
+	_timer.stop();
+  }
+
+  void transaction_checktime_timer::set_expiration_callback(void(*func)(void*), void* user) {
+	_timer.set_expiration_callback(func, user);
+  }
+
+  transaction_checktime_timer::~transaction_checktime_timer() {
+	stop();
+	_timer.set_expiration_callback(nullptr, nullptr);
+  }
+
    transaction_context::transaction_context( controller& c,
                                              const signed_transaction& t,
                                              const transaction_id_type& trx_id,
-                                             fc::time_point s )
+											 transaction_checktime_timer&& tmr,
+											 fc::time_point s )
    :control(c)
    ,trx(t)
    ,id(trx_id)
    ,undo_session()
    ,trace(std::make_shared<transaction_trace>())
    ,start(s)
+   ,transaction_timer(std::move(tmr))
    ,net_usage(trace->net_usage)
    ,pseudo_start(s)
    {
@@ -284,7 +309,6 @@ namespace bacc = boost::accumulators;
 
    void transaction_context::init_for_input_trx( uint64_t packed_trx_unprunable_size,
                                                  uint64_t packed_trx_prunable_size,
-                                                 uint32_t num_signatures,
                                                  bool skip_recording )
    {
       const auto& cfg = control.get_global_properties().configuration;
@@ -314,7 +338,7 @@ namespace bacc = boost::accumulators;
       if (!control.skip_trx_checks()) {
          control.validate_expiration(trx);
          control.validate_tapos(trx);
-         control.validate_referenced_accounts(trx);
+         validate_referenced_accounts( trx, enforce_whiteblacklist && control.is_producing_block() );
       }
       init( initial_net_usage);
       if (!skip_recording)
@@ -614,6 +638,44 @@ namespace bacc = boost::accumulators;
                      "duplicate transaction ${id}", ("id", id ) );
       }
    } /// record_transaction
+
+   void transaction_context::validate_referenced_accounts( const transaction& trx, bool enforce_actor_whitelist_blacklist )const {
+      const auto& db = control.db();
+      const auto& auth_manager = control.get_authorization_manager();
+
+      for( const auto& a : trx.context_free_actions ) {
+         auto* code = db.find<account_object2, by_name>(a.account);
+         EOS_ASSERT( code != nullptr, transaction_exception,
+                     "action's code account '${account}' does not exist", ("account", a.account) );
+         EOS_ASSERT( a.authorization.size() == 0, transaction_exception,
+                     "context-free actions cannot have authorizations" );
+      }
+
+      flat_set<account_name> actors;
+
+      bool one_auth = false;
+      for( const auto& a : trx.actions ) {
+         auto* code = db.find<account_object2, by_name>(a.account);
+         EOS_ASSERT( code != nullptr, transaction_exception,
+                     "action's code account '${account}' does not exist", ("account", a.account) );
+         for( const auto& auth : a.authorization ) {
+            one_auth = true;
+            auto* actor = db.find<account_object2, by_name>(auth.actor);
+            EOS_ASSERT( actor  != nullptr, transaction_exception,
+                        "action's authorizing actor '${account}' does not exist", ("account", auth.actor) );
+            EOS_ASSERT( auth_manager.find_permission(auth) != nullptr, transaction_exception,
+                        "action's authorizations include a non-existent permission: {permission}",
+                        ("permission", auth) );
+            if( enforce_actor_whitelist_blacklist )
+               actors.insert( auth.actor );
+         }
+      }
+      EOS_ASSERT( one_auth, tx_no_auths, "transaction must have at least one authorization" );
+
+      if( enforce_actor_whitelist_blacklist ) {
+         control.check_actor_list( actors );
+      }
+   }
 
 
 } } /// eosio::chain

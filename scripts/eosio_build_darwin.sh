@@ -23,7 +23,9 @@
 	printf "\\tPhysical Memory: %s Gbytes\\n" "${MEM_GIG}"
 	printf "\\tDisk install: %s\\n" "${DISK_INSTALL}"
 	printf "\\tDisk space total: %sG\\n" "${DISK_TOTAL}"
-	printf "\\tDisk space available: %sG\\n\\n" "${DISK_AVAIL}"
+	printf "\\tDisk space available: %sG\\n" "${DISK_AVAIL}"
+	printf "\\tTEMP_DIR: %s\\n\\n" "${TEMP_DIR}"
+
 
 	if [ "${MEM_GIG}" -lt 7 ]; then
 		echo "Your system must have 7 or more Gigabytes of physical memory installed."
@@ -68,8 +70,9 @@
 	printf "\\tChecking Home Brew installation\\n"
 	if ! BREW=$( command -v brew )
 	then
-		printf "\\tHomebrew must be installed to compile EOS.IO\\n\\n"
+		printf "\\tHomebrew must be installed to compile EOSIO\\n\\n"
 		printf "\\tDo you wish to install Home Brew?\\n"
+		if is_noninteractive; then exec <<< "1"; fi
 		select yn in "Yes" "No"; do
 			case "${yn}" in
 				[Yy]* )
@@ -138,6 +141,7 @@
 		printf "\\n\\tThe following dependencies are required to install EOSIO.\\n"
 		printf "\\n\\t${DISPLAY}\\n\\n"
 		echo "Do you wish to install these packages?"
+		if is_noninteractive; then exec <<< "1"; fi
 		select yn in "Yes" "No"; do
 			case $yn in
 				[Yy]* )
@@ -159,13 +163,12 @@
 						printf "\\tExiting now.\\n\\n"
 						exit 1;
 					fi
-                                        if [[ "$DEP" == "llvm@4" ]]; then
-                                                "${BREW}" unlink ${DEP}
-					elif ! "${BREW}" unlink ${DEP} && "${BREW}" link --force ${DEP}
-					then
-						printf "\\tHomebrew exited with the above errors.\\n"
-						printf "\\tExiting now.\\n\\n"
-						exit 1;
+					if [ $PERMISSION_GETTEXT -eq 1 ]; then
+						if ! "${BREW}" link --force gettext; then
+							printf "\\tHomebrew exited with the above errors.\\n"
+							printf "\\tExiting now.\\n\\n"
+							exit 1;
+						fi
 					fi
 				break;;
 				[Nn]* ) echo "User aborting installation of required dependencies, Exiting now."; exit;;
@@ -176,14 +179,25 @@
 		printf "\\n\\tNo required Home Brew dependencies to install.\\n"
 	fi
 
-
+	printf "\\n\\tChecking clang in CommandLineTools for MacOS.\\n"
+	which clang | grep CommandLineTools 1> /dev/null
+	ISCMDCLANG=$?
+	if [ ${ISCMDCLANG} -ne 0 ]; then
+		print "\\tPlease use the Apple clang version 11.0.0 at least.\\n"
+		print "\\tIf installed, please change the PATH to use it\\n"
+		print "\\tOr download v11.3.1 from: https://developer.apple.com/download/more/. \\n"
+		printf "\\tExiting now.\\n\\n"
+		exit 1;
+	fi
+	
 	printf "\\n\\tChecking boost library installation.\\n"
 	BVERSION=$( grep "#define BOOST_VERSION" "/usr/local/include/boost/version.hpp" 2>/dev/null | tail -1 | tr -s ' ' | cut -d\  -f3 )
-	if [ "${BVERSION}" != "106700" ]; then
+	if [ "${BVERSION}" != "107100" ]; then
 		if [ ! -z "${BVERSION}" ]; then
 			printf "\\tFound Boost Version %s.\\n" "${BVERSION}"
-			printf "\\tEOS.IO requires Boost version 1.67.\\n"
-			printf "\\tWould you like to uninstall version %s and install Boost version 1.67.\\n" "${BVERSION}"
+			printf "\\tEOSIO requires Boost version 1.71.\\n"
+			printf "\\tWould you like to uninstall version %s and install Boost version 1.71.\\n" "${BVERSION}"
+			if is_noninteractive; then exec <<< "1"; fi
 			select yn in "Yes" "No"; do
 				case $yn in
 					[Yy]* )
@@ -218,9 +232,9 @@
 			done
 		fi
 		printf "\\tInstalling boost libraries.\\n"
-		if ! "${BREW}" install https://raw.githubusercontent.com/Homebrew/homebrew-core/f946d12e295c8a27519b73cc810d06593270a07f/Formula/boost.rb
+		if ! "${BREW}" install "${SOURCE_DIR}/scripts/boost.rb"
 		then
-			printf "\\tUnable to install boost 1.67 libraries at this time. 0\\n"
+			printf "\\tUnable to install boost 1.71 libraries at this time. 0\\n"
 			printf "\\tExiting now.\\n\\n"
 			exit 1;
 		fi
@@ -232,9 +246,9 @@
 			exit 1;
 			fi
 		fi
-		printf "\\tBoost 1.67.0 successfully installed @ /usr/local.\\n"
+		printf "\\tBoost 1.71.0 successfully installed @ /usr/local.\\n"
 	else
-		printf "\\tBoost 1.67.0 found at /usr/local.\\n"
+		printf "\\tBoost 1.71.0 found at /usr/local.\\n"
 	fi
 
 	printf "\\n\\tChecking MongoDB C++ driver installation.\\n"
@@ -418,7 +432,7 @@
 			printf "\\tExiting now.\\n\\n"
 			exit 1;
 		fi
-		if ! git clone --depth 1 --single-branch --branch release_40 https://github.com/llvm-mirror/llvm.git
+		if ! git clone --depth 1 --single-branch --branch release_90 https://github.com/llvm-mirror/llvm.git
 		then
 			printf "\\tUnable to clone llvm repo @ https://github.com/llvm-mirror/llvm.git.\\n"
 			printf "\\tExiting now.\\n\\n"
@@ -430,7 +444,7 @@
 			printf "\\tExiting now.\\n\\n"
 			exit 1;
 		fi
-		if ! git clone --depth 1 --single-branch --branch release_40 https://github.com/llvm-mirror/clang.git
+		if ! git clone --depth 1 --single-branch --branch release_90 https://github.com/llvm-mirror/clang.git
 		then
 			printf "\\tUnable to clone clang repo @ https://github.com/llvm-mirror/clang.git.\\n"
 			printf "\\tExiting now.\\n\\n"
@@ -478,6 +492,126 @@
 	else
 		printf "\\tWASM found at /usr/local/wasm/bin/.\\n"
 	fi
+
+	printf "\\n\\tChecking for librdkafka with  support.\\n"
+    RDKAFKA_DIR=/usr/local/include/librdkafka
+    if [ ! -d "${RDKAFKA_DIR}" ]; then
+        # Build librdkafka support:
+        printf "\\tInstalling librdkafka\\n"
+        if ! cd "${TEMP_DIR}"
+        then
+            printf "\\n\\tUnable to cd into directory %s.\\n" "${TEMP_DIR}"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if [ -d "${TEMP_DIR}/librdkafka" ]; then
+            if ! rm -rf "${TEMP_DIR}/librdkafka"
+            then
+            printf "\\tUnable to remove directory %s. Please remove this directory and run this script %s again. 0\\n" "${TEMP_DIR}/librdkafka/" "${BASH_SOURCE[0]}"
+            printf "\\tExiting now.\\n\\n"
+            exit 1;
+            fi
+        fi
+        if ! git clone --depth 1 -b v0.11.6 https://github.com/boscore/librdkafka.git
+        then
+            printf "\\tUnable to clone librdkafka repo.\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cd "${TEMP_DIR}/librdkafka/"
+        then
+            printf "\\tUnable to enter directory %s/librdkafka/.\\n" "${TEMP_DIR}"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cmake -H. -B_cmake_build
+        then
+            printf "\\tError cmake_build librdkafka.\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cmake -DRDKAFKA_BUILD_STATIC=1 --build _cmake_build
+        then
+            printf "\\tError compiling cmake -DRDKAFKA_BUILD_STATIC=1 --build _cmake_build , librdkafka.1\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cd "${TEMP_DIR}/librdkafka/_cmake_build"
+        then
+            printf "\\tUnable to enter directory %s/librdkafka/_cmake_build.\\n" "${TEMP_DIR}"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! sudo make install
+        then
+            printf "\\tUnable to make install librdkafka.\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        printf "\\n\\tlibrdkafka successffully installed @ %s.\\n\\n" "${RDKAFKA_DIR}"
+    else
+        printf "\\t librdkafka found at %s.\\n" "${RDKAFKA_DIR}"
+    fi
+
+    printf "\\n\\tChecking for cppkafka with  support.\\n"
+    CPPKAFKA_DIR=/usr/local/include/cppkafka
+    if [ ! -d "${CPPKAFKA_DIR}" ]; then
+        # Build cppkafka support:
+        printf "\\tInstalling cppkafka\\n"
+        if ! cd "${TEMP_DIR}"
+        then
+            printf "\\n\\tUnable to cd into directory %s.\\n" "${TEMP_DIR}"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if [ -d "${TEMP_DIR}/cppkafka" ]; then
+            if ! rm -rf "${TEMP_DIR}/cppkafka"
+            then
+            printf "\\tUnable to remove directory %s. Please remove this directory and run this script %s again. 0\\n" "${TEMP_DIR}/cppkafka/" "${BASH_SOURCE[0]}"
+            printf "\\tExiting now.\\n\\n"
+            exit 1;
+            fi
+        fi
+        if ! git clone --depth 1 -b 0.2 https://github.com/boscore/cppkafka.git
+        then
+            printf "\\tUnable to clone cppkafka repo.\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cd "${TEMP_DIR}/cppkafka/"
+        then
+            printf "\\tUnable to enter directory %s/cppkafka/.\\n" "${TEMP_DIR}"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! mkdir build
+        then
+            printf "\\tUnable to remove directory build.\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cd "${TEMP_DIR}/cppkafka/build"
+        then
+            printf "\\tUnable to enter directory  %s/cppkafka/build.\\n" "${TEMP_DIR}"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! cmake -DCPPKAFKA_RDKAFKA_STATIC_LIB=1 -DCPPKAFKA_BUILD_SHARED=0 ..
+        then
+            printf "\\tError compiling cmake -DCPPKAFKA_RDKAFKA_STATIC_LIB=1 -DCPPKAFKA_BUILD_SHARED=0 ..  , cppkafka.1\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        if ! sudo make install
+        then
+            printf "\\tUnable to make install cppkafka.\\n"
+            printf "\\n\\tExiting now.\\n"
+            exit 1;
+        fi
+        printf "\\n\\tcppkafka successffully installed @ %s.\\n\\n" "${CPPKAFKA_DIR}"
+    else
+        printf "\\t cppkafka found at %s.\\n" "${CPPKAFKA_DIR}"
+    fi
 
 	function print_instructions()
 	{

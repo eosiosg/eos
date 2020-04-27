@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #include <eosio/chain/block.hpp>
 #include <eosio/chain/merkle.hpp>
@@ -26,6 +26,16 @@ namespace eosio { namespace chain {
       result._hash[0] &= 0xffffffff00000000;
       result._hash[0] += fc::endian_reverse_u32(block_num()); // store the block num in the ID, 160 bits is plenty for the hash
       return result;
+   }
+
+   void block_header::set_block_extensions_mroot(digest_type& mroot)
+   {
+      if (header_extensions.size() < 1)
+         header_extensions.emplace_back();
+
+      header_extensions[0].first = static_cast<uint16_t>(block_header_extensions_type::block_extensions_mroot);
+      header_extensions[0].second.resize(mroot.data_size());
+      std::copy(mroot.data(), mroot.data() + mroot.data_size(), header_extensions[0].second.data());
    }
 
 

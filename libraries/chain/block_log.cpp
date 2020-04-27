@@ -1,6 +1,6 @@
 /**
  *  @file
- *  @copyright defined in eos/LICENSE.txt
+ *  @copyright defined in eos/LICENSE
  */
 #include <eosio/chain/block_log.hpp>
 #include <eosio/chain/exceptions.hpp>
@@ -152,7 +152,11 @@ namespace eosio { namespace chain {
          }
 
          my->head = read_head();
-         my->head_id = my->head->id();
+         if( my->head ) {
+            my->head_id = my->head->id();
+         } else {
+            my->head_id = {};
+         }
 
          if (index_size) {
             my->check_block_read();
@@ -247,6 +251,9 @@ namespace eosio { namespace chain {
 
       if (first_block) {
          append(first_block);
+      } else {
+         my->head.reset();
+         my->head_id = {};
       }
 
       auto pos = my->block_stream.tellp();
@@ -338,6 +345,12 @@ namespace eosio { namespace chain {
 
       my->block_stream.seekg(-sizeof( uint64_t), std::ios::end);
       my->block_stream.read((char*)&end_pos, sizeof(end_pos));
+
+      if( end_pos == npos ) {
+         ilog( "Block log contains no blocks. No need to construct index." );
+         return;
+      }
+
       signed_block tmp;
 
       uint64_t pos = 0;
@@ -360,6 +373,8 @@ namespace eosio { namespace chain {
       while( pos < end_pos ) {
          fc::raw::unpack(my->block_stream, tmp);
          my->block_stream.read((char*)&pos, sizeof(pos));
+         if(tmp.block_num() % 1000 == 0)
+            ilog( "Block log index reconstructed for block ${n}", ("n", tmp.block_num()));
          my->index_stream.write((char*)&pos, sizeof(pos));
       }
    } // construct_index
@@ -473,7 +488,7 @@ namespace eosio { namespace chain {
             old_block_stream.read( reinterpret_cast<char*>(&tmp_pos), sizeof(tmp_pos) );
          }
          if( pos != tmp_pos ) {
-            bad_block = tmp;
+            bad_block.emplace(std::move(tmp));
             break;
          }
 
@@ -481,6 +496,8 @@ namespace eosio { namespace chain {
          new_block_stream.write( data.data(), data.size() );
          new_block_stream.write( reinterpret_cast<char*>(&pos), sizeof(pos) );
          block_num = tmp.block_num();
+         if(block_num % 1000 == 0)
+            ilog( "Recovered block ${num}", ("num", block_num) );
          pos = new_block_stream.tellp();
          if( block_num == truncate_at_block )
             break;
